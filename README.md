@@ -12,7 +12,7 @@ Educatieve rekenapp voor kinderen van ongeveer 6 jaar.
 - JDK 17
 - `ANDROID_HOME` omgevingsvariabele, OF `local.properties` bestand met `sdk.dir=/pad/naar/android/sdk`
 
-### Debug Build
+### Lokale Debug Build
 
 ```bash
 # Debug APK (voor testen)
@@ -20,6 +20,20 @@ Educatieve rekenapp voor kinderen van ongeveer 6 jaar.
 ```
 
 **Output locatie**: `app/build/outputs/apk/debug/app-debug.apk`
+
+### CI Build (GitHub Actions)
+
+De repository bevat een GitHub Actions workflow die automatisch een debug APK bouwt bij elke push naar `main` of `develop`.
+
+**Workflow bestand**: `.github/workflows/build-debug-apk.yml`
+
+**Hoe te gebruiken**:
+1. Push naar GitHub: `git push origin main`
+2. Ga naar **Actions** tab in GitHub repository
+3. Selecteer de meest recente workflow run
+4. Download `debug-apk` artifact
+
+**Artifact bewaarduur**: 30 dagen
 
 ### Release Build
 
@@ -32,10 +46,10 @@ Educatieve rekenapp voor kinderen van ongeveer 6 jaar.
 
 ### Build Varianten
 
-| Variant | Gebruik | APK Locatie |
-|---------|---------|-------------|
-| `debug` | Dagelijks testen | `app/build/outputs/apk/debug/app-debug.apk` |
-| `release` | Pre-release test | `app/build/outputs/apk/release/` |
+| Variant | Gebruik | APK Locatie | CI |
+|---------|---------|-------------|-----|
+| `debug` | Dagelijks testen | `app/build/outputs/apk/debug/app-debug.apk` | ✅ Ja |
+| `release` | Pre-release test | `app/build/outputs/apk/release/` | ❌ Nee |
 
 ## Installatie (Sideload)
 
