@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.dp
 fun SettingsScreen(
     soundEnabled: Boolean,
     onSoundToggle: (Boolean) -> Unit,
+    isPremiumUnlocked: Boolean,
+    onPremiumToggle: (Boolean) -> Unit,
     onOpenPremium: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
@@ -50,13 +52,52 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "🔊 Geluid",
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "🔊 Geluid",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = if (soundEnabled) "Aan" else "Uit",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
                     Switch(
                         checked = soundEnabled,
                         onCheckedChange = onSoundToggle
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Premium toggle (for testing)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "⭐ Premium (test)",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = if (isPremiumUnlocked) "Ontgrendeld" else "Gesloten",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                    Switch(
+                        checked = isPremiumUnlocked,
+                        onCheckedChange = onPremiumToggle
                     )
                 }
             }
@@ -76,13 +117,13 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "⭐ RekenRinkel Premium",
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = "Ontgrendel alle functies",
+                            text = "Bekijk premium functies",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
@@ -116,7 +157,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Een veilige, advertentievrije rekenapp voor kinderen.",
+                        text = "Een veilige, advertentievrije rekenapp voor kinderen. Alle data blijft op je apparaat.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )

@@ -2,6 +2,7 @@ package com.rekenrinkel.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rekenrinkel.data.datastore.SettingsDataStore
 import com.rekenrinkel.data.repository.ProfileRepository
 import com.rekenrinkel.data.repository.ProgressRepository
 import com.rekenrinkel.domain.engine.ExerciseEngine
@@ -14,7 +15,8 @@ class MainViewModel(
     private val profileRepository: ProfileRepository,
     private val progressRepository: ProgressRepository,
     private val exerciseEngine: ExerciseEngine,
-    private val sessionEngine: SessionEngine
+    private val sessionEngine: SessionEngine,
+    private val settingsDataStore: SettingsDataStore
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(MainUiState())
@@ -39,11 +41,24 @@ class MainViewModel(
                 _uiState.update { it.copy(progress = progress) }
             }
         }
+        
+        viewModelScope.launch {
+            settingsDataStore.soundEnabled.collect { enabled ->
+                _uiState.update { it.copy(soundEnabled = enabled) }
+            }
+        }
+        
+        viewModelScope.launch {
+            settingsDataStore.premiumUnlocked.collect { unlocked ->
+                _uiState.update { it.copy(isPremiumUnlocked = unlocked) }
+            }
+        }
     }
     
     fun startSession() {
         viewModelScope.launch {
-            val exercises = sessionEngine.buildSession()
+            val isPremium = uiState.value.isPremiumUnlocked
+            val exercises = sessionEngine.buildSession(isPremium)
             _navigation.emit(NavigationEvent.StartSession(exercises))
         }
     }
@@ -77,6 +92,7 @@ class MainViewModel(
             val current = uiState.value.profile ?: return@launch
             val updated = current.copy(name = name)
             profileRepository.updateProfile(updated)
+            settingsDataStore.setProfileName(name)
         }
     }
     
@@ -85,16 +101,34 @@ class MainViewModel(
             val current = uiState.value.profile ?: return@launch
             val updated = current.copy(theme = theme)
             profileRepository.updateProfile(updated)
+            settingsDataStore.setTheme(theme)
         }
     }
     
+    /**
+     * Toggle sound on/off
+     */
     fun toggleSound(enabled: Boolean) {
-        // TODO: Update in DataStore
+        viewModelScope.launch {
+            settingsDataStore.setSoundEnabled(enabled)
+        }
+    }
+    
+    /**
+     * Toggle premium unlocked status (for testing/placeholder)
+     */
+    fun togglePremiumUnlocked(unlocked: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.setPremiumUnlocked(unlocked)
+        }
     }
     
     fun completeOnboarding(name: String, theme: Theme) {
         viewModelScope.launch {
             profileRepository.createProfile(name, theme)
+            settingsDataStore.setProfileName(name)
+            settingsDataStore.setTheme(theme)
+            settingsDataStore.setOnboardingCompleted(true)
         }
     }
 }
@@ -102,6 +136,8 @@ class MainViewModel(
 data class MainUiState(
     val profile: Profile? = null,
     val progress: List<SkillProgress> = emptyList(),
+    val soundEnabled: Boolean = true,
+    val isPremiumUnlocked: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null
 )

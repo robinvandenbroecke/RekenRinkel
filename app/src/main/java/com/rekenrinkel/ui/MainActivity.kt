@@ -14,12 +14,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.rekenrinkel.data.datastore.SettingsDataStore
-import com.rekenrinkel.data.local.RekenRinkelDatabase
-import com.rekenrinkel.data.repository.ProfileRepository
-import com.rekenrinkel.data.repository.ProgressRepository
-import com.rekenrinkel.domain.engine.ExerciseEngine
-import com.rekenrinkel.domain.engine.ExerciseValidator
-import com.rekenrinkel.domain.engine.SessionEngine
 import com.rekenrinkel.domain.model.SessionResult
 import com.rekenrinkel.ui.screens.exercise.ExerciseScreen
 import com.rekenrinkel.ui.screens.home.HomeScreen
@@ -52,27 +46,11 @@ fun RekenRinkelApp() {
     val navController = rememberNavController()
     val context = LocalContext.current
     
-    // Initialize dependencies
-    val database = remember { RekenRinkelDatabase.getDatabase(context) }
+    // DataStore for settings
     val settingsDataStore = remember { SettingsDataStore(context) }
-    
-    val profileRepository = remember {
-        ProfileRepository(database.profileDao(), settingsDataStore)
-    }
-    
-    val progressRepository = remember {
-        ProgressRepository(database.skillProgressDao())
-    }
-    
-    val exerciseEngine = remember { ExerciseEngine() }
-    val sessionEngine = remember {
-        SessionEngine(exerciseEngine, progressRepository)
-    }
-    val exerciseValidator = remember { ExerciseValidator() }
     
     // Check if onboarding is completed
     val onboardingCompleted by settingsDataStore.onboardingCompleted.collectAsState(initial = false)
-    
     val startDestination = if (onboardingCompleted) "home" else "onboarding"
     
     RekenRinkelTheme {
@@ -86,12 +64,7 @@ fun RekenRinkelApp() {
             ) {
                 composable("home") {
                     val viewModel: MainViewModel = viewModel(
-                        factory = MainViewModelFactory(
-                            profileRepository,
-                            progressRepository,
-                            exerciseEngine,
-                            sessionEngine
-                        )
+                        factory = MainViewModelFactory(context)
                     )
                     
                     val uiState by viewModel.uiState.collectAsState()
@@ -126,12 +99,7 @@ fun RekenRinkelApp() {
                 
                 composable("profile") {
                     val viewModel: MainViewModel = viewModel(
-                        factory = MainViewModelFactory(
-                            profileRepository,
-                            progressRepository,
-                            exerciseEngine,
-                            sessionEngine
-                        )
+                        factory = MainViewModelFactory(context)
                     )
                     val uiState by viewModel.uiState.collectAsState()
                     
@@ -144,11 +112,16 @@ fun RekenRinkelApp() {
                 }
                 
                 composable("settings") {
-                    val soundEnabled by settingsDataStore.soundEnabled.collectAsState(initial = true)
+                    val viewModel: MainViewModel = viewModel(
+                        factory = MainViewModelFactory(context)
+                    )
+                    val uiState by viewModel.uiState.collectAsState()
                     
                     SettingsScreen(
-                        soundEnabled = soundEnabled,
-                        onSoundToggle = { /* TODO */ },
+                        soundEnabled = uiState.soundEnabled,
+                        onSoundToggle = { viewModel.toggleSound(it) },
+                        isPremiumUnlocked = uiState.isPremiumUnlocked,
+                        onPremiumToggle = { viewModel.togglePremiumUnlocked(it) },
                         onOpenPremium = { navController.navigate("premium") },
                         onBack = { navController.popBackStack() }
                     )
@@ -156,19 +129,13 @@ fun RekenRinkelApp() {
                 
                 composable("parent") {
                     val viewModel: MainViewModel = viewModel(
-                        factory = MainViewModelFactory(
-                            profileRepository,
-                            progressRepository,
-                            exerciseEngine,
-                            sessionEngine
-                        )
+                        factory = MainViewModelFactory(context)
                     )
                     val uiState by viewModel.uiState.collectAsState()
                     
                     ParentDashboardScreen(
                         progressList = uiState.progress,
-                        totalSessions = 0,
-                        averageSessionTime = "5 min",
+                        isPremiumUnlocked = uiState.isPremiumUnlocked,
                         currentStreak = uiState.profile?.currentStreak ?: 0,
                         onBack = { navController.popBackStack() }
                     )
@@ -182,12 +149,7 @@ fun RekenRinkelApp() {
                 
                 composable("onboarding") {
                     val viewModel: MainViewModel = viewModel(
-                        factory = MainViewModelFactory(
-                            profileRepository,
-                            progressRepository,
-                            exerciseEngine,
-                            sessionEngine
-                        )
+                        factory = MainViewModelFactory(context)
                     )
                     
                     OnboardingScreen(
@@ -202,12 +164,7 @@ fun RekenRinkelApp() {
                 
                 composable("exercise") {
                     val viewModel: SessionViewModel = viewModel(
-                        factory = SessionViewModelFactory(
-                            progressRepository,
-                            exerciseEngine,
-                            sessionEngine,
-                            exerciseValidator
-                        )
+                        factory = SessionViewModelFactory(context)
                     )
                     
                     val uiState by viewModel.uiState.collectAsState()
