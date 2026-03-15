@@ -37,4 +37,8 @@ class FakeSkillProgressDao : SkillProgressDao {
     override suspend fun getStrongSkills(): List<SkillProgressEntity> {
         return data.values.filter { it.masteryScore >= 75 }
     }
+
+    override suspend fun clearAll() {
+        data.clear()
+    }
 }

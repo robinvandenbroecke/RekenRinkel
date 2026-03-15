@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 
-class ProgressRepository(private val skillProgressDao: SkillProgressDao) {
+open class ProgressRepository(private val skillProgressDao: SkillProgressDao) {
     
     fun getProgress(skillId: String): Flow<SkillProgress?> {
         return skillProgressDao.getProgress(skillId).map { entity ->
@@ -25,7 +25,7 @@ class ProgressRepository(private val skillProgressDao: SkillProgressDao) {
         }
     }
     
-    fun getAllProgress(): Flow<List<SkillProgress>> {
+    open fun getAllProgress(): Flow<List<SkillProgress>> {
         return skillProgressDao.getAllProgress().map { entities ->
             entities.map {
                 SkillProgress(

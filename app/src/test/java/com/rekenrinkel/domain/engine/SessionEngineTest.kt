@@ -149,7 +149,7 @@ class FakeProgressRepository : com.rekenrinkel.data.repository.ProgressRepositor
     com.rekenrinkel.data.local.dao.FakeSkillProgressDao()
 ) {
     private val mockProgress = mutableMapOf<String, SkillProgress>()
-    
+
     fun addMockProgress(skillId: String, masteryScore: Int) {
         mockProgress[skillId] = SkillProgress(
             skillId = skillId,
@@ -158,12 +158,8 @@ class FakeProgressRepository : com.rekenrinkel.data.repository.ProgressRepositor
             wrongAnswers = 10 - masteryScore / 10
         )
     }
-    
-    override suspend fun getAllProgress(): List<SkillProgress> {
-        return mockProgress.values.toList()
-    }
-    
-    override suspend fun getOrCreateProgress(skillId: String): SkillProgress {
-        return mockProgress[skillId] ?: SkillProgress(skillId = skillId)
+
+    override fun getAllProgress(): kotlinx.coroutines.flow.Flow<List<SkillProgress>> {
+        return kotlinx.coroutines.flow.flow { emit(mockProgress.values.toList()) }
     }
 }
