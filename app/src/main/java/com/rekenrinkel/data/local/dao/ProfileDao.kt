@@ -17,4 +17,7 @@ interface ProfileDao {
     
     @Update
     suspend fun updateProfile(profile: ProfileEntity)
+
+    @Query("DELETE FROM profiles")
+    suspend fun clearAll()
 }

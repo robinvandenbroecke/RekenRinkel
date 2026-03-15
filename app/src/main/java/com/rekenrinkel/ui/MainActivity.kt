@@ -15,6 +15,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.rekenrinkel.data.datastore.SettingsDataStore
 import com.rekenrinkel.domain.model.SessionResult
+import com.rekenrinkel.domain.model.Theme
 import com.rekenrinkel.ui.screens.exercise.ExerciseScreen
 import com.rekenrinkel.ui.screens.home.HomeScreen
 import com.rekenrinkel.ui.screens.onboarding.OnboardingScreen
@@ -45,15 +46,20 @@ class MainActivity : ComponentActivity() {
 fun RekenRinkelApp() {
     val navController = rememberNavController()
     val context = LocalContext.current
-    
+
     // DataStore for settings
     val settingsDataStore = remember { SettingsDataStore(context) }
-    
+
     // Check if onboarding is completed
     val onboardingCompleted by settingsDataStore.onboardingCompleted.collectAsState(initial = false)
+    val einkModeEnabled by settingsDataStore.einkModeEnabled.collectAsState(initial = false)
+    val appTheme by settingsDataStore.theme.collectAsState(initial = Theme.DINOSAURS)
     val startDestination = if (onboardingCompleted) "home" else "onboarding"
-    
-    RekenRinkelTheme {
+
+    RekenRinkelTheme(
+        appTheme = appTheme,
+        einkMode = einkModeEnabled
+    ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
@@ -116,12 +122,16 @@ fun RekenRinkelApp() {
                         factory = MainViewModelFactory(context)
                     )
                     val uiState by viewModel.uiState.collectAsState()
-                    
+
                     SettingsScreen(
                         soundEnabled = uiState.soundEnabled,
                         onSoundToggle = { viewModel.toggleSound(it) },
                         isPremiumUnlocked = uiState.isPremiumUnlocked,
                         onPremiumToggle = { viewModel.togglePremiumUnlocked(it) },
+                        einkModeEnabled = uiState.einkModeEnabled,
+                        onEinkModeToggle = { viewModel.toggleEinkMode(it) },
+                        onResetProgress = { viewModel.resetProgress() },
+                        onResetProfile = { viewModel.resetProfile() },
                         onOpenPremium = { navController.navigate("premium") },
                         onBack = { navController.popBackStack() }
                     )

@@ -53,6 +53,12 @@ class MainViewModel(
                 _uiState.update { it.copy(isPremiumUnlocked = unlocked) }
             }
         }
+
+        viewModelScope.launch {
+            settingsDataStore.einkModeEnabled.collect { enabled ->
+                _uiState.update { it.copy(einkModeEnabled = enabled) }
+            }
+        }
     }
     
     fun startSession() {
@@ -122,7 +128,36 @@ class MainViewModel(
             settingsDataStore.setPremiumUnlocked(unlocked)
         }
     }
-    
+
+    /**
+     * Toggle E-Ink mode
+     */
+    fun toggleEinkMode(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.setEinkModeEnabled(enabled)
+        }
+    }
+
+    /**
+     * Reset all progress (skills, sessions, exercises)
+     */
+    fun resetProgress() {
+        viewModelScope.launch {
+            progressRepository.clearAll()
+        }
+    }
+
+    /**
+     * Reset profile and all data
+     */
+    fun resetProfile() {
+        viewModelScope.launch {
+            progressRepository.clearAll()
+            profileRepository.clearAll()
+            settingsDataStore.clearAll()
+        }
+    }
+
     fun completeOnboarding(name: String, theme: Theme) {
         viewModelScope.launch {
             profileRepository.createProfile(name, theme)
@@ -138,6 +173,7 @@ data class MainUiState(
     val progress: List<SkillProgress> = emptyList(),
     val soundEnabled: Boolean = true,
     val isPremiumUnlocked: Boolean = false,
+    val einkModeEnabled: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null
 )

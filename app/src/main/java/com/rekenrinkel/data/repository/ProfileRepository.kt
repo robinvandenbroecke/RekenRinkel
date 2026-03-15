@@ -99,4 +99,8 @@ class ProfileRepository(
         lastSessionDate = lastSessionDate,
         longestStreak = longestStreak
     )
+
+    suspend fun clearAll() {
+        profileDao.clearAll()
+    }
 }

@@ -19,6 +19,7 @@ class SettingsDataStore(private val context: Context) {
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val PREMIUM_UNLOCKED = booleanPreferencesKey("premium_unlocked")
         val PARENT_MODE_ENABLED = booleanPreferencesKey("parent_mode_enabled")
+        val EINK_MODE_ENABLED = booleanPreferencesKey("eink_mode_enabled")
     }
     
     val profileName: Flow<String> = context.dataStore.data.map { 
@@ -41,10 +42,14 @@ class SettingsDataStore(private val context: Context) {
         it[Keys.PREMIUM_UNLOCKED] == true 
     }
     
-    val parentModeEnabled: Flow<Boolean> = context.dataStore.data.map { 
-        it[Keys.PARENT_MODE_ENABLED] == true 
+    val parentModeEnabled: Flow<Boolean> = context.dataStore.data.map {
+        it[Keys.PARENT_MODE_ENABLED] == true
     }
-    
+
+    val einkModeEnabled: Flow<Boolean> = context.dataStore.data.map {
+        it[Keys.EINK_MODE_ENABLED] == true
+    }
+
     suspend fun setProfileName(name: String) {
         context.dataStore.edit { it[Keys.PROFILE_NAME] = name }
     }
@@ -67,5 +72,13 @@ class SettingsDataStore(private val context: Context) {
     
     suspend fun setParentModeEnabled(enabled: Boolean) {
         context.dataStore.edit { it[Keys.PARENT_MODE_ENABLED] = enabled }
+    }
+
+    suspend fun setEinkModeEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.EINK_MODE_ENABLED] = enabled }
+    }
+
+    suspend fun clearAll() {
+        context.dataStore.edit { it.clear() }
     }
 }

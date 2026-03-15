@@ -16,4 +16,7 @@ interface ExerciseResultDao {
     
     @Query("SELECT * FROM exercise_results WHERE isCorrect = 0 ORDER BY timestamp DESC LIMIT 20")
     suspend fun getRecentErrors(): List<ExerciseResultEntity>
+
+    @Query("DELETE FROM exercise_results")
+    suspend fun clearAll()
 }

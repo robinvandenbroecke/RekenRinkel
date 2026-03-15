@@ -20,4 +20,7 @@ interface SessionResultDao {
     
     @Query("SELECT SUM(xpEarned) FROM session_results")
     suspend fun getTotalXpEarned(): Int?
+
+    @Query("DELETE FROM session_results")
+    suspend fun clearAll()
 }

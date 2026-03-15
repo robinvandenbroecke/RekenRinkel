@@ -26,4 +26,7 @@ interface SkillProgressDao {
     
     @Query("SELECT * FROM skill_progress WHERE masteryScore >= 75 ORDER BY masteryScore DESC")
     suspend fun getStrongSkills(): List<SkillProgressEntity>
+
+    @Query("DELETE FROM skill_progress")
+    suspend fun clearAll()
 }

@@ -139,4 +139,8 @@ class ProgressRepository(private val skillProgressDao: SkillProgressDao) {
         lastPracticed = lastPracticed,
         currentDifficulty = currentDifficulty
     )
+
+    suspend fun clearAll() {
+        skillProgressDao.clearAll()
+    }
 }
