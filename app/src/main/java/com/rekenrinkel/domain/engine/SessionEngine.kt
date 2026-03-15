@@ -366,25 +366,37 @@ class SessionEngine(
     }
     
     /**
-     * Smart shuffle: voorkom teveel van zelfde skill achter elkaar
+     * Smart shuffle: voorkom teveel van zelfde skill, antwoord of vraag achter elkaar
      */
     private fun smartShuffle(exercises: List<Exercise>): List<Exercise> {
         if (exercises.size <= 3) return exercises.shuffled()
-        
+
         val result = mutableListOf<Exercise>()
         val remaining = exercises.toMutableList()
-        var lastSkillId: String? = null
-        
+        var lastExercise: Exercise? = null
+
         while (remaining.isNotEmpty()) {
-            // Zoek een oefening die niet dezelfde skill is als de vorige
-            val candidate = remaining.find { it.skillId != lastSkillId } 
-                ?: remaining.first() // Fallback als alleen zelfde skill overblijft
-            
+            // Zoek een oefening die verschilt van de vorige op meerdere dimensies
+            val candidate = remaining.find { candidate ->
+                val last = lastExercise
+                if (last == null) return@find true
+
+                // Must differ on at least one key dimension
+                candidate.skillId != last.skillId &&
+                candidate.correctAnswer != last.correctAnswer &&
+                candidate.question != last.question
+            } ?: remaining.find { candidate ->
+                // Fallback: at least different skill or answer
+                val last = lastExercise
+                if (last == null) return@find true
+                candidate.skillId != last.skillId || candidate.correctAnswer != last.correctAnswer
+            } ?: remaining.first() // Ultimate fallback
+
             result.add(candidate)
             remaining.remove(candidate)
-            lastSkillId = candidate.skillId
+            lastExercise = candidate
         }
-        
+
         return result
     }
     

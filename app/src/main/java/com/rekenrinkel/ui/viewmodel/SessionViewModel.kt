@@ -58,10 +58,13 @@ class SessionViewModel(
     fun submitAnswer(answer: String) {
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
-        
+
+        // Guard: already answered or feedback showing - prevent double submit
+        if (state.showFeedback) return
+
         // Bereken response time
         val responseTimeMs = System.currentTimeMillis() - exerciseStartTime
-        
+
         viewModelScope.launch {
             val isCorrect = exerciseValidator.validate(currentExercise, answer)
             
@@ -97,7 +100,10 @@ class SessionViewModel(
      */
     fun skipExercise() {
         val state = _uiState.value
-        
+
+        // Guard: already answered or feedback showing - prevent double skip
+        if (state.showFeedback) return
+
         // Markeer als fout met een hoge response time (skip)
         val currentExercise = state.currentExercise
         if (currentExercise != null) {

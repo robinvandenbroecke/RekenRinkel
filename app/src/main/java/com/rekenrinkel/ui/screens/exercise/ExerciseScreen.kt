@@ -44,7 +44,7 @@ fun ExerciseScreen(
     // Handle feedback auto-advance
     LaunchedEffect(showFeedback) {
         if (showFeedback) {
-            delay(1500)
+            delay(800)
             onFeedbackComplete()
         }
     }

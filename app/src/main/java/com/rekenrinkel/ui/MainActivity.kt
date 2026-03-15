@@ -197,13 +197,13 @@ fun RekenRinkelApp() {
                         viewModel.navigation.collectLatest { event ->
                             when (event) {
                                 is SessionNavigationEvent.SessionComplete -> {
+                                    // Navigate to result first, then set result on that entry
+                                    navController.navigate("result")
+                                    // Set result on the result screen's entry (current after navigation)
                                     navController.currentBackStackEntry?.savedStateHandle?.set(
                                         "result",
                                         event.result
                                     )
-                                    navController.navigate("result") {
-                                        popUpTo("home")
-                                    }
                                 }
                                 is SessionNavigationEvent.BackToHome -> {
                                     navController.navigate("home") {
@@ -234,10 +234,10 @@ fun RekenRinkelApp() {
                 }
                 
                 composable("result") {
-                    val result = navController.previousBackStackEntry
+                    val result = navController.currentBackStackEntry
                         ?.savedStateHandle
                         ?.get<SessionResult>("result")
-                    
+
                     if (result != null) {
                         SessionResultScreen(
                             result = result,
@@ -252,6 +252,13 @@ fun RekenRinkelApp() {
                                 }
                             }
                         )
+                    } else {
+                        // Fallback: no result available, go back to home
+                        LaunchedEffect(Unit) {
+                            navController.navigate("home") {
+                                popUpTo("home") { inclusive = true }
+                            }
+                        }
                     }
                 }
             }
