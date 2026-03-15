@@ -32,12 +32,12 @@ import com.rekenrinkel.ui.screens.profile.ProfileScreen
 import com.rekenrinkel.ui.screens.session.SessionResultScreen
 import com.rekenrinkel.ui.screens.settings.SettingsScreen
 import com.rekenrinkel.ui.theme.RekenRinkelTheme
+import com.rekenrinkel.ui.viewmodel.LessonNavigationEvent
+import com.rekenrinkel.ui.viewmodel.LessonViewModel
+import com.rekenrinkel.ui.viewmodel.LessonViewModelFactory
 import com.rekenrinkel.ui.viewmodel.MainViewModel
 import com.rekenrinkel.ui.viewmodel.MainViewModelFactory
 import com.rekenrinkel.ui.viewmodel.NavigationEvent as MainNavEvent
-import com.rekenrinkel.ui.viewmodel.SessionNavigationEvent
-import com.rekenrinkel.ui.viewmodel.SessionViewModel
-import com.rekenrinkel.ui.viewmodel.SessionViewModelFactory
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 
@@ -182,38 +182,39 @@ fun RekenRinkelApp() {
                 }
                 
                 composable("exercise") {
-                    val viewModel: SessionViewModel = viewModel(
-                        factory = SessionViewModelFactory(context)
+                    val viewModel: LessonViewModel = viewModel(
+                        factory = LessonViewModelFactory(context)
                     )
-                    
+
                     val uiState by viewModel.uiState.collectAsState()
-                    
-                    // Get exercises from saved state
-                    val exercises = navController.previousBackStackEntry
-                        ?.savedStateHandle
-                        ?.get<ArrayList<com.rekenrinkel.domain.model.Exercise>>("exercises")
-                    
-                    // Start session if not active and exercises available
-                    LaunchedEffect(exercises) {
-                        if (!uiState.isActive && exercises != null) {
-                            viewModel.startSession(exercises.toList())
+
+                    // Start lesson if not active
+                    LaunchedEffect(Unit) {
+                        if (!uiState.isActive && !uiState.isLoading) {
+                            viewModel.startLesson()
                         }
                     }
-                    
+
                     // Handle navigation events
                     LaunchedEffect(Unit) {
                         viewModel.navigation.collectLatest { event ->
                             when (event) {
-                                is SessionNavigationEvent.SessionComplete -> {
-                                    // Navigate to result first, then set result on that entry
+                                is LessonNavigationEvent.LessonComplete -> {
                                     navController.navigate("result")
-                                    // Set result on the result screen's entry (current after navigation)
                                     navController.currentBackStackEntry?.savedStateHandle?.set(
                                         "result",
                                         event.result
                                     )
+                                    navController.currentBackStackEntry?.savedStateHandle?.set(
+                                        "badges",
+                                        ArrayList(event.badges)
+                                    )
+                                    navController.currentBackStackEntry?.savedStateHandle?.set(
+                                        "xpTotal",
+                                        event.xpTotal
+                                    )
                                 }
-                                is SessionNavigationEvent.BackToHome -> {
+                                is LessonNavigationEvent.BackToHome -> {
                                     navController.navigate("home") {
                                         popUpTo("home") { inclusive = true }
                                     }
@@ -221,7 +222,23 @@ fun RekenRinkelApp() {
                             }
                         }
                     }
-                    
+
+                    // Show loading while building lesson
+                    if (uiState.isLoading) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator()
+                            Text(
+                                text = "Les aan het voorbereiden...",
+                                modifier = Modifier.padding(top = 16.dp)
+                            )
+                        }
+                        return@composable
+                    }
+
                     val currentExercise = uiState.currentExercise
 
                     if (currentExercise != null) {
