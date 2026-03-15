@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">RekenRinkel</string>
+    <string name="home_title">RekenRinkel</string>
+    <string name="start_session">Start met oefenen</string>
+    <string name="profile">Profiel</string>
+    <string name="settings">Instellingen</string>
+    <string name="parent_dashboard">Ouderdashboard</string>
+    <string name="premium">Premium</string>
+    <string name="exercise">Oefening</string>
+    <string name="result">Resultaat</string>
+    <string name="correct">Goed!</string>
+    <string name="incorrect">Probeer opnieuw</string>
+    <string name="next">Volgende</string>
+    <string name="finish">Klaar</string>
+    <string name="back">Terug</string>
+</resources>
