@@ -3,7 +3,7 @@ package com.rekenrinkel.ui.screens.premium
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -23,7 +23,7 @@ fun PremiumScreen(
                 title = { Text("Premium") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Terug")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Terug")
                     }
                 }
             )

@@ -27,7 +27,7 @@ jobs:
         run: ./gradlew --version
 
       - name: Run unit tests
-        run: ./gradlew testDebugUnitTest --stacktrace --info
+        run: ./gradlew testDebugUnitTest --stacktrace --no-daemon
         continue-on-error: false
 
       - name: Upload test reports
@@ -39,7 +39,7 @@ jobs:
           retention-days: 7
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug --stacktrace --no-daemon
 
       - name: List APK outputs
         run: find app/build/outputs -type f | sort

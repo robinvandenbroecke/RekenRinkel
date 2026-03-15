@@ -88,8 +88,9 @@ fun EInkContentTransform(
             targetState = targetState,
             modifier = modifier,
             transitionSpec = {
-                fadeIn(animationSpec = tween(150)) with
-                fadeOut(animationSpec = tween(150))
+                fadeIn(animationSpec = tween(150)).togetherWith(
+                    fadeOut(animationSpec = tween(150))
+                )
             }
         ) { state ->
             if (state) {

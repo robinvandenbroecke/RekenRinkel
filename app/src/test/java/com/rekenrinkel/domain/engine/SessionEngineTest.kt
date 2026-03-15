@@ -78,20 +78,77 @@ class SessionEngineTest {
     fun `session respects skill mix ratio`() = runBlocking {
         val repo = FakeProgressRepository()
         val engine = SessionEngine(ExerciseEngine(), repo)
-        
+
         // Seed with some progress
         repo.addMockProgress("foundation_number_images_5", 80) // Mastered
         repo.addMockProgress("foundation_splits_10", 30)      // Practicing
         repo.addMockProgress("arithmetic_add_10", 10)         // Emerging
-        
+
         val session = engine.buildSession(isPremiumUnlocked = false)
-        
+
         // Should have 8 exercises
         assertEquals(8, session.size)
-        
+
         // Should have variety (not all same skill)
         val uniqueSkills = session.map { it.skillId }.toSet().size
         assertTrue("Should have skill variety", uniqueSkills > 1)
+    }
+
+    @Test
+    fun `session always has exactly 8 exercises`() = runBlocking {
+        val repo = FakeProgressRepository()
+        val engine = SessionEngine(ExerciseEngine(), repo)
+
+        // Test with no progress at all (fresh start)
+        val session1 = engine.buildSession(isPremiumUnlocked = false)
+        assertEquals("Fresh start session should have 8 exercises", 8, session1.size)
+
+        // Test with some skills mastered
+        repo.addMockProgress("foundation_number_images_5", 100)
+        repo.addMockProgress("foundation_splits_10", 100)
+        val session2 = engine.buildSession(isPremiumUnlocked = false)
+        assertEquals("Progress session should have 8 exercises", 8, session2.size)
+
+        // Test with premium unlocked
+        val session3 = engine.buildSession(isPremiumUnlocked = true)
+        assertEquals("Premium session should have 8 exercises", 8, session3.size)
+    }
+
+    @Test
+    fun `session has skill variety when enough skills available`() = runBlocking {
+        val repo = FakeProgressRepository()
+        val engine = SessionEngine(ExerciseEngine(), repo)
+
+        // Unlock multiple skills via progress
+        repo.addMockProgress("foundation_number_images_5", 100)
+        repo.addMockProgress("foundation_splits_10", 100)
+        repo.addMockProgress("arithmetic_add_10", 100)
+        repo.addMockProgress("arithmetic_sub_10", 100)
+        repo.addMockProgress("patterns_doubles", 100)
+
+        val session = engine.buildSession(isPremiumUnlocked = false)
+
+        // With many skills available, should have good variety
+        val uniqueSkills = session.map { it.skillId }.toSet().size
+        assertTrue("Should have multiple different skills", uniqueSkills >= 3)
+    }
+
+    @Test
+    fun `no crash with few accessible skills`() = runBlocking {
+        val repo = FakeProgressRepository()
+        val engine = SessionEngine(ExerciseEngine(), repo)
+
+        // Only unlock the very first skill
+        // This tests the edge case where backfill must use repeats
+        val session = engine.buildSession(isPremiumUnlocked = false)
+
+        // Should still produce 8 exercises without crashing
+        assertEquals(8, session.size)
+
+        // With only one skill available, all exercises will be from that skill
+        // This is acceptable behavior for this edge case
+        val uniqueSkills = session.map { it.skillId }.toSet().size
+        assertTrue("Should have at least 1 skill", uniqueSkills >= 1)
     }
     
     @Test

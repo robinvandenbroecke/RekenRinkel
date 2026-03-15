@@ -3,7 +3,7 @@ package com.rekenrinkel.ui.screens.settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -36,7 +36,7 @@ fun SettingsScreen(
                 title = { Text("Instellingen") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Terug")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Terug")
                     }
                 }
             )
