@@ -20,10 +20,10 @@ Educatieve rekenapp voor kinderen van ongeveer 6 jaar.
 | ContentRepository | ✅ Werkt | Alle 18 skills geconfigureerd |
 | ExerciseEngine | ✅ Werkt | Didactisch correcte oefeningen |
 | ExerciseValidator | ✅ Werkt | Consistente validatie |
-| SessionEngine | ⚠️ Gedeeltelijk | Basis adaptief, nog verfijning nodig |
+| SessionEngine | ✅ Werkt | Expliciete skill status, prioriteit, smart shuffle |
 | Room Database | ✅ Werkt | Profiel, progress, resultaten |
 | DataStore | ✅ Werkt | Instellingen, premium flag |
-| Response Time | ⚠️ Gedeeltelijk | Gemeten maar nog niet optimaal gebruikt |
+| Response Time | ✅ Werkt | Timer, tracking, weergave in resultaten |
 | Geluid | ❌ Placeholder | Toggle UI werkt, geen audio |
 | Premium Flow | ❌ Placeholder | Lokale flag, geen billing |
 | UI Schermen | ✅ Werkt | Alle schermen functioneel |
@@ -100,12 +100,21 @@ Tests:
 ## Changelog Iteratie 2
 
 ### Toegevoegd
-- Gradle wrapper
-- Plugin repositories configuratie
+- Gradle wrapper + build configuratie
+- Expliciete SkillStatus enum (NOT_LEARNED, EMERGING, PRACTICING, SOLID, MASTERED)
+- ReviewCandidate met priorityScore
+- Smart shuffle om skill herhaling te voorkomen
+- Response time tracking (timer start/stop, skip penalty)
+- Average response time in SessionResult
+- Uitgebreide tests voor SessionEngine
+- Fake DAOs voor testing
 
-### Gedeeltelijk
-- SessionEngine (basis werkt, verfijning nodig)
-- Response time tracking (gemeten, niet optimaal gebruikt)
+### Verbeterd
+- SessionEngine: betere focus skill selectie
+- SessionEngine: geprioriteerde review skills
+- SessionEngine: veilige fallback logica
+- ExerciseValidator: consistente validatie
+- ContentRepository: didactische regels
 
 ### Placeholder
 - Geluidseffecten
