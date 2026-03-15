@@ -408,7 +408,7 @@ class SessionEngine(
         val config = ContentRepository.getConfig(skillId) ?: return false
         if (config.prerequisites.isEmpty()) return true
         
-        val allProgress = progressRepository.getAllProgress()
+        val allProgress = progressRepository.getAllProgress().first()
         val masteredSkills = allProgress
             .filter { it.masteryScore >= MASTERY_THRESHOLD_WEAK }
             .map { it.skillId }

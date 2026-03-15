@@ -21,8 +21,8 @@ class SessionViewModel(
     private val _uiState = MutableStateFlow(SessionUiState())
     val uiState: StateFlow<SessionUiState> = _uiState.asStateFlow()
     
-    private val _navigation = MutableSharedFlow<NavigationEvent>()
-    val navigation: SharedFlow<NavigationEvent> = _navigation.asSharedFlow()
+    private val _navigation = MutableSharedFlow<SessionNavigationEvent>()
+    val navigation: SharedFlow<SessionNavigationEvent> = _navigation.asSharedFlow()
     
     // Timer voor response time tracking
     private var exerciseStartTime: Long = 0
@@ -171,7 +171,7 @@ class SessionViewModel(
                 averageResponseTimeMs = averageResponseTime
             )
             
-            _navigation.emit(NavigationEvent.SessionComplete(sessionResult))
+            _navigation.emit(SessionNavigationEvent.SessionComplete(sessionResult))
         }
     }
     
@@ -180,7 +180,7 @@ class SessionViewModel(
      */
     fun skipSession() {
         viewModelScope.launch {
-            _navigation.emit(NavigationEvent.BackToHome)
+            _navigation.emit(SessionNavigationEvent.BackToHome)
         }
     }
 }
@@ -198,9 +198,9 @@ data class SessionUiState(
     val progress: Float = if (totalExercises > 0) currentIndex.toFloat() / totalExercises else 0f
 }
 
-sealed class NavigationEvent {
-    data class SessionComplete(val result: SessionResult) : NavigationEvent()
-    data object BackToHome : NavigationEvent()
+sealed class SessionNavigationEvent {
+    data class SessionComplete(val result: SessionResult) : SessionNavigationEvent()
+    data object BackToHome : SessionNavigationEvent()
 }
 
 private fun List<ExerciseResult>.accuracy(): Float {

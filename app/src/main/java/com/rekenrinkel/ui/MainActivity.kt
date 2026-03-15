@@ -28,6 +28,7 @@ import com.rekenrinkel.ui.theme.RekenRinkelTheme
 import com.rekenrinkel.ui.viewmodel.MainViewModel
 import com.rekenrinkel.ui.viewmodel.MainViewModelFactory
 import com.rekenrinkel.ui.viewmodel.NavigationEvent as MainNavEvent
+import com.rekenrinkel.ui.viewmodel.SessionNavigationEvent
 import com.rekenrinkel.ui.viewmodel.SessionViewModel
 import com.rekenrinkel.ui.viewmodel.SessionViewModelFactory
 import kotlinx.coroutines.flow.collectLatest
@@ -195,7 +196,7 @@ fun RekenRinkelApp() {
                     LaunchedEffect(Unit) {
                         viewModel.navigation.collectLatest { event ->
                             when (event) {
-                                is com.rekenrinkel.ui.viewmodel.NavigationEvent.SessionComplete -> {
+                                is SessionNavigationEvent.SessionComplete -> {
                                     navController.currentBackStackEntry?.savedStateHandle?.set(
                                         "result",
                                         event.result
@@ -204,7 +205,7 @@ fun RekenRinkelApp() {
                                         popUpTo("home")
                                     }
                                 }
-                                is com.rekenrinkel.ui.viewmodel.NavigationEvent.BackToHome -> {
+                                is SessionNavigationEvent.BackToHome -> {
                                     navController.navigate("home") {
                                         popUpTo("home") { inclusive = true }
                                     }
