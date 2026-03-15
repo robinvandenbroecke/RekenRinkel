@@ -215,16 +215,19 @@ fun RekenRinkelApp() {
                     }
                     
                     val currentExercise = uiState.currentExercise
-                    
+
                     if (currentExercise != null) {
                         ExerciseScreen(
                             exercise = currentExercise,
                             currentIndex = uiState.currentIndex + 1,
                             totalExercises = uiState.totalExercises,
-                            onAnswer = { answer -> 
+                            showFeedback = uiState.showFeedback,
+                            isLastAnswerCorrect = uiState.lastAnswerCorrect,
+                            onAnswer = { answer ->
                                 viewModel.submitAnswer(answer)
                             },
-                            onSkip = { viewModel.skipSession() },
+                            onSkip = { viewModel.skipExercise() },
+                            onFeedbackComplete = { viewModel.nextExercise() },
                             onExerciseShown = { viewModel.startExerciseTimer() }
                         )
                     }

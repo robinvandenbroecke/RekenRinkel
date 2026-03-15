@@ -23,23 +23,30 @@ fun ExerciseScreen(
     exercise: Exercise,
     currentIndex: Int,
     totalExercises: Int,
+    showFeedback: Boolean,
+    isLastAnswerCorrect: Boolean?,
     onAnswer: (String) -> Unit,
     onSkip: () -> Unit,
+    onFeedbackComplete: () -> Unit,
     onExerciseShown: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var showFeedback by remember { mutableStateOf(false) }
-    var isCorrect by remember { mutableStateOf(false) }
     var typedAnswer by remember { mutableStateOf("") }
     var selectedOption by remember { mutableStateOf<String?>(null) }
-    
+
     // Reset state when exercise changes and start timer
     LaunchedEffect(exercise.id) {
-        showFeedback = false
-        isCorrect = false
         typedAnswer = ""
         selectedOption = null
         onExerciseShown() // Start de timer voor response time tracking
+    }
+
+    // Handle feedback auto-advance
+    LaunchedEffect(showFeedback) {
+        if (showFeedback) {
+            delay(1500)
+            onFeedbackComplete()
+        }
     }
     
     Scaffold(
@@ -104,16 +111,10 @@ fun ExerciseScreen(
                         onTypedAnswerChange = { typedAnswer = it },
                         onOptionSelected = { option ->
                             selectedOption = option
-                            handleAnswer(option, exercise, onAnswer) { correct ->
-                                isCorrect = correct
-                                showFeedback = true
-                            }
+                            handleAnswer(option, exercise, onAnswer)
                         },
                         onConfirmTyped = {
-                            handleAnswer(typedAnswer, exercise, onAnswer) { correct ->
-                                isCorrect = correct
-                                showFeedback = true
-                            }
+                            handleAnswer(typedAnswer, exercise, onAnswer)
                         },
                         enabled = !showFeedback
                     )
@@ -132,19 +133,11 @@ fun ExerciseScreen(
         }
         
         // Feedback overlay
-        if (showFeedback) {
+        if (showFeedback && isLastAnswerCorrect != null) {
             FeedbackOverlay(
-                isCorrect = isCorrect,
-                onDismiss = {
-                    showFeedback = false
-                    // Auto-advance after delay
-                }
+                isCorrect = isLastAnswerCorrect,
+                onDismiss = { /* Handled by LaunchedEffect above */ }
             )
-            
-            LaunchedEffect(showFeedback) {
-                delay(1500)
-                showFeedback = false
-            }
         }
     }
 }
@@ -317,11 +310,8 @@ private fun AnswerContent(
 private fun handleAnswer(
     answer: String,
     exercise: Exercise,
-    onAnswer: (String) -> Unit,
-    onShowFeedback: (Boolean) -> Unit
+    onAnswer: (String) -> Unit
 ) {
-    val isCorrect = validateAnswer(answer, exercise)
-    onShowFeedback(isCorrect)
     onAnswer(answer)
 }
 
