@@ -1,5 +1,6 @@
 package com.rekenrinkel.domain.model
 
+import com.rekenrinkel.domain.content.ContentRepository
 import java.io.Serializable
 import java.util.UUID
 
@@ -180,40 +181,51 @@ enum class ContentAvailability {
 }
 
 /**
- * Alle skills voor V1
+ * Skill definitions - gebruikt ContentRepository als bron
+ * Deprecated: Gebruik ContentRepository voor nieuwe code
  */
 object SkillDefinitions {
-    val ALL_SKILLS = listOf(
-        // FOUNDATION - FREE
-        Skill("foundation_number_images_5", "Getalbeelden tot 5", "Visuele getalbeelden tot 5", SkillCategory.FOUNDATION, 1, 3, false),
-        Skill("foundation_splits_10", "Splitsingen tot 10", "Getallen splitsen tot 10", SkillCategory.FOUNDATION, 1, 4, false),
-        Skill("foundation_splits_20", "Splitsingen tot 20", "Getallen splitsen tot 20", SkillCategory.FOUNDATION, 2, 5, true),
-        
-        // ARITHMETIC - FREE + PREMIUM
-        Skill("arithmetic_add_10", "Optellen tot 10", "Optellen tot 10", SkillCategory.ARITHMETIC, 1, 3, false),
-        Skill("arithmetic_sub_10", "Aftrekken tot 10", "Aftrekken tot 10", SkillCategory.ARITHMETIC, 1, 3, false),
-        Skill("arithmetic_add_20", "Optellen tot 20", "Optellen tot 20", SkillCategory.ARITHMETIC, 2, 4, true),
-        Skill("arithmetic_sub_20", "Aftrekken tot 20", "Aftrekken tot 20", SkillCategory.ARITHMETIC, 2, 4, true),
-        Skill("arithmetic_bridge_add", "Brug over 10 (optellen)", "Brug over 10 bij optellen", SkillCategory.ARITHMETIC, 3, 5, true),
-        Skill("arithmetic_bridge_sub", "Brug over 10 (aftrekken)", "Brug over 10 bij aftrekken", SkillCategory.ARITHMETIC, 3, 5, true),
-        
-        // PATTERNS - FREE + PREMIUM
-        Skill("patterns_doubles", "Dubbelen tot 20", "Dubbelen tot 20", SkillCategory.PATTERNS, 1, 3, false),
-        Skill("patterns_halves", "Helften tot 20", "Helften van even getallen tot 20", SkillCategory.PATTERNS, 1, 3, false),
-        Skill("patterns_count_2", "Tellen per 2", "Tellen met sprongen van 2", SkillCategory.PATTERNS, 2, 4, true),
-        Skill("patterns_count_5", "Tellen per 5", "Tellen met sprongen van 5", SkillCategory.PATTERNS, 2, 4, true),
-        Skill("patterns_count_10", "Tellen per 10", "Tellen met sprongen van 10", SkillCategory.PATTERNS, 2, 4, true),
-        
-        // ADVANCED - PREMIUM
-        Skill("advanced_compare_100", "Vergelijken tot 100", "Getallen vergelijken tot 100", SkillCategory.ADVANCED, 3, 5, true),
-        Skill("advanced_place_value", "Tientallen en eenheden", "Tientallen en eenheden herkennen", SkillCategory.ADVANCED, 3, 5, true),
-        Skill("advanced_groups", "Vermenigvuldigen als groepjes", "Groepjes tellen", SkillCategory.ADVANCED, 3, 5, true),
-        Skill("advanced_table_2", "Tafel van 2", "Tafel van 2", SkillCategory.ADVANCED, 3, 5, true),
-        Skill("advanced_table_5", "Tafel van 5", "Tafel van 5", SkillCategory.ADVANCED, 3, 5, true),
-        Skill("advanced_table_10", "Tafel van 10", "Tafel van 10", SkillCategory.ADVANCED, 3, 5, true)
-    )
     
-    fun getById(id: String): Skill? = ALL_SKILLS.find { it.id == id }
-    fun getFreeSkills(): List<Skill> = ALL_SKILLS.filter { !it.isPremium }
-    fun getPremiumSkills(): List<Skill> = ALL_SKILLS.filter { it.isPremium }
+    /**
+     * Alle skills - gedelegeerd naar ContentRepository
+     */
+    val ALL_SKILLS: List<Skill>
+        get() = ContentRepository.getAllConfigs().map { it.toSkill() }
+    
+    /**
+     * Haal skill op basis van ID
+     */
+    fun getById(id: String): Skill? {
+        return ContentRepository.getConfig(id)?.toSkill()
+    }
+    
+    /**
+     * Haal alle gratis skills op
+     */
+    fun getFreeSkills(): List<Skill> {
+        return ContentRepository.getFreeConfigs().map { it.toSkill() }
+    }
+    
+    /**
+     * Haal alle premium skills op
+     */
+    fun getPremiumSkills(): List<Skill> {
+        return ContentRepository.getPremiumConfigs().map { it.toSkill() }
+    }
+    
+    /**
+     * Converteer ContentConfig naar Skill
+     */
+    private fun com.rekenrinkel.domain.content.SkillContentConfig.toSkill(): Skill {
+        return Skill(
+            id = this.skillId,
+            name = this.name,
+            description = this.description,
+            category = this.category,
+            minDifficulty = this.minDifficulty,
+            maxDifficulty = this.maxDifficulty,
+            isPremium = this.isPremium,
+            prerequisites = this.prerequisites
+        )
+    }
 }
