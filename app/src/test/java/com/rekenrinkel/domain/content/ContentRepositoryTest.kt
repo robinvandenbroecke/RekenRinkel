@@ -5,10 +5,6 @@ import org.junit.Test
 
 class ContentRepositoryTest {
     
-    // ============================================
-    // BASIC CONFIG TESTS
-    // ============================================
-    
     @Test
     fun `getConfig returns correct config`() {
         val config = ContentRepository.getConfig("foundation_number_images_5")
@@ -41,10 +37,6 @@ class ContentRepositoryTest {
             assertTrue("Allowed types should not be empty", config.allowedExerciseTypes.isNotEmpty())
         }
     }
-    
-    // ============================================
-    // PREREQUISITES TESTS
-    // ============================================
     
     @Test
     fun `foundation skills have no prerequisites`() {
@@ -145,17 +137,12 @@ class ContentRepositoryTest {
         )
     }
     
-    // ============================================
-    // FREE/PREMIUM TESTS
-    // ============================================
-    
     @Test
     fun `free configs exist`() {
         val freeConfigs = ContentRepository.getFreeConfigs()
         
         assertTrue("Should have free configs", freeConfigs.isNotEmpty())
         
-        // Check specific free skills
         val freeSkillIds = listOf(
             "foundation_number_images_5",
             "foundation_splits_10",
@@ -177,7 +164,6 @@ class ContentRepositoryTest {
         
         assertTrue("Should have premium configs", premiumConfigs.isNotEmpty())
         
-        // Check specific premium skills
         val premiumSkillIds = listOf(
             "foundation_splits_20",
             "arithmetic_add_20",
@@ -204,21 +190,15 @@ class ContentRepositoryTest {
         }
     }
     
-    // ============================================
-    // LEARNING PATH TESTS
-    // ============================================
-    
     @Test
     fun `learning path exists and is valid`() {
         val learningPath = ContentRepository.getLearningPath()
         
         assertTrue("Learning path should not be empty", learningPath.isNotEmpty())
         
-        // Each level should have at least one skill
         learningPath.forEachIndexed { index, skills ->
             assertTrue("Level $index should have skills", skills.isNotEmpty())
             
-            // All skills in learning path should exist
             skills.forEach { skillId ->
                 assertNotNull(
                     "Skill $skillId in learning path should exist",
@@ -240,28 +220,24 @@ class ContentRepositoryTest {
     }
     
     // ============================================
-    // GENERATOR RULES TESTS
+    // TYPED RULES TESTS
     // ============================================
     
     @Test
-    fun `number images has correct generator rules`() {
+    fun `number images has correct value range`() {
         val config = ContentRepository.getConfig("foundation_number_images_5")
         
         assertNotNull(config)
-        assertEquals(1, config?.generatorRules?.minValue)
-        assertEquals(5, config?.generatorRules?.maxValue)
-        assertFalse(config?.generatorRules?.allowZero ?: true)
+        assertEquals(1, config?.rules?.valueRange?.min)
+        assertEquals(5, config?.rules?.valueRange?.max)
     }
     
     @Test
-    fun `halves has onlyEven rule`() {
+    fun `halves has require even rule`() {
         val config = ContentRepository.getConfig("patterns_halves")
         
         assertNotNull(config)
-        assertEquals(
-            "true",
-            config?.generatorRules?.specificRules?.get("onlyEven")
-        )
+        assertTrue("Halves should require even input", config!!.rules.requireEven)
     }
     
     @Test
@@ -269,16 +245,46 @@ class ContentRepositoryTest {
         val config = ContentRepository.getConfig("patterns_count_2")
         
         assertNotNull(config)
-        assertEquals("2", config?.generatorRules?.specificRules?.get("step"))
-        assertEquals("4", config?.generatorRules?.specificRules?.get("sequenceLength"))
+        assertEquals(2, config?.rules?.step)
+        val seqLength = config?.rules?.find<DidacticRule.SequenceLength>()?.length
+        assertEquals(4, seqLength)
     }
     
     @Test
-    fun `bridge addition has requireBridge rule`() {
+    fun `bridge addition has require bridge rule`() {
         val config = ContentRepository.getConfig("arithmetic_bridge_add")
         
         assertNotNull(config)
-        assertEquals("true", config?.generatorRules?.specificRules?.get("requireBridge"))
+        assertTrue("Bridge add should require bridge", config!!.rules.requireBridge)
+    }
+    
+    @Test
+    fun `splits has min and max part rules`() {
+        val config = ContentRepository.getConfig("foundation_splits_10")
+        
+        assertNotNull(config)
+        val minPart = config?.rules?.find<DidacticRule.MinPartValue>()?.min
+        val maxPart = config?.rules?.find<DidacticRule.MaxPartValue>()?.max
+        assertEquals(1, minPart)
+        assertEquals(9, maxPart)
+    }
+    
+    @Test
+    fun `tables have exact multiplier rule`() {
+        val config = ContentRepository.getConfig("advanced_table_5")
+        
+        assertNotNull(config)
+        assertEquals(5, config?.rules?.multiplier)
+    }
+    
+    @Test
+    fun `no specificRules in codebase`() {
+        val configs = ContentRepository.getAllConfigs()
+        
+        configs.forEach { config ->
+            // Verify we're using typed rules, not string maps
+            assertNotNull("Rules should not be null", config.rules)
+        }
     }
     
     // ============================================

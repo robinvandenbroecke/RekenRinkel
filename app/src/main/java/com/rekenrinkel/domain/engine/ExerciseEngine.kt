@@ -1,6 +1,7 @@
 package com.rekenrinkel.domain.engine
 
 import com.rekenrinkel.domain.content.ContentRepository
+import com.rekenrinkel.domain.content.DidacticRule
 import com.rekenrinkel.domain.model.*
 import kotlin.math.max
 import kotlin.math.min
@@ -97,14 +98,17 @@ class ExerciseEngine {
         max: Int
     ): Exercise {
         // Genereer een getal binnen de grenzen
+        val valueRange = config.rules.valueRange
+        val minVal = valueRange?.min ?: 1
+        val maxVal = valueRange?.max ?: max
         val total = random.nextInt(
-            max(3, config.generatorRules.minValue),
-            min(max + 1, config.generatorRules.maxValue + 1)
+            max(3, minVal),
+            min(max + 1, maxVal + 1)
         )
         
         // Genereer een betekenisvolle splitsing
-        val minPart = config.generatorRules.specificRules["minPart"]?.toIntOrNull() ?: 1
-        val maxPart = config.generatorRules.specificRules["maxPart"]?.toIntOrNull() ?: (total - 1)
+        val minPart = config.rules.find<DidacticRule.MinPartValue>()?.min ?: 1
+        val maxPart = config.rules.find<DidacticRule.MaxPartValue>()?.max ?: (total - 1)
         
         val part1 = random.nextInt(minPart, min(maxPart + 1, total))
         val part2 = total - part1
@@ -239,7 +243,8 @@ class ExerciseEngine {
      * Dubbelen - Altijd correcte dubbelen
      */
     private fun generateDoubles(config: com.rekenrinkel.domain.content.SkillContentConfig, difficulty: Int): Exercise {
-        val max = min(10, config.generatorRules.maxValue / 2)
+        val maxVal = config.rules.valueRange?.max ?: 20
+        val max = min(10, maxVal / 2)
         val n = random.nextInt(1, max + 1)
         val correct = n * 2
         
@@ -263,8 +268,8 @@ class ExerciseEngine {
      */
     private fun generateHalves(config: com.rekenrinkel.domain.content.SkillContentConfig, difficulty: Int): Exercise {
         // Alleen even getallen
-        val max = config.generatorRules.maxValue
-        val n = (random.nextInt(1, max / 2 + 1) * 2).coerceAtLeast(2)
+        val maxVal = config.rules.valueRange?.max ?: 20
+        val n = (random.nextInt(1, maxVal / 2 + 1) * 2).coerceAtLeast(2)
         val correct = n / 2
         
         return Exercise(
@@ -290,7 +295,8 @@ class ExerciseEngine {
         difficulty: Int,
         step: Int
     ): Exercise {
-        val maxStart = config.generatorRules.maxValue - (step * 4)
+        val maxVal = config.rules.valueRange?.max ?: 100
+        val maxStart = maxVal - (step * 4)
         val start = step * random.nextInt(1, maxStart / step + 1)
         
         val sequence = listOf(
@@ -399,8 +405,8 @@ class ExerciseEngine {
      * Groepjes - Als concrete vermenigvuldiging
      */
     private fun generateGroups(config: com.rekenrinkel.domain.content.SkillContentConfig, difficulty: Int): Exercise {
-        val maxGroups = config.generatorRules.specificRules["maxGroups"]?.toIntOrNull() ?: 5
-        val maxPerGroup = config.generatorRules.specificRules["maxPerGroup"]?.toIntOrNull() ?: 5
+        val maxGroups = config.rules.find<DidacticRule.MaxGroups>()?.max ?: 5
+        val maxPerGroup = config.rules.find<DidacticRule.MaxPerGroup>()?.max ?: 5
         
         val groups = random.nextInt(2, maxGroups + 1)
         val perGroup = random.nextInt(2, maxPerGroup + 1)

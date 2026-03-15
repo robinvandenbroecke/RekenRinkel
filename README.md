@@ -2,136 +2,67 @@
 
 Educatieve rekenapp voor kinderen van ongeveer 6 jaar.
 
-**Status**: Actieve ontwikkeling - V1 iteratie 2
+**Status**: Technische basis aanwezig, nog niet productierijp
 
-## Build Status
-
-✅ **Reproduceerbaar**: Gradle wrapper toegevoegd  
-⚠️ **Vereist**: `ANDROID_HOME` environment variable of `local.properties` met `sdk.dir`
+## Build
 
 ```bash
 ./gradlew assembleDebug
 ```
 
-## Functionele Status
+Vereisten:
+- Android Studio Hedgehog+
+- JDK 17
+- `ANDROID_HOME` of `local.properties` met `sdk.dir`
 
-| Component | Status | Opmerkingen |
-|-----------|--------|-------------|
-| ContentRepository | ✅ Werkt | Alle 18 skills geconfigureerd |
-| ExerciseEngine | ✅ Werkt | Didactisch correcte oefeningen |
-| ExerciseValidator | ✅ Werkt | Consistente validatie |
-| SessionEngine | ✅ Werkt | Expliciete skill status, prioriteit, smart shuffle |
-| Room Database | ✅ Werkt | Profiel, progress, resultaten |
-| DataStore | ✅ Werkt | Instellingen, premium flag |
-| Response Time | ✅ Werkt | Timer, tracking, weergave in resultaten |
-| Geluid | ❌ Placeholder | Toggle UI werkt, geen audio |
-| Premium Flow | ❌ Placeholder | Lokale flag, geen billing |
-| UI Schermen | ✅ Werkt | Alle schermen functioneel |
+## Status Componenten
 
-## Oefentypes Status
+| Component | Status | Opmerking |
+|-----------|--------|-----------|
+| ContentRepository | Basis werkt | Typed rules, geen string maps meer |
+| ExerciseEngine | Basis werkt | Genereert oefeningen, verfijning mogelijk |
+| ExerciseValidator | Basis werkt | Valideert antwoorden |
+| SessionEngine | Basis werkt | Adaptieve logica aanwezig, niet optimaal getest |
+| Room Database | Aanwezig | Entiteiten gedefinieerd, migraties niet getest |
+| DataStore | Aanwezig | Instellingen opslag |
+| Response Time | Aanwezig | Timer werkt, integratie niet breed getest |
+| UI Schermen | Aanwezig | Functioneel, geen gebruikerstests |
+| Tests | Gedeeltelijk | Unit tests, geen integratietests |
+| Geluid | Placeholder | UI toggle, geen audio |
+| Premium | Placeholder | Lokale flag, geen billing |
 
-| Type | Generator | Validator | UI | Opmerkingen |
-|------|-----------|-----------|-----|-------------|
-| VISUAL_QUANTITY | ✅ | ✅ | ✅ | Getalbeelden correct |
-| VISUAL_GROUPS | ✅ | ✅ | ✅ | Splitsingen/groepjes |
-| SIMPLE_SEQUENCE | ✅ | ✅ | ✅ | Skip counting |
-| COMPARE_NUMBERS | ✅ | ✅ | ✅ | Vergelijken |
-| TYPED_NUMERIC | ✅ | ✅ | ✅ | Optellen/aftrekken |
-| MISSING_NUMBER | ✅ | ✅ | ✅ | Ontbrekend getal |
-| NUMBER_LINE_CLICK | ⚠️ | ✅ | ⚠️ | Nummerlijn placeholder |
+## Typed Didactische Regels
 
-## Vaardigheden (18 skills)
+Vervanging van `Map<String, String>` door sealed class:
 
-### Gratis (6)
-- foundation_number_images_5
-- foundation_splits_10  
-- arithmetic_add_10
-- arithmetic_sub_10
-- patterns_doubles
-- patterns_halves
+```kotlin
+sealed class DidacticRule {
+    data class ValueRange(val min: Int, val max: Int) : DidacticRule()
+    data class RequireBridgeThroughTen(val required: Boolean) : DidacticRule()
+    data class ExactStep(val step: Int) : DidacticRule()
+    // ...
+}
+```
 
-### Premium (12)
-- foundation_splits_20
-- arithmetic_add_20, arithmetic_sub_20
-- arithmetic_bridge_add, arithmetic_bridge_sub
-- patterns_count_2, patterns_count_5, patterns_count_10
-- advanced_compare_100, advanced_place_value
-- advanced_groups
-- advanced_table_2, advanced_table_5, advanced_table_10
+## Vaardigheden
+
+18 skills met prerequisites, verdeeld in gratis/premium.
 
 ## Architectuur
 
-```
-app/src/main/java/com/rekenrinkel/
-├── data/
-│   ├── datastore/       # DataStore
-│   ├── local/           # Room
-│   └── repository/
-├── domain/
-│   ├── content/         # Skill configuraties
-│   ├── engine/          # ExerciseEngine, SessionEngine
-│   └── model/
-├── ui/
-│   ├── screens/
-│   └── viewmodel/
-```
+- MVVM met Jetpack Compose
+- Room voor lokale data
+- DataStore voor instellingen
 
-## Vereisten
+## Beperkingen
 
-- Android Studio Hedgehog+
-- JDK 17
-- Android SDK 34
-- `ANDROID_HOME` of `local.properties`:
-```
-sdk.dir=/path/to/android/sdk
-```
-
-## Testen
-
-```bash
-./gradlew test
-```
-
-Tests:
-- ContentRepositoryTest
-- ExerciseEngineTest
-- ExerciseValidatorTest
-
-## Changelog Iteratie 2
-
-### Toegevoegd
-- Gradle wrapper + build configuratie
-- Expliciete SkillStatus enum (NOT_LEARNED, EMERGING, PRACTICING, SOLID, MASTERED)
-- ReviewCandidate met priorityScore
-- Smart shuffle om skill herhaling te voorkomen
-- Response time tracking (timer start/stop, skip penalty)
-- Average response time in SessionResult
-- Uitgebreide tests voor SessionEngine
-- Fake DAOs voor testing
-
-### Verbeterd
-- SessionEngine: betere focus skill selectie
-- SessionEngine: geprioriteerde review skills
-- SessionEngine: veilige fallback logica
-- ExerciseValidator: consistente validatie
-- ContentRepository: didactische regels
-
-### Placeholder
-- Geluidseffecten
-- Premium billing
-
-## Roadmap
-
-### Iteratie 3 (gepland)
-- [ ] SessionEngine verfijnen
-- [ ] Response time integratie
-- [ ] Didactische regels versterken
-
-### V2 (toekomst)
-- [ ] Billing
-- [ ] Meer thema's
-- [ ] Geluidseffecten
+- Geen geluidseffecten
+- Geen Play Store billing
+- Geen integratietests
+- Geen breed gebruikersgetest
+- SessionEngine adaptiviteit niet gevalideerd
+- Response time tracking niet gevalideerd in echte sessies
 
 ## Licentie
 
-Copyright 2024 - Alle rechten voorbehouden
+Copyright 2024

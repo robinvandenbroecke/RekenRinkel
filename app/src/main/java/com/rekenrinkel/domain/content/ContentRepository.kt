@@ -4,8 +4,174 @@ import com.rekenrinkel.domain.model.ExerciseType
 import com.rekenrinkel.domain.model.SkillCategory
 
 /**
+ * Typed didactische regels voor oefeninggeneratie.
+ * Vervangt losse Map<String, String> configuratie.
+ */
+sealed class DidacticRule {
+    // Basis regels
+    data class ValueRange(val min: Int, val max: Int) : DidacticRule()
+    data class AllowZero(val allowed: Boolean) : DidacticRule()
+    data class AllowNegative(val allowed: Boolean) : DidacticRule()
+    
+    // Rekenregels
+    data class MaxResult(val max: Int) : DidacticRule()
+    data class MinResult(val min: Int) : DidacticRule()
+    data class RequireBridgeThroughTen(val required: Boolean) : DidacticRule()
+    data class RequireNoBridge(val required: Boolean) : DidacticRule()
+    data class BothOperandsUnder(val limit: Int) : DidacticRule()
+    data class ResultUnder(val limit: Int) : DidacticRule()
+    
+    // Patroonregels
+    data class RequireEvenInput(val required: Boolean) : DidacticRule()
+    data class ExactStep(val step: Int) : DidacticRule()
+    data class SequenceLength(val length: Int) : DidacticRule()
+    
+    // Vergelijkingregels
+    data class AllowEqualComparison(val allowed: Boolean) : DidacticRule()
+    data class MinDifference(val difference: Int) : DidacticRule()
+    
+    // Groepjes/vermenigvuldiging
+    data class MaxGroups(val max: Int) : DidacticRule()
+    data class MaxPerGroup(val max: Int) : DidacticRule()
+    data class ExactMultiplier(val multiplier: Int) : DidacticRule()
+    
+    // Splitsingen
+    data class MinPartValue(val min: Int) : DidacticRule()
+    data class MaxPartValue(val max: Int) : DidacticRule()
+    
+    // Visuele prompts
+    data class RequiresVisualPrompt(val required: Boolean) : DidacticRule()
+}
+
+/**
+ * Didactische regels container met typed toegang
+ */
+data class DidacticRules(
+    val rules: Set<DidacticRule> = emptySet()
+) {
+    inline fun <reified T : DidacticRule> find(): T? {
+        return rules.filterIsInstance<T>().firstOrNull()
+    }
+    
+    fun has(rule: DidacticRule): Boolean = rule in rules
+    
+    val valueRange: DidacticRule.ValueRange?
+        get() = find()
+    
+    val maxResult: Int?
+        get() = find<DidacticRule.MaxResult>()?.max
+    
+    val minResult: Int?
+        get() = find<DidacticRule.MinResult>()?.min
+    
+    val requireBridge: Boolean
+        get() = find<DidacticRule.RequireBridgeThroughTen>()?.required ?: false
+    
+    val step: Int?
+        get() = find<DidacticRule.ExactStep>()?.step
+    
+    val multiplier: Int?
+        get() = find<DidacticRule.ExactMultiplier>()?.multiplier
+    
+    val requireEven: Boolean
+        get() = find<DidacticRule.RequireEvenInput>()?.required ?: false
+    
+    companion object {
+        fun build(block: Builder.() -> Unit): DidacticRules {
+            return Builder().apply(block).build()
+        }
+    }
+    
+    class Builder {
+        private val rules = mutableSetOf<DidacticRule>()
+        
+        fun range(min: Int, max: Int) = apply {
+            rules.add(DidacticRule.ValueRange(min, max))
+        }
+        
+        fun allowZero() = apply {
+            rules.add(DidacticRule.AllowZero(true))
+        }
+        
+        fun allowNegative() = apply {
+            rules.add(DidacticRule.AllowNegative(true))
+        }
+        
+        fun maxResult(max: Int) = apply {
+            rules.add(DidacticRule.MaxResult(max))
+        }
+        
+        fun minResult(min: Int) = apply {
+            rules.add(DidacticRule.MinResult(min))
+        }
+        
+        fun requireBridgeThroughTen() = apply {
+            rules.add(DidacticRule.RequireBridgeThroughTen(true))
+        }
+        
+        fun requireNoBridge() = apply {
+            rules.add(DidacticRule.RequireNoBridge(true))
+        }
+        
+        fun bothOperandsUnder(limit: Int) = apply {
+            rules.add(DidacticRule.BothOperandsUnder(limit))
+        }
+        
+        fun resultUnder(limit: Int) = apply {
+            rules.add(DidacticRule.ResultUnder(limit))
+        }
+        
+        fun requireEven() = apply {
+            rules.add(DidacticRule.RequireEvenInput(true))
+        }
+        
+        fun exactStep(step: Int) = apply {
+            rules.add(DidacticRule.ExactStep(step))
+        }
+        
+        fun sequenceLength(length: Int) = apply {
+            rules.add(DidacticRule.SequenceLength(length))
+        }
+        
+        fun allowEqual() = apply {
+            rules.add(DidacticRule.AllowEqualComparison(true))
+        }
+        
+        fun minDifference(diff: Int) = apply {
+            rules.add(DidacticRule.MinDifference(diff))
+        }
+        
+        fun maxGroups(max: Int) = apply {
+            rules.add(DidacticRule.MaxGroups(max))
+        }
+        
+        fun maxPerGroup(max: Int) = apply {
+            rules.add(DidacticRule.MaxPerGroup(max))
+        }
+        
+        fun exactMultiplier(multiplier: Int) = apply {
+            rules.add(DidacticRule.ExactMultiplier(multiplier))
+        }
+        
+        fun minPart(min: Int) = apply {
+            rules.add(DidacticRule.MinPartValue(min))
+        }
+        
+        fun maxPart(max: Int) = apply {
+            rules.add(DidacticRule.MaxPartValue(max))
+        }
+        
+        fun requireVisualPrompt() = apply {
+            rules.add(DidacticRule.RequiresVisualPrompt(true))
+        }
+        
+        fun build(): DidacticRules = DidacticRules(rules)
+    }
+}
+
+/**
  * Didactische configuratie voor een skill.
- * Definieert regels voor het genereren van oefeningen.
+ * Gebruikt typed DidacticRules in plaats van Map<String, String>.
  */
 data class SkillContentConfig(
     val skillId: String,
@@ -17,19 +183,8 @@ data class SkillContentConfig(
     val minDifficulty: Int = 1,
     val maxDifficulty: Int = 5,
     val allowedExerciseTypes: List<ExerciseType>,
-    val generatorRules: GeneratorRules,
+    val rules: DidacticRules,
     val hintStrategy: HintStrategy = HintStrategy.NONE
-)
-
-/**
- * Regels voor het genereren van oefeningen per difficulty level
- */
-data class GeneratorRules(
-    val minValue: Int,
-    val maxValue: Int,
-    val allowZero: Boolean = false,
-    val allowNegative: Boolean = false,
-    val specificRules: Map<String, String> = emptyMap()
 )
 
 /**
@@ -43,12 +198,11 @@ enum class HintStrategy {
 }
 
 /**
- * Content repository met alle skill configuraties
+ * Content repository met alle skill configuraties (met typed rules)
  */
 object ContentRepository {
     
     private val configs = listOf(
-        // FOUNDATION
         SkillContentConfig(
             skillId = "foundation_number_images_5",
             name = "Getalbeelden tot 5",
@@ -59,12 +213,10 @@ object ContentRepository {
             minDifficulty = 1,
             maxDifficulty = 3,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_QUANTITY),
-            generatorRules = GeneratorRules(
-                minValue = 1,
-                maxValue = 5,
-                allowZero = false,
-                allowNegative = false
-            ),
+            rules = DidacticRules.build {
+                range(1, 5)
+                requireVisualPrompt()
+            },
             hintStrategy = HintStrategy.VISUAL
         ),
         
@@ -78,16 +230,11 @@ object ContentRepository {
             minDifficulty = 1,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.MISSING_NUMBER),
-            generatorRules = GeneratorRules(
-                minValue = 3,
-                maxValue = 10,
-                allowZero = false,
-                allowNegative = false,
-                specificRules = mapOf(
-                    "minPart" to "1",
-                    "maxPart" to "9"
-                )
-            ),
+            rules = DidacticRules.build {
+                range(3, 10)
+                minPart(1)
+                maxPart(9)
+            },
             hintStrategy = HintStrategy.VISUAL
         ),
         
@@ -101,16 +248,14 @@ object ContentRepository {
             minDifficulty = 2,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.MISSING_NUMBER, ExerciseType.TYPED_NUMERIC),
-            generatorRules = GeneratorRules(
-                minValue = 11,
-                maxValue = 20,
-                allowZero = false,
-                allowNegative = false
-            ),
+            rules = DidacticRules.build {
+                range(11, 20)
+                minPart(1)
+                maxPart(19)
+            },
             hintStrategy = HintStrategy.STEP_BY_STEP
         ),
         
-        // ARITHMETIC
         SkillContentConfig(
             skillId = "arithmetic_add_10",
             name = "Optellen tot 10",
@@ -121,16 +266,12 @@ object ContentRepository {
             minDifficulty = 1,
             maxDifficulty = 3,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
-            generatorRules = GeneratorRules(
-                minValue = 1,
-                maxValue = 10,
-                allowZero = false,
-                allowNegative = false,
-                specificRules = mapOf(
-                    "maxSum" to "10",
-                    "allowBridge" to "false"
-                )
-            ),
+            rules = DidacticRules.build {
+                range(1, 9)
+                maxResult(10)
+                minResult(2)
+                requireNoBridge()
+            },
             hintStrategy = HintStrategy.VISUAL
         ),
         
@@ -144,16 +285,11 @@ object ContentRepository {
             minDifficulty = 1,
             maxDifficulty = 3,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
-            generatorRules = GeneratorRules(
-                minValue = 1,
-                maxValue = 10,
-                allowZero = false,
-                allowNegative = false,
-                specificRules = mapOf(
-                    "minResult" to "1",
-                    "allowBridge" to "false"
-                )
-            ),
+            rules = DidacticRules.build {
+                range(1, 10)
+                minResult(1)
+                requireNoBridge()
+            },
             hintStrategy = HintStrategy.VISUAL
         ),
         
@@ -167,16 +303,12 @@ object ContentRepository {
             minDifficulty = 2,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
-            generatorRules = GeneratorRules(
-                minValue = 11,
-                maxValue = 20,
-                allowZero = false,
-                allowNegative = false,
-                specificRules = mapOf(
-                    "maxSum" to "20",
-                    "allowBridge" to "false"
-                )
-            ),
+            rules = DidacticRules.build {
+                range(1, 19)
+                maxResult(20)
+                minResult(11)
+                requireNoBridge()
+            },
             hintStrategy = HintStrategy.STEP_BY_STEP
         ),
         
@@ -190,15 +322,11 @@ object ContentRepository {
             minDifficulty = 2,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
-            generatorRules = GeneratorRules(
-                minValue = 11,
-                maxValue = 20,
-                allowZero = false,
-                allowNegative = false,
-                specificRules = mapOf(
-                    "minResult" to "1"
-                )
-            ),
+            rules = DidacticRules.build {
+                range(11, 20)
+                minResult(1)
+                requireNoBridge()
+            },
             hintStrategy = HintStrategy.STEP_BY_STEP
         ),
         
@@ -212,17 +340,13 @@ object ContentRepository {
             minDifficulty = 3,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.TYPED_NUMERIC, ExerciseType.MISSING_NUMBER),
-            generatorRules = GeneratorRules(
-                minValue = 2,
-                maxValue = 9,
-                allowZero = false,
-                allowNegative = false,
-                specificRules = mapOf(
-                    "requireBridge" to "true",
-                    "maxSum" to "18",
-                    "bothUnder10" to "true"
-                )
-            ),
+            rules = DidacticRules.build {
+                range(2, 9)
+                maxResult(18)
+                minResult(11)
+                requireBridgeThroughTen()
+                bothOperandsUnder(10)
+            },
             hintStrategy = HintStrategy.STEP_BY_STEP
         ),
         
@@ -236,21 +360,15 @@ object ContentRepository {
             minDifficulty = 3,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.TYPED_NUMERIC, ExerciseType.MISSING_NUMBER),
-            generatorRules = GeneratorRules(
-                minValue = 11,
-                maxValue = 18,
-                allowZero = false,
-                allowNegative = false,
-                specificRules = mapOf(
-                    "requireBridge" to "true",
-                    "subtrahendUnder10" to "true",
-                    "resultUnder10" to "true"
-                )
-            ),
+            rules = DidacticRules.build {
+                range(11, 18)
+                minResult(1)
+                resultUnder(10)
+                requireBridgeThroughTen()
+            },
             hintStrategy = HintStrategy.STEP_BY_STEP
         ),
         
-        // PATTERNS
         SkillContentConfig(
             skillId = "patterns_doubles",
             name = "Dubbelen tot 20",
@@ -261,12 +379,9 @@ object ContentRepository {
             minDifficulty = 1,
             maxDifficulty = 3,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
-            generatorRules = GeneratorRules(
-                minValue = 1,
-                maxValue = 10,
-                allowZero = false,
-                allowNegative = false
-            ),
+            rules = DidacticRules.build {
+                range(1, 10)
+            },
             hintStrategy = HintStrategy.VISUAL
         ),
         
@@ -280,15 +395,10 @@ object ContentRepository {
             minDifficulty = 1,
             maxDifficulty = 3,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
-            generatorRules = GeneratorRules(
-                minValue = 2,
-                maxValue = 20,
-                allowZero = false,
-                allowNegative = false,
-                specificRules = mapOf(
-                    "onlyEven" to "true"
-                )
-            ),
+            rules = DidacticRules.build {
+                range(2, 20)
+                requireEven()
+            },
             hintStrategy = HintStrategy.VISUAL
         ),
         
@@ -302,16 +412,11 @@ object ContentRepository {
             minDifficulty = 2,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.SIMPLE_SEQUENCE, ExerciseType.MISSING_NUMBER),
-            generatorRules = GeneratorRules(
-                minValue = 2,
-                maxValue = 20,
-                allowZero = false,
-                allowNegative = false,
-                specificRules = mapOf(
-                    "step" to "2",
-                    "sequenceLength" to "4"
-                )
-            ),
+            rules = DidacticRules.build {
+                range(2, 20)
+                exactStep(2)
+                sequenceLength(4)
+            },
             hintStrategy = HintStrategy.COUNTING_AID
         ),
         
@@ -325,16 +430,11 @@ object ContentRepository {
             minDifficulty = 2,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.SIMPLE_SEQUENCE, ExerciseType.MISSING_NUMBER),
-            generatorRules = GeneratorRules(
-                minValue = 5,
-                maxValue = 50,
-                allowZero = false,
-                allowNegative = false,
-                specificRules = mapOf(
-                    "step" to "5",
-                    "sequenceLength" to "4"
-                )
-            ),
+            rules = DidacticRules.build {
+                range(5, 50)
+                exactStep(5)
+                sequenceLength(4)
+            },
             hintStrategy = HintStrategy.COUNTING_AID
         ),
         
@@ -348,20 +448,14 @@ object ContentRepository {
             minDifficulty = 2,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.SIMPLE_SEQUENCE, ExerciseType.MISSING_NUMBER),
-            generatorRules = GeneratorRules(
-                minValue = 10,
-                maxValue = 100,
-                allowZero = false,
-                allowNegative = false,
-                specificRules = mapOf(
-                    "step" to "10",
-                    "sequenceLength" to "4"
-                )
-            ),
+            rules = DidacticRules.build {
+                range(10, 100)
+                exactStep(10)
+                sequenceLength(4)
+            },
             hintStrategy = HintStrategy.COUNTING_AID
         ),
         
-        // ADVANCED
         SkillContentConfig(
             skillId = "advanced_compare_100",
             name = "Vergelijken tot 100",
@@ -372,15 +466,11 @@ object ContentRepository {
             minDifficulty = 3,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.COMPARE_NUMBERS),
-            generatorRules = GeneratorRules(
-                minValue = 1,
-                maxValue = 100,
-                allowZero = false,
-                allowNegative = false,
-                specificRules = mapOf(
-                    "allowEqual" to "true"
-                )
-            ),
+            rules = DidacticRules.build {
+                range(1, 100)
+                minDifference(5)
+                allowEqual()
+            },
             hintStrategy = HintStrategy.VISUAL
         ),
         
@@ -394,12 +484,10 @@ object ContentRepository {
             minDifficulty = 3,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.MISSING_NUMBER),
-            generatorRules = GeneratorRules(
-                minValue = 10,
-                maxValue = 99,
-                allowZero = true,
-                allowNegative = false
-            ),
+            rules = DidacticRules.build {
+                range(10, 99)
+                allowZero()
+            },
             hintStrategy = HintStrategy.VISUAL
         ),
         
@@ -413,16 +501,11 @@ object ContentRepository {
             minDifficulty = 3,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
-            generatorRules = GeneratorRules(
-                minValue = 2,
-                maxValue = 5,
-                allowZero = false,
-                allowNegative = false,
-                specificRules = mapOf(
-                    "maxGroups" to "5",
-                    "maxPerGroup" to "5"
-                )
-            ),
+            rules = DidacticRules.build {
+                range(2, 5)
+                maxGroups(5)
+                maxPerGroup(5)
+            },
             hintStrategy = HintStrategy.VISUAL
         ),
         
@@ -436,15 +519,10 @@ object ContentRepository {
             minDifficulty = 3,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
-            generatorRules = GeneratorRules(
-                minValue = 1,
-                maxValue = 10,
-                allowZero = false,
-                allowNegative = false,
-                specificRules = mapOf(
-                    "multiplier" to "2"
-                )
-            ),
+            rules = DidacticRules.build {
+                range(1, 10)
+                exactMultiplier(2)
+            },
             hintStrategy = HintStrategy.VISUAL
         ),
         
@@ -458,15 +536,10 @@ object ContentRepository {
             minDifficulty = 3,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
-            generatorRules = GeneratorRules(
-                minValue = 1,
-                maxValue = 10,
-                allowZero = false,
-                allowNegative = false,
-                specificRules = mapOf(
-                    "multiplier" to "5"
-                )
-            ),
+            rules = DidacticRules.build {
+                range(1, 10)
+                exactMultiplier(5)
+            },
             hintStrategy = HintStrategy.VISUAL
         ),
         
@@ -480,69 +553,38 @@ object ContentRepository {
             minDifficulty = 3,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
-            generatorRules = GeneratorRules(
-                minValue = 1,
-                maxValue = 10,
-                allowZero = false,
-                allowNegative = false,
-                specificRules = mapOf(
-                    "multiplier" to "10"
-                )
-            ),
+            rules = DidacticRules.build {
+                range(1, 10)
+                exactMultiplier(10)
+            },
             hintStrategy = HintStrategy.VISUAL
         )
     )
     
-    /**
-     * Haal configuratie op voor een skill
-     */
     fun getConfig(skillId: String): SkillContentConfig? {
         return configs.find { it.skillId == skillId }
     }
     
-    /**
-     * Haal alle configuraties op
-     */
     fun getAllConfigs(): List<SkillContentConfig> = configs
     
-    /**
-     * Haal gratis configuraties op
-     */
     fun getFreeConfigs(): List<SkillContentConfig> = configs.filter { !it.isPremium }
     
-    /**
-     * Haal premium configuraties op
-     */
     fun getPremiumConfigs(): List<SkillContentConfig> = configs.filter { it.isPremium }
     
-    /**
-     * Check of een skill unlocked kan worden op basis van prerequisites
-     */
     fun canUnlockSkill(skillId: String, masteredSkills: Set<String>): Boolean {
         val config = getConfig(skillId) ?: return false
         return config.prerequisites.all { it in masteredSkills }
     }
     
-    /**
-     * Haal de leerlijn op (skills in logische volgorde)
-     */
     fun getLearningPath(): List<List<String>> {
         return listOf(
-            // Level 1: Foundation
             listOf("foundation_number_images_5"),
-            // Level 2: Basic splits and add/sub to 10
             listOf("foundation_splits_10", "arithmetic_add_10"),
-            // Level 3: Subtraction and doubles/halves
             listOf("arithmetic_sub_10", "patterns_doubles", "patterns_halves"),
-            // Level 4: Splits to 20, add/sub to 20
             listOf("foundation_splits_20", "arithmetic_add_20", "arithmetic_sub_20"),
-            // Level 5: Bridge over 10
             listOf("arithmetic_bridge_add", "arithmetic_bridge_sub"),
-            // Level 6: Skip counting
             listOf("patterns_count_2", "patterns_count_5", "patterns_count_10"),
-            // Level 7: Compare and place value
             listOf("advanced_compare_100", "advanced_place_value"),
-            // Level 8: Groups and tables
             listOf("advanced_groups", "advanced_table_2", "advanced_table_5", "advanced_table_10")
         )
     }
