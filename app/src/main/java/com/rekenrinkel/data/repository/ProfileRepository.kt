@@ -3,10 +3,13 @@ package com.rekenrinkel.data.repository
 import com.rekenrinkel.data.datastore.SettingsDataStore
 import com.rekenrinkel.data.local.dao.ProfileDao
 import com.rekenrinkel.data.local.entity.ProfileEntity
+import com.rekenrinkel.domain.model.Badge
 import com.rekenrinkel.domain.model.Profile
+import com.rekenrinkel.domain.model.Rewards
 import com.rekenrinkel.domain.model.Theme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import java.util.*
 
@@ -102,5 +105,60 @@ class ProfileRepository(
 
     suspend fun clearAll() {
         profileDao.clearAll()
+    }
+
+    // ============ REWARDS METHODS ============
+
+    /**
+     * Haal huidige rewards op (van profile)
+     */
+    suspend fun getRewards(): Rewards {
+        val profile = profileDao.getProfileSync()
+            ?: return Rewards()
+
+        return Rewards(
+            totalXp = profile.totalXp,
+            currentLevel = profile.currentLevel,
+            currentStreak = profile.currentStreak,
+            longestStreak = profile.longestStreak,
+            lastSessionDate = profile.lastSessionDate
+            // Badges worden opgeslagen in SettingsDataStore of aparte tabel
+        )
+    }
+
+    /**
+     * Update rewards
+     */
+    suspend fun updateRewards(rewards: Rewards) {
+        val current = profileDao.getProfileSync() ?: return
+
+        val updated = current.copy(
+            totalXp = rewards.totalXp,
+            currentLevel = rewards.currentLevel,
+            currentStreak = rewards.currentStreak,
+            longestStreak = rewards.longestStreak,
+            lastSessionDate = rewards.lastSessionDate
+        )
+        profileDao.updateProfile(updated)
+    }
+
+    /**
+     * Voeg XP toe en update level
+     */
+    suspend fun addXp(amount: Int): Rewards {
+        val current = getRewards()
+        val newRewards = current.addXp(amount)
+        updateRewards(newRewards)
+        return newRewards
+    }
+
+    /**
+     * Update daily streak
+     */
+    suspend fun updateStreak(): Rewards {
+        val current = getRewards()
+        val newRewards = current.updateStreak()
+        updateRewards(newRewards)
+        return newRewards
     }
 }
