@@ -1,0 +1,26 @@
+# Gradle
+.gradle/
+build/
+
+# Local configuration
+local.properties
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Android
+*.apk
+*.ap_
+*.dex
+bin/
+gen/
+out/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
