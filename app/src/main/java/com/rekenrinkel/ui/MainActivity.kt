@@ -3,11 +3,18 @@ package com.rekenrinkel.ui
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -31,6 +38,7 @@ import com.rekenrinkel.ui.viewmodel.NavigationEvent as MainNavEvent
 import com.rekenrinkel.ui.viewmodel.SessionNavigationEvent
 import com.rekenrinkel.ui.viewmodel.SessionViewModel
 import com.rekenrinkel.ui.viewmodel.SessionViewModelFactory
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 
 class MainActivity : ComponentActivity() {
@@ -238,25 +246,40 @@ fun RekenRinkelApp() {
                         ?.savedStateHandle
                         ?.get<SessionResult>("result")
 
-                    if (result != null) {
-                        SessionResultScreen(
-                            result = result,
-                            onHome = {
-                                navController.navigate("home") {
-                                    popUpTo("home") { inclusive = true }
+                    when {
+                        result != null -> {
+                            SessionResultScreen(
+                                result = result,
+                                onHome = {
+                                    navController.navigate("home") {
+                                        popUpTo("home") { inclusive = true }
+                                    }
+                                },
+                                onRetry = {
+                                    navController.navigate("home") {
+                                        popUpTo("home") { inclusive = true }
+                                    }
                                 }
-                            },
-                            onRetry = {
-                                navController.navigate("home") {
-                                    popUpTo("home") { inclusive = true }
-                                }
+                            )
+                        }
+                        else -> {
+                            // Fallback: show error message and navigate home
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = "Resultaat laden...",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                CircularProgressIndicator(modifier = Modifier.padding(16.dp))
                             }
-                        )
-                    } else {
-                        // Fallback: no result available, go back to home
-                        LaunchedEffect(Unit) {
-                            navController.navigate("home") {
-                                popUpTo("home") { inclusive = true }
+                            LaunchedEffect(Unit) {
+                                kotlinx.coroutines.delay(500)
+                                navController.navigate("home") {
+                                    popUpTo("home") { inclusive = true }
+                                }
                             }
                         }
                     }

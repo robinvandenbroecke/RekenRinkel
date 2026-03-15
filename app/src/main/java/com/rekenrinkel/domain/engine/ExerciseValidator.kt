@@ -82,6 +82,11 @@ class ExerciseValidator {
 
         if (normalizedGiven == normalizedCorrect) return true
 
+        // Check of beide splits zijn met dezelfde getallen (bijv. "2 en 3" == "3 en 2")
+        val givenNumbers = extractNumbers(normalizedGiven).sorted()
+        val correctNumbers = extractNumbers(normalizedCorrect).sorted()
+        if (givenNumbers.isNotEmpty() && givenNumbers == correctNumbers) return true
+
         // Check of correct antwoord een split is (bijv. "2 en 3")
         // en gebruiker heeft het totaal ingevoerd (bijv. "5")
         val correctTotal = calculateTotal(normalizedCorrect)
@@ -142,6 +147,14 @@ class ExerciseValidator {
         val regex = Regex("\\d+")
         val match = regex.find(input)
         return match?.value?.toIntOrNull()
+    }
+
+    /**
+     * Extract alle getallen uit een string
+     */
+    private fun extractNumbers(input: String): List<Int> {
+        val regex = Regex("\\d+")
+        return regex.findAll(input).map { it.value.toIntOrNull() }.filterNotNull().toList()
     }
     
     /**
