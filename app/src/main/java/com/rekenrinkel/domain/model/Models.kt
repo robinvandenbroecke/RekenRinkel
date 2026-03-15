@@ -165,7 +165,8 @@ data class SessionResult(
     val endTime: Long? = null,
     val exercises: List<ExerciseResult> = emptyList(),
     val xpEarned: Int = 0,
-    val stars: Int = 0
+    val stars: Int = 0,
+    val averageResponseTimeMs: Long = 0
 ) : Serializable {
     fun correctCount(): Int = exercises.count { it.isCorrect }
     fun totalCount(): Int = exercises.size

@@ -25,6 +25,7 @@ fun ExerciseScreen(
     totalExercises: Int,
     onAnswer: (String) -> Unit,
     onSkip: () -> Unit,
+    onExerciseShown: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showFeedback by remember { mutableStateOf(false) }
@@ -32,12 +33,13 @@ fun ExerciseScreen(
     var typedAnswer by remember { mutableStateOf("") }
     var selectedOption by remember { mutableStateOf<String?>(null) }
     
-    // Reset state when exercise changes
+    // Reset state when exercise changes and start timer
     LaunchedEffect(exercise.id) {
         showFeedback = false
         isCorrect = false
         typedAnswer = ""
         selectedOption = null
+        onExerciseShown() // Start de timer voor response time tracking
     }
     
     Scaffold(

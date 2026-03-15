@@ -213,7 +213,8 @@ fun RekenRinkelApp() {
                             onAnswer = { answer -> 
                                 viewModel.submitAnswer(answer)
                             },
-                            onSkip = { viewModel.skipSession() }
+                            onSkip = { viewModel.skipSession() },
+                            onExerciseShown = { viewModel.startExerciseTimer() }
                         )
                     }
                 }

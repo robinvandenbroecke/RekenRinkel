@@ -96,6 +96,33 @@ fun SessionResultScreen(
                 )
             }
             
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Response time
+            if (result.averageResponseTimeMs > 0) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Gemiddelde tijd per vraag",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = "${(result.averageResponseTimeMs / 1000.0).format(1)}s",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                }
+            }
+            
             Spacer(modifier = Modifier.weight(1f))
             
             // What went well
@@ -179,6 +206,13 @@ fun SessionResultScreen(
             }
         }
     }
+}
+
+/**
+ * Formatteer een double naar x decimalen
+ */
+private fun Double.format(decimals: Int): String {
+    return String.format("%.${decimals}f", this)
 }
 
 @Composable
