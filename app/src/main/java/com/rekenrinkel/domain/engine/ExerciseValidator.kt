@@ -71,18 +71,34 @@ class ExerciseValidator {
     }
     
     /**
-     * Valideer visual groups - kan "a en b" of alleen getal zijn
+     * Valideer visual groups - kan "a en b" of alleen getal (totaal) zijn
      */
     private fun validateVisualGroups(given: String, correct: String): Boolean {
         // Exacte match
         if (given == correct) return true
-        
-        // Check of beide als enkel getal geïnterpreteerd kunnen worden
-        // (voor sommen waar het totaal gevraagd wordt)
-        val givenInt = extractNumber(given)
-        val correctInt = extractNumber(correct)
-        
-        return givenInt != null && correctInt != null && givenInt == correctInt
+
+        val normalizedGiven = normalizeInput(given)
+        val normalizedCorrect = normalizeInput(correct)
+
+        if (normalizedGiven == normalizedCorrect) return true
+
+        // Check of correct antwoord een split is (bijv. "2 en 3")
+        // en gebruiker heeft het totaal ingevoerd (bijv. "5")
+        val correctTotal = calculateTotal(normalizedCorrect)
+        val givenInt = normalizedGiven.toIntOrNull() ?: extractNumber(normalizedGiven)
+
+        return givenInt != null && correctTotal != null && givenInt == correctTotal
+    }
+
+    /**
+     * Bereken het totaal van een gesplitst antwoord (bijv. "2 en 3" -> 5)
+     */
+    private fun calculateTotal(normalizedInput: String): Int? {
+        // Split op spaties (normalizeInput vervangt " en " door " ")
+        val parts = normalizedInput.split(" ").filter { it.isNotEmpty() }
+        val numbers = parts.mapNotNull { it.toIntOrNull() }
+
+        return if (numbers.isNotEmpty()) numbers.sum() else null
     }
     
     /**

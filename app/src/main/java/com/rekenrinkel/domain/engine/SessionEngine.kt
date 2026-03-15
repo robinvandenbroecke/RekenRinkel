@@ -131,14 +131,45 @@ class SessionEngine(
         val challengeCandidates = determineChallengeSkillsExplicit(
             solid, mastered, accessibleConfigs, progressMap, isPremiumUnlocked
         )
-        
+
         challengeCandidates.take(challengeCount).forEach { skill ->
             val progress = progressMap[skill.id]
             val challengeDifficulty = ((progress?.currentDifficulty ?: 1) + 1)
                 .coerceIn(skill.minDifficulty, skill.maxDifficulty)
             exercises.add(exerciseEngine.generateExercise(skill.id, challengeDifficulty))
         }
-        
+
+        // Backfill: ensure we always have exactly SESSION_SIZE exercises
+        while (exercises.size < SESSION_SIZE) {
+            val needed = SESSION_SIZE - exercises.size
+
+            // Try to fill from accessible skills, allowing repeats if necessary
+            val backfillSkills = accessibleSkills
+                .filter { skill -> exercises.count { it.skillId == skill.id } < 2 } // Max 2 per skill
+                .shuffled()
+                .take(needed)
+
+            if (backfillSkills.isEmpty()) {
+                // Last resort: allow any accessible skill even if already used
+                accessibleSkills.shuffled().take(needed).forEach { skill ->
+                    val progress = progressMap[skill.id]
+                    val difficulty = determineDifficulty(skill, progress, false)
+                    exercises.add(exerciseEngine.generateExercise(skill.id, difficulty))
+                }
+            } else {
+                backfillSkills.forEach { skill ->
+                    val progress = progressMap[skill.id]
+                    val difficulty = determineDifficulty(skill, progress, false)
+                    exercises.add(exerciseEngine.generateExercise(skill.id, difficulty))
+                }
+            }
+
+            // Safety check to prevent infinite loop
+            if (exercises.size < SESSION_SIZE && accessibleSkills.isEmpty()) {
+                throw IllegalStateException("Cannot build session: no accessible skills available")
+            }
+        }
+
         // Shuffle met constraint: niet teveel van zelfde skill achter elkaar
         return smartShuffle(exercises)
     }

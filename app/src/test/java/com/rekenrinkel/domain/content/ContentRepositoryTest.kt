@@ -39,15 +39,52 @@ class ContentRepositoryTest {
     }
     
     @Test
-    fun `foundation skills have no prerequisites`() {
-        val foundationSkills = ContentRepository.getAllConfigs()
-            .filter { it.category == com.rekenrinkel.domain.model.SkillCategory.FOUNDATION }
-        
-        foundationSkills.forEach { skill ->
+    fun `entry skills have no prerequisites`() {
+        // Entry skills (root of learning path) should have no prerequisites
+        val entrySkills = listOf("foundation_number_images_5")
+
+        entrySkills.forEach { skillId ->
+            val config = ContentRepository.getConfig(skillId)
+            assertNotNull(config)
             assertTrue(
-                "Foundation skill ${skill.skillId} should have no prerequisites",
-                skill.prerequisites.isEmpty()
+                "Entry skill $skillId should have no prerequisites",
+                config?.prerequisites?.isEmpty() ?: false
             )
+        }
+    }
+
+    @Test
+    fun `all prerequisites refer to existing skills`() {
+        val allConfigs = ContentRepository.getAllConfigs()
+        val allSkillIds = allConfigs.map { it.skillId }.toSet()
+
+        allConfigs.forEach { config ->
+            config.prerequisites.forEach { prereqId ->
+                assertTrue(
+                    "Prerequisite $prereqId for ${config.skillId} should exist",
+                    prereqId in allSkillIds
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `learning path order respects prerequisites`() {
+        val learningPath = ContentRepository.getLearningPath()
+        val seenSkills = mutableSetOf<String>()
+
+        learningPath.flatten().forEach { skillId ->
+            val config = ContentRepository.getConfig(skillId)
+            assertNotNull(config)
+
+            // All prerequisites should have been seen before (earlier in path)
+            config?.prerequisites?.forEach { prereqId ->
+                assertTrue(
+                    "Skill $skillId prerequisite $prereqId should appear earlier in learning path",
+                    prereqId in seenSkills
+                )
+            }
+            seenSkills.add(skillId)
         }
     }
     

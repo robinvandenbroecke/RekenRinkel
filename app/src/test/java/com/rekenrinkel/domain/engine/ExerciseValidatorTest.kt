@@ -114,9 +114,45 @@ class ExerciseValidatorTest {
             type = ExerciseType.VISUAL_GROUPS,
             correctAnswer = "2 en 3"
         )
-        
+
         assertFalse(validator.validate(exercise, "1 en 4"))
         assertFalse(validator.validate(exercise, "4 en 1"))
+        assertFalse(validator.validate(exercise, "2 en 2"))
+    }
+
+    @Test
+    fun `validate visual groups rejects wrong total`() {
+        val exercise = createExercise(
+            type = ExerciseType.VISUAL_GROUPS,
+            correctAnswer = "2 en 3"
+        )
+
+        // Wrong total should be rejected
+        assertFalse(validator.validate(exercise, "4"))
+        assertFalse(validator.validate(exercise, "6"))
+    }
+
+    @Test
+    fun `validate visual groups accepts single number when correct is total`() {
+        val exercise = createExercise(
+            type = ExerciseType.VISUAL_GROUPS,
+            correctAnswer = "5"
+        )
+
+        // When correct answer is just a number, accept that number
+        assertTrue(validator.validate(exercise, "5"))
+    }
+
+    @Test
+    fun `validate visual groups rejects malformed input`() {
+        val exercise = createExercise(
+            type = ExerciseType.VISUAL_GROUPS,
+            correctAnswer = "2 en 3"
+        )
+
+        assertFalse(validator.validate(exercise, ""))
+        assertFalse(validator.validate(exercise, "abc"))
+        assertFalse(validator.validate(exercise, "en"))
     }
     
     // ============================================
