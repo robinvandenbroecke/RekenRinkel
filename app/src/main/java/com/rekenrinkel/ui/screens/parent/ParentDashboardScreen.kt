@@ -13,22 +13,46 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.rekenrinkel.domain.content.ContentRepository
 import com.rekenrinkel.domain.model.MasteryLevel
-import com.rekenrinkel.domain.model.SkillDefinitions
 import com.rekenrinkel.domain.model.SkillProgress
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ParentDashboardScreen(
     progressList: List<SkillProgress>,
-    totalSessions: Int,
-    averageSessionTime: String,
+    isPremiumUnlocked: Boolean,
     currentStreak: Int,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val weakSkills = progressList.filter { it.masteryScore < 50 }
-    val strongSkills = progressList.filter { it.masteryScore >= 75 }
+    // Filter op basis van premium status
+    val allConfigs = ContentRepository.getAllConfigs()
+    val accessibleConfigs = if (isPremiumUnlocked) {
+        allConfigs
+    } else {
+        allConfigs.filter { !it.isPremium }
+    }
+    
+    val accessibleSkillIds = accessibleConfigs.map { it.skillId }.toSet()
+    
+    // Categoriseer voortgang
+    val accessibleProgress = progressList.filter { it.skillId in accessibleSkillIds }
+    val weakSkills = accessibleProgress.filter { it.masteryScore < 50 }
+    val practicingSkills = accessibleProgress.filter { 
+        it.masteryScore >= 50 && it.masteryScore < 75 
+    }
+    val strongSkills = accessibleProgress.filter { it.masteryScore >= 75 }
+    
+    // Ontbrekende skills (nog niet gestart)
+    val startedSkillIds = accessibleProgress.map { it.skillId }.toSet()
+    val notStartedConfigs = accessibleConfigs.filter { it.skillId !in startedSkillIds }
+    
+    // Bereken statistieken
+    val totalSessions = accessibleProgress.sumOf { it.correctAnswers + it.wrongAnswers }
+    val avgResponseTime = if (accessibleProgress.isNotEmpty()) {
+        accessibleProgress.map { it.averageResponseTimeMs }.filter { it > 0 }.average()
+    } else 0.0
     
     Scaffold(
         topBar = {
@@ -58,7 +82,7 @@ fun ParentDashboardScreen(
                 ) {
                     SummaryCard(
                         value = totalSessions.toString(),
-                        label = "Sessies",
+                        label = "Opgaven gemaakt",
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -67,51 +91,118 @@ fun ParentDashboardScreen(
                         label = "Dagen streak",
                         modifier = Modifier.weight(1f)
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    SummaryCard(
+                        value = "${accessibleProgress.size}/${accessibleConfigs.size}",
+                        label = "Skills gestart",
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
             
-            // Weak skills section
+            // Average response time
+            if (avgResponseTime > 0) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Gemiddelde responstijd",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                text = "${(avgResponseTime / 1000).toInt()}s",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                    }
+                }
+            }
+            
+            // Nog niet gestart
+            if (notStartedConfigs.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "Nog te ontdekken (${notStartedConfigs.size})",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                }
+                
+                items(notStartedConfigs.take(3)) { config ->
+                    SkillConfigCard(
+                        config = config,
+                        isStarted = false
+                    )
+                }
+            }
+            
+            // Weak skills
             if (weakSkills.isNotEmpty()) {
                 item {
                     Text(
-                        text = "Aandacht nodig",
-                        style = MaterialTheme.typography.titleLarge
+                        text = "Aandacht nodig (${weakSkills.size})",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color(0xFFE57373)
                     )
                 }
                 
-                items(weakSkills) { progress ->
+                items(weakSkills.sortedBy { it.masteryScore }) { progress ->
                     SkillProgressCard(progress = progress)
                 }
             }
             
-            // Strong skills section
+            // Practicing skills
+            if (practicingSkills.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "Aan het oefenen (${practicingSkills.size})",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color(0xFFFFA726)
+                    )
+                }
+                
+                items(practicingSkills.sortedByDescending { it.masteryScore }) { progress ->
+                    SkillProgressCard(progress = progress)
+                }
+            }
+            
+            // Strong skills
             if (strongSkills.isNotEmpty()) {
                 item {
                     Text(
-                        text = "Goed beheerst",
-                        style = MaterialTheme.typography.titleLarge
+                        text = "Goed beheerst (${strongSkills.size})",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color(0xFF66BB6A)
                     )
                 }
                 
-                items(strongSkills) { progress ->
+                items(strongSkills.sortedByDescending { it.masteryScore }) { progress ->
                     SkillProgressCard(progress = progress)
                 }
-            }
-            
-            // All skills
-            item {
-                Text(
-                    text = "Alle vaardigheden",
-                    style = MaterialTheme.typography.titleLarge
-                )
-            }
-            
-            items(progressList) { progress ->
-                SkillProgressCard(progress = progress)
             }
             
             // Suggested focus
             item {
+                val suggestionText = when {
+                    weakSkills.isNotEmpty() -> {
+                        val weakest = weakSkills.minByOrNull { it.masteryScore }
+                        val skillName = ContentRepository.getConfig(weakest?.skillId ?: "")?.name
+                        "Focus op: $skillName"
+                    }
+                    notStartedConfigs.isNotEmpty() -> {
+                        val nextSkill = notStartedConfigs.first()
+                        "Volgende stap: ${nextSkill.name}"
+                    }
+                    else -> "Alles gaat goed! Blijf oefenen om sterker te worden."
+                }
+                
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
@@ -128,15 +219,36 @@ fun ParentDashboardScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = if (weakSkills.isNotEmpty()) {
-                                "Focus op: ${weakSkills.firstOrNull()?.let { 
-                                    SkillDefinitions.getById(it.skillId)?.name 
-                                } ?: "basisvaardigheden"}"
-                            } else {
-                                "Alles gaat goed! Probeer nieuwe uitdagingen."
-                            },
+                            text = suggestionText,
                             style = MaterialTheme.typography.bodyMedium
                         )
+                    }
+                }
+            }
+            
+            // Premium info
+            if (!isPremiumUnlocked) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Text(
+                                text = "⭐ Premium",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Ontgrendel ${ContentRepository.getPremiumConfigs().size} extra vaardigheden in de instellingen",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
                     }
                 }
             }
@@ -165,7 +277,8 @@ private fun SummaryCard(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
             )
         }
     }
@@ -173,7 +286,7 @@ private fun SummaryCard(
 
 @Composable
 private fun SkillProgressCard(progress: SkillProgress) {
-    val skill = SkillDefinitions.getById(progress.skillId)
+    val config = ContentRepository.getConfig(progress.skillId)
     val masteryColor = when (progress.masteryLevel()) {
         MasteryLevel.NOT_LEARNED -> Color.Gray
         MasteryLevel.EMERGING -> Color(0xFFFFA726)
@@ -191,12 +304,20 @@ private fun SkillProgressCard(progress: SkillProgress) {
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = skill?.name ?: progress.skillId,
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = config?.name ?: progress.skillId,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = progress.masteryLevel().name.lowercase().replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = masteryColor
+                    )
+                }
                 Text(
                     text = "${progress.masteryScore}%",
                     style = MaterialTheme.typography.titleMedium,
@@ -211,16 +332,70 @@ private fun SkillProgressCard(progress: SkillProgress) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp),
-                color = masteryColor
+                color = masteryColor,
+                trackColor = masteryColor.copy(alpha = 0.2f)
             )
             
             Spacer(modifier = Modifier.height(4.dp))
             
-            Row {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Text(
-                    text = "✓ ${progress.correctAnswers}  ✗ ${progress.wrongAnswers}",
+                    text = "✓ ${progress.correctAnswers} goed  ✗ ${progress.wrongAnswers} fout",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                if (progress.averageResponseTimeMs > 0) {
+                    Text(
+                        text = "${(progress.averageResponseTimeMs / 1000)}s",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SkillConfigCard(
+    config: com.rekenrinkel.domain.content.SkillContentConfig,
+    isStarted: Boolean
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (config.isPremium) 
+                MaterialTheme.colorScheme.secondaryContainer 
+            else 
+                MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = config.name,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = config.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            if (config.isPremium) {
+                Text(
+                    text = "⭐",
+                    style = MaterialTheme.typography.titleMedium
                 )
             }
         }
