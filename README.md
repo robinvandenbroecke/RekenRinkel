@@ -204,3 +204,4 @@ Copyright 2024 - Privé testbuild
 - [ ] App crasht niet tijdens oefenen
 - [ ] App crasht niet bij snel schakelen
 - [ ] Back button werkt correct
+**Laatste CI build**: 2026-03-15 16:13 UTC
