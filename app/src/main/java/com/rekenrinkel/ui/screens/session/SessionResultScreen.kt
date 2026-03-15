@@ -3,7 +3,7 @@ package com.rekenrinkel.ui.screens.session
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -42,7 +42,7 @@ fun SessionResultScreen(
         ) {
             // Success icon
             Icon(
-                imageVector = Icons.Default.EmojiEvents,
+                imageVector = Icons.Default.Star,
                 contentDescription = null,
                 modifier = Modifier.size(80.dp),
                 tint = MaterialTheme.colorScheme.primary
