@@ -3,6 +3,7 @@ package com.rekenrinkel.domain.engine
 import com.rekenrinkel.domain.content.ContentRepository
 import com.rekenrinkel.domain.model.*
 import com.rekenrinkel.data.repository.ProgressRepository
+import kotlinx.coroutines.flow.first
 
 /**
  * Engine voor sessiebeheer en adaptieve oefeningselectie.
@@ -58,7 +59,7 @@ class SessionEngine(
         val exercises = mutableListOf<Exercise>()
         
         // Haal voortgang op
-        val allProgress = progressRepository.getAllProgress()
+        val allProgress = progressRepository.getAllProgress().first()
         val progressMap = allProgress.associateBy { it.skillId }
         
         // Bepaal welke skills beschikbaar zijn (prerequisites behaald)

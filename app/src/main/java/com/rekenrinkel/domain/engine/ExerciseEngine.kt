@@ -157,9 +157,9 @@ class ExerciseEngine {
         maxSum: Int,
         useBridge: Boolean
     ): Exercise {
-        val a: Int
-        val b: Int
-        
+        var a: Int
+        var b: Int
+
         if (useBridge) {
             // Brug over 10: beide < 10, som > 10, som <= maxSum
             do {
@@ -201,9 +201,9 @@ class ExerciseEngine {
         max: Int,
         useBridge: Boolean
     ): Exercise {
-        val a: Int
-        val b: Int
-        
+        var a: Int
+        var b: Int
+
         if (useBridge) {
             // Brug over 10: a > 10, b < 10, resultaat < 10, en echt brug nodig
             do {
