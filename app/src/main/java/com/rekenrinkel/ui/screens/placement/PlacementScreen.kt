@@ -6,27 +6,38 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.rekenrinkel.domain.engine.PlacementEngine
 import com.rekenrinkel.domain.model.Profile
 
 @Composable
 fun PlacementScreen(
     profile: Profile?,
-    onPlacementComplete: () -> Unit,
+    placementEngine: PlacementEngine = remember { PlacementEngine() },
+    onPlacementComplete: (PlacementEngine.PlacementAnalysis) -> Unit,
     onCancel: () -> Unit
 ) {
-    var currentQuestion by remember { mutableIntStateOf(0) }
-    var isComplete by remember { mutableStateOf(false) }
-    
-    // Simpele placement flow - 5 vragen
-    val questions = remember {
-        listOf(
-            "Hoeveel stippen zie je? (3)" to "3",
-            "Wat is 2 + 3?" to "5",
-            "Wat is 10 - 4?" to "6",
-            "Welk getal is groter: 7 of 5?" to "7",
-            "Hoeveel is 5 + 5?" to "10"
-        )
+    if (profile == null) {
+        // Loading state
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+        return
     }
+
+    var currentQuestionIndex by remember { mutableIntStateOf(0) }
+    var isComplete by remember { mutableStateOf(false) }
+    var results by remember { mutableStateOf(mutableListOf<Pair<Boolean, Long>>()) }
+    var startTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    
+    // Genereer placement items op basis van startband
+    val placementItems = remember(profile.startingBand) {
+        placementEngine.generatePlacementItems(profile.startingBand)
+    }
+    
+    val currentItem = placementItems.getOrNull(currentQuestionIndex)
     
     Column(
         modifier = Modifier
@@ -36,7 +47,20 @@ fun PlacementScreen(
         verticalArrangement = Arrangement.Center
     ) {
         if (isComplete) {
-            // Completing state
+            // Completing state - toon analyse
+            val analysis = placementEngine.analyzePlacement(
+                profile.startingBand,
+                results.mapIndexed { index, (isCorrect, responseTime) ->
+                    com.rekenrinkel.domain.model.PlacementResult(
+                        skillId = placementItems.getOrNull(index)?.skillId ?: "",
+                        isCorrect = isCorrect,
+                        responseTimeMs = responseTime,
+                        givenAnswer = if (isCorrect) "correct" else "incorrect",
+                        correctAnswer = "correct"
+                    )
+                }
+            )
+            
             Text(
                 text = "🎯",
                 style = MaterialTheme.typography.displayLarge
@@ -51,64 +75,121 @@ fun PlacementScreen(
             
             Spacer(modifier = Modifier.height(16.dp))
             
+            // Toon resultaat
+            val correctCount = results.count { it.first }
             Text(
-                text = "We bepalen nu je startniveau...",
+                text = "$correctCount van ${placementItems.size} correct",
                 style = MaterialTheme.typography.bodyLarge
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = "Startniveau: ${analysis.recommendedBand.name}",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            
+            Text(
+                text = "Eerste skills: ${analysis.startSkills.take(2).joinToString(", ")}",
+                style = MaterialTheme.typography.bodyMedium
             )
             
             Spacer(modifier = Modifier.height(32.dp))
             
             Button(
-                onClick = onPlacementComplete,
+                onClick = { onPlacementComplete(analysis) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
             ) {
                 Text("Start met leren!")
             }
-        } else {
+        } else if (currentItem != null) {
             // Question state
             Text(
-                text = "Placement ${currentQuestion + 1}/${questions.size}",
+                text = "Placement ${currentQuestionIndex + 1}/${placementItems.size}",
                 style = MaterialTheme.typography.titleMedium
             )
             
             Spacer(modifier = Modifier.height(32.dp))
             
             LinearProgressIndicator(
-                progress = { (currentQuestion + 1).toFloat() / questions.size },
+                progress = { (currentQuestionIndex + 1).toFloat() / placementItems.size },
                 modifier = Modifier.fillMaxWidth()
             )
             
             Spacer(modifier = Modifier.height(48.dp))
             
             Text(
-                text = questions[currentQuestion].first,
-                style = MaterialTheme.typography.headlineSmall
+                text = currentItem.question,
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
             
             Spacer(modifier = Modifier.height(48.dp))
             
-            // Answer buttons (simplified)
-            Row(
+            // Antwoord knoppen
+            val answers = when {
+                currentItem.correctAnswer.toIntOrNull() != null -> {
+                    // Numeriek antwoord
+                    (1..10).map { it.toString() }
+                }
+                else -> {
+                    // Textueel antwoord
+                    listOf("links", "rechts", "evenveel", currentItem.correctAnswer)
+                }
+            }.distinct().shuffled().take(6)
+            
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                maxItemsInEachRow = 3
             ) {
-                listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10").forEach { answer ->
+                answers.forEach { answer ->
                     Button(
                         onClick = {
-                            if (currentQuestion < questions.size - 1) {
-                                currentQuestion++
+                            val responseTime = System.currentTimeMillis() - startTime
+                            val isCorrect = answer == currentItem.correctAnswer
+                            results.add(isCorrect to responseTime)
+                            
+                            if (currentQuestionIndex < placementItems.size - 1) {
+                                currentQuestionIndex++
+                                startTime = System.currentTimeMillis()
                             } else {
                                 isComplete = true
                             }
                         },
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier
+                            .padding(4.dp)
+                            .size(64.dp)
                     ) {
-                        Text(answer)
+                        Text(
+                            text = answer,
+                            style = MaterialTheme.typography.titleMedium
+                        )
                     }
                 }
             }
         }
     }
+}
+
+// Helper composable voor FlowRow (vereist material3)
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun FlowRow(
+    modifier: Modifier = Modifier,
+    horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
+    verticalArrangement: Arrangement.Vertical = Arrangement.Top,
+    maxItemsInEachRow: Int = Int.MAX_VALUE,
+    content: @Composable () -> Unit
+) {
+    androidx.compose.foundation.layout.FlowRow(
+        modifier = modifier,
+        horizontalArrangement = horizontalArrangement,
+        verticalArrangement = verticalArrangement,
+        maxItemsInEachRow = maxItemsInEachRow,
+        content = { content() }
+    )
 }

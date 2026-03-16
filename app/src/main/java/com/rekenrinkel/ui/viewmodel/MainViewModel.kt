@@ -64,31 +64,32 @@ class MainViewModel(
     }
     
     /**
-     * PATCH 2: LessonEngine als primaire leermotor
-     * Bouwt didactische les met warm-up, focus, review, challenge
+     * PATCH 3: LessonEngine als EXCLUSIEVE leermotor
+     * Geen fallback naar SessionEngine - LessonEngine bepaalt alles
      */
     fun startSession() {
         viewModelScope.launch {
             val profile = uiState.value.profile
             val isPremium = uiState.value.isPremiumUnlocked
             
-            // Gebruik LessonEngine voor didactische lesopbouw
-            val lessonPlan = profile?.let {
-                lessonEngine.buildLesson(
-                    userProfile = com.rekenrinkel.domain.model.UserProfile(
-                        id = it.id,
-                        name = it.name,
-                        age = it.age,
-                        theme = it.theme
-                    ),
-                    isPremiumUnlocked = isPremium
-                )
+            if (profile == null) {
+                // Geen profiel - kan geen sessie starten
+                return@launch
             }
             
-            // Converteer LessonPlan naar exercises voor UI
-            val exercises = lessonPlan?.exercises ?: sessionEngine.buildSession(isPremium)
+            // Gebruik ALLEEN LessonEngine - geen fallback
+            val lessonPlan = lessonEngine.buildLesson(
+                userProfile = com.rekenrinkel.domain.model.UserProfile(
+                    id = profile.id,
+                    name = profile.name,
+                    age = profile.age,
+                    theme = profile.theme
+                ),
+                isPremiumUnlocked = isPremium
+            )
             
-            _navigation.emit(NavigationEvent.StartSession(exercises))
+            // SessionEngine is nu alleen een helper - niet meer parallel
+            _navigation.emit(NavigationEvent.StartSession(lessonPlan.exercises))
         }
     }
     
@@ -192,16 +193,21 @@ class MainViewModel(
     }
     
     /**
-     * PATCH 1: Voltooi placement en bepaal startniveau
+     * PATCH 2: Voltooi placement met echte analyse
      */
-    fun completePlacement() {
+    fun completePlacement(analysis: com.rekenrinkel.domain.engine.PlacementEngine.PlacementAnalysis) {
         viewModelScope.launch {
             val profile = uiState.value.profile ?: return@launch
             
-            // Simuleer placement analyse (in echte implementatie: gebruik PlacementEngine resultaten)
             val updated = profile.copy(
                 placementCompleted = true,
-                startingBand = determineStartingBand(profile.age)
+                startingBand = analysis.recommendedBand,
+                placementAnalysisResult = com.rekenrinkel.domain.model.PlacementAnalysisResult(
+                    recommendedBand = analysis.recommendedBand,
+                    startSkills = analysis.startSkills,
+                    startCpaPhase = analysis.startCpaPhase,
+                    difficultyOffset = analysis.difficultyOffset
+                )
             )
             profileRepository.updateProfile(updated)
         }

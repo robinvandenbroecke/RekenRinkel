@@ -32,6 +32,7 @@ import com.rekenrinkel.ui.screens.profile.ProfileScreen
 import com.rekenrinkel.ui.screens.session.SessionResultScreen
 import com.rekenrinkel.ui.screens.settings.SettingsScreen
 import com.rekenrinkel.ui.screens.placement.PlacementScreen
+import com.rekenrinkel.domain.engine.PlacementEngine
 import com.rekenrinkel.ui.theme.RekenRinkelTheme
 import com.rekenrinkel.ui.viewmodel.LessonNavigationEvent
 import com.rekenrinkel.ui.viewmodel.LessonViewModel
@@ -124,7 +125,7 @@ fun RekenRinkelApp() {
                     )
                 }
                 
-                // PATCH 1: Placement route toegevoegd
+                // PATCH 2: Placement route functioneel gemaakt
                 composable("placement") {
                     val viewModel: MainViewModel = viewModel(
                         factory = MainViewModelFactory(context)
@@ -141,10 +142,12 @@ fun RekenRinkelApp() {
                         }
                     }
                     
-                    // Placeholder placement screen - gebruikt exercise engine
+                    // Echte placement screen met analyse
                     PlacementScreen(
                         profile = placementProfile,
-                        onPlacementComplete = { viewModel.completePlacement() },
+                        onPlacementComplete = { analysis ->
+                            viewModel.completePlacement(analysis)
+                        },
                         onCancel = { 
                             // Kan niet cancellen - placement is verplicht
                         }
