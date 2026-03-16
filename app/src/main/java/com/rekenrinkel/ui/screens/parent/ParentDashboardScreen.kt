@@ -49,7 +49,7 @@ fun ParentDashboardScreen(
     val notStartedConfigs = accessibleConfigs.filter { it.skillId !in startedSkillIds }
     
     // Bereken statistieken
-    val totalSessions = accessibleProgress.sumOf { it.correctAnswers + it.wrongAnswers }
+    val totalSessions = accessibleProgress.sumOf { it.correctCount + it.incorrectCount }
     val avgResponseTime = if (accessibleProgress.isNotEmpty()) {
         accessibleProgress.map { it.averageResponseTimeMs }.filter { it > 0 }.average()
     } else 0.0
@@ -343,7 +343,7 @@ private fun SkillProgressCard(progress: SkillProgress) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "✓ ${progress.correctAnswers} goed  ✗ ${progress.wrongAnswers} fout",
+                    text = "✓ ${progress.correctCount} goed  ✗ ${progress.incorrectCount} fout",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )

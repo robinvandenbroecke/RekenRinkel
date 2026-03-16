@@ -13,28 +13,8 @@ enum class Theme {
     SPACE
 }
 
-/**
- * Gebruikersprofiel
- */
-data class Profile(
-    val id: String = UUID.randomUUID().toString(),
-    val name: String = "",
-    val theme: Theme = Theme.DINOSAURS,
-    val currentLevel: Int = 1,
-    val totalXp: Int = 0,
-    val currentStreak: Int = 0,
-    val lastSessionDate: Long? = null,
-    val longestStreak: Int = 0
-) {
-    fun xpForNextLevel(): Int {
-        return currentLevel * 100
-    }
-    
-    fun xpProgress(): Float {
-        val xpInCurrentLevel = totalXp % 100
-        return xpInCurrentLevel / 100f
-    }
-}
+// Profile is nu gedefinieerd in EnhancedModels.kt als UserProfile
+// met uitgebreide rewards tracking en typealias Profile = UserProfile
 
 /**
  * Mastery levels voor vaardigheden
@@ -134,17 +114,8 @@ enum class VisualType : Serializable {
     COMPARISON
 }
 
-/**
- * Resultaat van een oefening
- */
-data class ExerciseResult(
-    val exerciseId: String,
-    val skillId: String,
-    val isCorrect: Boolean,
-    val responseTimeMs: Long,
-    val givenAnswer: String,
-    val timestamp: Long = System.currentTimeMillis()
-) : Serializable
+// ExerciseResult is nu gedefinieerd in EnhancedModels.kt als DetailedExerciseResult
+// met uitgebreide velden en typealias ExerciseResult = DetailedExerciseResult
 
 /**
  * Sessie resultaat
