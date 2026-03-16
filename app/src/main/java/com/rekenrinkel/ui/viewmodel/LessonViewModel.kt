@@ -7,6 +7,7 @@ import com.rekenrinkel.data.repository.ProfileRepository
 import com.rekenrinkel.data.repository.ProgressRepository
 import com.rekenrinkel.domain.engine.*
 import com.rekenrinkel.domain.model.*
+import com.rekenrinkel.domain.model.UserProfile as ProfileModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -43,7 +44,8 @@ class LessonViewModel(
             try {
                 // Haal user profile op
                 val profile = profileRepository.getProfile().firstOrNull()
-                    ?: UserProfile() // Default
+                    ?.let { ProfileModel(name = it.name, age = it.age, theme = it.theme) }
+                    ?: ProfileModel() // Default
 
                 val isPremium = settingsDataStore.premiumUnlocked.first()
 
@@ -248,7 +250,7 @@ class LessonViewModel(
             }
 
             val sessionResult = SessionResult(
-                exercises = state.results,
+                exercises = state.results.map { it.toExerciseResult() },
                 xpEarned = state.xpEarnedThisLesson,
                 stars = stars,
                 averageResponseTimeMs = averageResponseTime
@@ -343,4 +345,14 @@ private fun List<DetailedExerciseResult>.accuracy(): Float {
     if (isEmpty()) return 0f
     val correct = count { it.isCorrect }
     return correct.toFloat() / size
+}
+
+private fun DetailedExerciseResult.toExerciseResult(): ExerciseResult {
+    return ExerciseResult(
+        exerciseId = exerciseId,
+        skillId = skillId,
+        isCorrect = isCorrect,
+        responseTimeMs = responseTimeMs,
+        givenAnswer = givenAnswer
+    )
 }
