@@ -214,6 +214,23 @@ data class DidacticRules(
  * Didactische configuratie voor een skill.
  * Gebruikt typed DidacticRules in plaats van Map<String, String>.
  */
+/**
+ * Strategie voor het tonen van hints
+ * MOET voor SkillContentConfig staan vanwege default parameter
+ */
+enum class HintStrategy {
+    NONE,
+    VISUAL,
+    STEP_BY_STEP,
+    COUNTING_AID,
+    BOND_MODEL,
+    NUMBER_LINE
+}
+
+/**
+ * Didactische configuratie voor een skill.
+ * Gebruikt typed DidacticRules in plaats van Map<String, String>.
+ */
 data class SkillContentConfig(
     val skillId: String,
     val name: String,
@@ -231,18 +248,6 @@ data class SkillContentConfig(
     val commonErrorTypes: List<ErrorType> = emptyList(),
     val remediationSkill: String? = null
 )
-
-/**
- * Strategie voor het tonen van hints
- */
-enum class HintStrategy {
-    NONE,
-    VISUAL,
-    STEP_BY_STEP,
-    COUNTING_AID,
-    BOND_MODEL,
-    NUMBER_LINE
-}
 
 /**
  * Content repository met alle skill configuraties (met typed rules)
