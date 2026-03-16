@@ -28,9 +28,14 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 - Representaties: DOTS, BLOCKS, BOND_MODEL, NUMBER_LINE, SYMBOLS
 
 ### Sessie/Les (didactisch opgebouwd)
-- LessonEngine: primaire leermotor
+- LessonEngine: primaire leermotor met fouttype-remediëring
 - 10 items per les: Warm-up (2), Focus (4), Review (2), Challenge (2)
 - Didactische flow: Worked example → Guided → Independent
+- **PATCH 4**: Fouttype-remediëring:
+  * BRIDGE_10_ERROR → bond model
+  * COMPARE_ERROR → getallenlijn
+  * GROUPING_ERROR → arrays
+  * etc.
 - CPA-fase bepaalt oefeningstype:
   * CONCRETE: veel scaffolding (worked + guided)
   * PICTORIAL: mix (guided + independent)
@@ -38,9 +43,11 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 - Smart shuffle met variatie
 - Exit check na sessie
 
-### Voortgang
+### Voortgang (PATCH 5 & 6)
 - SkillProgress per skill: masteryScore (0-100), difficultyTier, CPA-fase
-- Rewards: XP, level, streak tracking
+- **PATCH 6**: Mastery sterren (0-3⭐) per skill
+- **PATCH 5**: Leerdoelen zichtbaar in UI (focus skill, CPA-fase, voortgang)
+- Rewards: XP, level, streak tracking + gekoppeld aan mastery
 - ProfielRepository: CRUD operaties
 - ProgressRepository: skill resultaten
 
@@ -71,10 +78,12 @@ Volgende les
 
 ## Wat in opbouw is
 
-### Leeftijdsadaptatie (basis aanwezig)
+### Leeftijdsadaptatie (PATCH 7 - basis aanwezig)
 - Startband via leeftijd: geïmplementeerd
 - Placement test: verplicht vóór normaal leerpad
 - Placement resultaat bepaalt start cluster
+- **PATCH 7**: Leeftijd = bias, niet dictator
+- Prestaties overrulen leeftijd na placement
 - Dynamische content selectie: in ontwikkeling
 
 ### CPA/Singapore Math (gedeeltelijk geïmplementeerd)
@@ -85,11 +94,13 @@ Volgende les
   * PICTORIAL → ABSTRACT: 75% mastery + 8 attempts
   * ABSTRACT → MIXED: 85% mastery
 
-### Mastery engine (gedeeltelijk geïmplementeerd)
+### Mastery engine (PATCH 4, 5, 6 - gedeeltelijk geïmplementeerd)
 - SkillProgress tracking: basis aanwezig
 - Difficulty adjustment: geïmplementeerd
 - CPA-fase tracking: geïmplementeerd
-- Remediëring op basis van fouttypes: framework aanwezig
+- **PATCH 4**: Fouttype-remediëring geïmplementeerd
+- **PATCH 5**: Leerdoelen zichtbaar in UI
+- **PATCH 6**: Mastery sterren (0-3⭐) per skill
 
 ### Rewards (gedeeltelijk geïmplementeerd)
 - XP systeem: basis aanwezig

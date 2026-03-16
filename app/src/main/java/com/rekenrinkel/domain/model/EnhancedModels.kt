@@ -86,6 +86,19 @@ data class SkillProgress(
     fun masteryLevel(): MasteryLevel = masteryScore.toMasteryLevel()
     fun isMastered(): Boolean = masteryScore >= 90
 
+    // PATCH 6: Mastery sterren (0-3) voor visuele voortgang
+    fun masteryStars(): Int = when {
+        masteryScore >= 90 -> 3  // ⭐⭐⭐ Mastered
+        masteryScore >= 70 -> 2  // ⭐⭐ Gevorderd
+        masteryScore >= 50 -> 1  // ⭐ Beginner
+        else -> 0                // Nog niet gestart
+    }
+
+    // PATCH 6: Dominant fouttype voor remediëring
+    fun dominantErrorType(): String? {
+        return errorTypeSummary.maxByOrNull { it.value }?.key
+    }
+
     /**
      * Bereken difficulty adjustment op basis van recente prestaties
      * @return +1 (moeilijker), -1 (makkelijker), of 0 (gelijk)

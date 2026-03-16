@@ -45,6 +45,92 @@ class LessonEngine(
     }
 
     /**
+     * PATCH 4: Remediëringsinformatie per fouttype
+     */
+    data class RemediationInfo(
+        val errorType: com.rekenrinkel.domain.content.ErrorType,
+        val fallbackRepresentation: com.rekenrinkel.domain.content.RepresentationType,
+        val remediationSkill: String,
+        val hint: String
+    )
+
+    /**
+     * PATCH 4: Bepaal remediëring op basis van fouttype
+     */
+    fun getRemediationForError(errorType: com.rekenrinkel.domain.content.ErrorType): RemediationInfo {
+        return when (errorType) {
+            com.rekenrinkel.domain.content.ErrorType.COUNTING_ERROR -> RemediationInfo(
+                errorType = errorType,
+                fallbackRepresentation = com.rekenrinkel.domain.content.RepresentationType.DOTS,
+                remediationSkill = "foundation_subitize_5",
+                hint = "Tel langzaam en wijs naar elk object"
+            )
+            com.rekenrinkel.domain.content.ErrorType.BOND_ERROR -> RemediationInfo(
+                errorType = errorType,
+                fallbackRepresentation = com.rekenrinkel.domain.content.RepresentationType.BOND_MODEL,
+                remediationSkill = "foundation_number_bonds_10",
+                hint = "Welke twee getallen maken samen 10?"
+            )
+            com.rekenrinkel.domain.content.ErrorType.COMPARE_ERROR -> RemediationInfo(
+                errorType = errorType,
+                fallbackRepresentation = com.rekenrinkel.domain.content.RepresentationType.NUMBER_LINE,
+                remediationSkill = "foundation_more_less",
+                hint = "Welk getal staat verder op de getallenlijn?"
+            )
+            com.rekenrinkel.domain.content.ErrorType.BRIDGE_10_ERROR -> RemediationInfo(
+                errorType = errorType,
+                fallbackRepresentation = com.rekenrinkel.domain.content.RepresentationType.BOND_MODEL,
+                remediationSkill = "foundation_number_bonds_10",
+                hint = "Splits om over 10 heen te komen: 8 + 5 = 8 + 2 + 3 = 10 + 3"
+            )
+            com.rekenrinkel.domain.content.ErrorType.GROUPING_ERROR -> RemediationInfo(
+                errorType = errorType,
+                fallbackRepresentation = com.rekenrinkel.domain.content.RepresentationType.ARRAY,
+                remediationSkill = "advanced_groups",
+                hint = "Maak gelijke groepjes of teken een rooster"
+            )
+            com.rekenrinkel.domain.content.ErrorType.PLACE_VALUE_ERROR -> RemediationInfo(
+                errorType = errorType,
+                fallbackRepresentation = com.rekenrinkel.domain.content.RepresentationType.BLOCKS,
+                remediationSkill = "advanced_place_value",
+                hint = "Hoeveel tientallen en hoeveel eenheden?"
+            )
+            com.rekenrinkel.domain.content.ErrorType.SEQUENCE_ERROR -> RemediationInfo(
+                errorType = errorType,
+                fallbackRepresentation = com.rekenrinkel.domain.content.RepresentationType.NUMBER_LINE,
+                remediationSkill = "patterns_count_2",
+                hint = "Gebruik de getallenlijn om de sprong te zien"
+            )
+            else -> RemediationInfo(
+                errorType = errorType,
+                fallbackRepresentation = com.rekenrinkel.domain.content.RepresentationType.BLOCKS,
+                remediationSkill = "foundation_counting",
+                hint = "Probeer het nog eens stap voor stap"
+            )
+        }
+    }
+
+    /**
+     * PATCH 4: Genereer remediëringsoefening na fout
+     */
+    fun generateRemediationExercise(
+        originalSkillId: String,
+        errorType: com.rekenrinkel.domain.content.ErrorType,
+        difficulty: Int
+    ): Exercise {
+        val remediation = getRemediationForError(errorType)
+        
+        // Genereer worked example voor remediëring
+        return exerciseEngine.generateWorkedExample(
+            skillId = originalSkillId,
+            difficulty = maxOf(1, difficulty - 1)  // Iets makkelijker
+        ).copy(
+            hint = remediation.hint,
+            isRemediation = true
+        )
+    }
+
+    /**
      * Bouw een complete les met alle phases
      */
     suspend fun buildLesson(

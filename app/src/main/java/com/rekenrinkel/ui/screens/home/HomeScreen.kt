@@ -53,8 +53,18 @@ fun HomeScreen(
                 ProfileCard(profile = profile)
             }
             
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // PATCH 5: Leerdoelen sectie
+            LearningGoalsCard(
+                focusSkill = "splitsingen tot 10",  // TODO: uit repository halen
+                cpaPhase = "picturaal",
+                masteryProgress = 0.65f,
+                nextSkill = "brug over 10"
+            )
+
             Spacer(modifier = Modifier.weight(1f))
-            
+
             // Hoofdactie
             Card(
                 modifier = Modifier
@@ -180,6 +190,72 @@ private fun ProfileCard(profile: Profile) {
                     style = MaterialTheme.typography.titleMedium
                 )
             }
+        }
+    }
+}
+
+/**
+ * PATCH 5: Leerdoelen kaart - toont huidige focus en voortgang
+ */
+@Composable
+private fun LearningGoalsCard(
+    focusSkill: String,
+    cpaPhase: String,
+    masteryProgress: Float,
+    nextSkill: String
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "📚 Vandaag",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = focusSkill,
+                style = MaterialTheme.typography.headlineSmall
+            )
+
+            Text(
+                text = "Fase: $cpaPhase",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Mastery progress
+            LinearProgressIndicator(
+                progress = { masteryProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+            )
+
+            Text(
+                text = "${(masteryProgress * 100).toInt()}% naar mastery",
+                style = MaterialTheme.typography.labelSmall
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "➡️ Volgende: $nextSkill",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
         }
     }
 }
