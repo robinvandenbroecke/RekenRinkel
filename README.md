@@ -5,65 +5,67 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 **Status**: Privétestfase - niet productierijp  
 **Laatste update**: 2026-03-16
 
-## Wat werkt
+## Werkwijze
 
-### Start op basis van leeftijd (nieuw)
-- Geen verplichte placement-test meer
-- Leeftijd bepaalt startband en initiële skills:
-  - **5-6 jaar**: Foundation (subitizing, telling, number bonds 5)
-  - **7-8 jaar**: Early Arithmetic (optellen/aftrekken tot 20, brug over 10)
-  - **9-11 jaar**: Extended (tafels, plaatswaarde, breuken)
-- Direct naar leerpad na onboarding
-- Placement optioneel beschikbaar als oudertool
+### Start op leeftijd, dan adaptief
+1. **Leeftijd bepaalt de start** (5-6 / 7-8 / 9-11 jaar)
+2. **Daarna sturen prestaties** het traject:
+   - Snelle correcte antwoorden → sneller naar hogere difficulty of volgende CPA-fase
+   - Herhaalde fouten → meer steun, lagere difficulty, of terug naar sterkere representatie
+   - Zwakke skills komen terug via spaced review
+   - Sterke kinderen stromen sneller door dan de leeftijdsnorm
+   - Zwakkere kinderen vallen terug naar eerdere conceptuele lagen
 
 ### Curriculum NL/Vlaanderen
-Skills afgestemd op:
+Inhoud afgestemd op:
 - **Nederland**: Kerndoelen rekenen-wiskunde PO (referentieniveaus 1F/1S)
 - **Vlaanderen**: Minimumdoelen wiskunde lager onderwijs
 
-Domeinen:
-- Getalbegrip (number sense, bonds, plaatswaarde)
+Clusters:
+- Getalbegrip (subitizing, bonds, plaatswaarde)
 - Bewerkingen (optellen, aftrekken, brug over 10)
 - Patronen en relaties (doubles, skip counting)
 - Vermenigvuldigen (groepjes, arrays, tafels)
 - Breuken en redeneren (vanaf 8-11 jaar)
 
-### Adaptieve progressie
-- Mastery per skill (0-100%)
-- Automatische difficulty adjustment (+1 na 3 correct, -1 na 2 fout)
-- CPA-fase advance op basis van prestaties:
-  - CONCRETE → PICTORIAL: 60% mastery + 5 attempts
-  - PICTORIAL → ABSTRACT: 75% mastery + 8 attempts
-  - ABSTRACT → MIXED: 85% mastery
+### CPA-gestuurde representaties
+Per skillcluster: Concrete → Pictorial → Abstract → Transfer
+- Fase-vooruit na voldoende beheersing (60%/75%/90% mastery + streak)
+- Terugval naar sterkere representatie bij 3+ opeenvolgende fouten
+- Geen abstract-first bij jonge of zwakke gebruikers
 
-### LessonEngine
-- 10 items per les: Warm-up (2), Focus (4), Review (2), Challenge (2)
-- Didactische flow: Worked example → Guided → Independent
-- Fouttype-remediëring (terug naar sterkere representatie bij fouten)
+### Lesstructuur
+- **Duur**: 5-10 minuten
+- **Aantal**: 8 items per les
+- **Opbouw**: 1 warm-up, 4 focus, 2 review, 1 challenge
+- **Focus**: 1 skill of microcluster per les
 
 ### Progressie-UI
-- Huidige focus skill met mastery score
+- Huidige focus skill met mastery score (0-100%)
 - CPA-fase indicator
 - Mastery sterren: ⭐ (50%), ⭐⭐ (70%), ⭐⭐⭐ (90%)
-- "Mastered" status bij 90%
+- "Mastered" bij 90%
+- Review indicator voor skills die lang geleden zijn geoefend
 
-### Rewards (mastery-first)
-- Mastery sterren per skill
-- "Skill Mastered" badge
-- XP secundair (correct, snel, streak, mastered bonus)
+### Rewards (leerpad-gericht)
+- Skill mastered badge
+- CPA-fase badges
+- Mastery sterren (0-3)
+- Cluster badges (foundation, arithmetic)
+- Review consistentie badge
+- XP secundair (correct, snel, streak)
 
-## Wat in ontwikkeling is
-
-- Spaced review algoritme
-- Uitgebreider parent dashboard
-- Meer oefentypes
+### Placement
+- **Optioneel**, niet verplicht
+- Beschikbaar als diagnostische tool voor ouders
+- Voor herijking na lange tijd of schoolse evaluatie
 
 ## Flow
 
 ```
-App Start → Onboarding (leeftijd) → Home → LessonEngine → Rewards
-                ↓
-        Optionele placement (oudertool)
+Onboarding (leeftijd) → Home → Les (8 items, ~7 min) → Beloningen
+                              ↓
+                        Adaptieve bijsturing
 ```
 
 ## Build
