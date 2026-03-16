@@ -98,11 +98,12 @@ class LessonViewModel(
     }
 
     /**
-     * PATCH 1: Centrale helper voor het afronden van een oefening - FAIL-SAFE.
+     * PATCH 1-3: Centrale helper voor het afronden van een oefening - FAIL-SAFE.
      * Alle paden (submit, worked, skip) eindigen hier.
      * Deze functie regelt ook de feedback delay en auto-advance.
      *
      * BELANGRIJK: Bij exceptions gaan we NOOIT meer stil terug naar SHOWING.
+     * We gaan naar ERROR state met expliciete failure context.
      */
     private suspend fun finishCurrentExercise(
         result: DetailedExerciseResult,
@@ -110,7 +111,10 @@ class LessonViewModel(
         feedbackDurationMs: Long = 800
     ) {
         val state = _uiState.value
-        val currentExercise = state.currentExercise ?: return
+        val currentExercise = state.currentExercise ?: run {
+            handleCompletionFailure("Geen huidige oefening", FailureStage.UNKNOWN)
+            return
+        }
 
         // PATCH 2: Harde completion guard
         if (currentlyCompletingExerciseId == currentExercise.id) {
@@ -123,106 +127,120 @@ class LessonViewModel(
             currentExercise.type == com.rekenrinkel.domain.model.ExerciseType.WORKED_EXAMPLE
 
         try {
-            // 1. Update progress/mastery (indien niet geskipped/worked)
+            // PATCH 3: Stap 1 - Resultaat opslaan
+            var newResults: List<DetailedExerciseResult>
+            try {
+                newResults = state.results + result
+            } catch (e: Exception) {
+                handleCompletionFailure("Resultaat aanmaken mislukt", FailureStage.RESULT_LOGGING, currentExercise)
+                return
+            }
+
+            // PATCH 3: Stap 2 - Progress/mastery update (indien niet geskipped/worked)
+            var outcome: ExerciseOutcome? = null
             if (!skipMasteryUpdate) {
                 try {
                     val currentProgress = progressRepository.getOrCreateProgress(currentExercise.skillId)
-                    val outcome = lessonEngine.processExerciseResult(result, currentProgress)
+                    outcome = lessonEngine.processExerciseResult(result, currentProgress)
                     progressRepository.updateProgress(outcome.updatedProgress)
+                } catch (e: Exception) {
+                    // Fout in progress update - log maar ga door
+                    outcome = null
+                }
 
-                    // 2. Update rewards (XP, streak, badges)
-                    val currentRewards = profileRepository.getRewards()
-                    val updatedRewards = currentRewards
-                        .addXp(outcome.xpEarned)
-                        .updateStreak()
+                // PATCH 3: Stap 3 - Rewards update
+                try {
+                    if (outcome != null) {
+                        val currentRewards = profileRepository.getRewards()
+                        val updatedRewards = currentRewards
+                            .addXp(outcome.xpEarned)
+                            .updateStreak()
 
-                    val newBadges = lessonEngine.checkBadges(
-                        outcome,
-                        currentRewards,
-                        currentExercise.skillId
-                    )
-
-                    val finalRewards = newBadges.fold(updatedRewards) { rewards, badge ->
-                        rewards.addBadge(badge)
-                    }
-                    profileRepository.updateRewards(finalRewards)
-
-                    // 3. Update UI state met resultaten
-                    val newResults = state.results + result
-                    _uiState.update {
-                        it.copy(
-                            results = newResults,
-                            stepState = if (needsFeedback) LessonStepState.FEEDBACK else LessonStepState.ADVANCING,
-                            lastAnswerCorrect = result.isCorrect,
-                            xpEarnedThisLesson = it.xpEarnedThisLesson + outcome.xpEarned,
-                            badgesEarnedThisLesson = it.badgesEarnedThisLesson + newBadges,
-                            difficultyChanged = if (outcome.difficultyChanged) outcome.newDifficultyTier else null
+                        val newBadges = lessonEngine.checkBadges(
+                            outcome,
+                            currentRewards,
+                            currentExercise.skillId
                         )
+
+                        val finalRewards = newBadges.fold(updatedRewards) { rewards, badge ->
+                            rewards.addBadge(badge)
+                        }
+                        profileRepository.updateRewards(finalRewards)
                     }
                 } catch (e: Exception) {
-                    // PATCH 1: Fout in progress/rewards mag flow niet blokkeren
-                    val newResults = state.results + result
-                    _uiState.update {
-                        it.copy(
-                            results = newResults,
-                            stepState = if (needsFeedback) LessonStepState.FEEDBACK else LessonStepState.ADVANCING,
-                            lastAnswerCorrect = result.isCorrect,
-                            error = "Progress update mislukt, maar je kunt verder"
-                        )
-                    }
+                    // Fout in rewards update - log maar ga door
                 }
-            } else {
-                // Skip/Worked: alleen resultaat opslaan
-                val newResults = state.results + result
+            }
+
+            // PATCH 3: Stap 4 - UI state update
+            try {
                 _uiState.update {
                     it.copy(
                         results = newResults,
                         stepState = if (needsFeedback) LessonStepState.FEEDBACK else LessonStepState.ADVANCING,
-                        lastAnswerCorrect = result.isCorrect
+                        lastAnswerCorrect = result.isCorrect,
+                        xpEarnedThisLesson = it.xpEarnedThisLesson + (outcome?.xpEarned ?: 0),
+                        badgesEarnedThisLesson = it.badgesEarnedThisLesson + (outcome?.let { o ->
+                            lessonEngine.checkBadges(o, profileRepository.getRewards(), currentExercise.skillId)
+                        } ?: emptyList()),
+                        difficultyChanged = outcome?.let { if (it.difficultyChanged) it.newDifficultyTier else null }
                     )
                 }
+            } catch (e: Exception) {
+                handleCompletionFailure("State update mislukt", FailureStage.STATE_UPDATE, currentExercise)
+                return
             }
 
-            // 4. Advance beslissing - VOLLEDIG IN VIEWMODEL
-            if (needsFeedback) {
-                // Toon feedback, wacht, dan advance
-                delay(feedbackDurationMs)
+            // PATCH 3: Stap 5 - Advance
+            try {
+                if (needsFeedback) {
+                    delay(feedbackDurationMs)
+                }
                 advanceToNextExercise()
-            } else {
-                // Direct advance (voor worked example en skip)
-                advanceToNextExercise()
+            } catch (e: Exception) {
+                handleCompletionFailure("Advance mislukt", FailureStage.ADVANCE, currentExercise)
             }
 
         } catch (e: Exception) {
-            // PATCH 1: FAIL-SAFE - Geen stil terug naar SHOWING
-            handleCompletionFailure(e.message ?: "Onbekende fout")
+            // PATCH 1-2: FAIL-SAFE - Geen stil terug naar SHOWING
+            handleCompletionFailure(e.message ?: "Onbekende fout", FailureStage.UNKNOWN, currentExercise)
         }
     }
 
     /**
-     * PATCH 1: Fail-safe handler voor completion fouten
+     * PATCH 2: Fail-safe handler voor completion fouten met expliciete context
      * Zorgt dat de app nooit meer stil blijft hangen
      */
-    private fun handleCompletionFailure(errorMessage: String) {
+    private fun handleCompletionFailure(
+        errorMessage: String,
+        stage: FailureStage = FailureStage.UNKNOWN,
+        exercise: Exercise? = null
+    ) {
         val state = _uiState.value
+        val currentExercise = exercise ?: state.currentExercise
 
-        // Log de fout duidelijk
-        _uiState.update {
-            it.copy(
-                error = "Oefening afhandeling mislukt: $errorMessage",
-                stepState = LessonStepState.SHOWING
+        // PATCH 2: Maak expliciete failure context
+        val failureContext = currentExercise?.let {
+            FailureContext(
+                errorMessage = errorMessage,
+                exerciseId = it.id,
+                exerciseType = it.type,
+                currentIndex = state.currentIndex,
+                stage = stage
             )
         }
 
-        // PATCH 1: Probeer VEILIG door te gaan naar volgende oefening
-        viewModelScope.launch {
-            delay(500) // Korte pauze zodat gebruiker fout kan zien
-            if (state.currentIndex < state.exercises.size - 1) {
-                advanceToNextExercise()
-            } else {
-                completeLesson()
-            }
+        // PATCH 1: Ga naar ERROR state, niet terug naar SHOWING
+        _uiState.update {
+            it.copy(
+                stepState = LessonStepState.ERROR,
+                error = "Oefening afhandeling mislukt in stap ${stage.name}: $errorMessage",
+                failureContext = failureContext
+            )
         }
+
+        // Reset completion guard zodat recovery mogelijk is
+        currentlyCompletingExerciseId = null
     }
 
     /**
@@ -358,21 +376,65 @@ class LessonViewModel(
     }
 
     /**
-     * PATCH 7: Verder gaan na een fout
-     * Gebruiker kan kiezen om te verdergaan na een zichtbare foutmelding
+     * PATCH 4: Verder gaan na een fout - context-aware recovery
+     * Gebruikt failure context om veilige recovery te bepalen
      */
     fun continueAfterError() {
         val state = _uiState.value
+        val failureContext = state.failureContext
 
-        // Reset error state
-        _uiState.update { it.copy(error = null) }
-
-        // Probeer veilig door te gaan
-        viewModelScope.launch {
-            if (state.currentIndex < state.exercises.size - 1) {
-                advanceToNextExercise()
-            } else {
-                completeLesson()
+        // PATCH 4: Smart recovery gebaseerd op failure stage
+        when (failureContext?.stage) {
+            FailureStage.RESULT_LOGGING,
+            FailureStage.PROGRESS_UPDATE,
+            FailureStage.REWARD_UPDATE -> {
+                // Deze fouten zijn "veilig" - we kunnen door naar volgende oefening
+                // zonder dubbele logging want de guard is gereset
+                viewModelScope.launch {
+                    _uiState.update {
+                        it.copy(
+                            stepState = LessonStepState.ADVANCING,
+                            error = null,
+                            failureContext = null
+                        )
+                    }
+                    advanceToNextExercise()
+                }
+            }
+            FailureStage.STATE_UPDATE,
+            FailureStage.ADVANCE -> {
+                // State was mogelijk deels geupdate - probeer veilig door
+                viewModelScope.launch {
+                    _uiState.update {
+                        it.copy(
+                            stepState = LessonStepState.ADVANCING,
+                            error = null,
+                            failureContext = null
+                        )
+                    }
+                    // Reset guard expliciet voor veiligheid
+                    currentlyCompletingExerciseId = null
+                    advanceToNextExercise()
+                }
+            }
+            FailureStage.UNKNOWN,
+            null -> {
+                // Onbekende fout - meest veilige optie
+                viewModelScope.launch {
+                    _uiState.update {
+                        it.copy(
+                            stepState = LessonStepState.ADVANCING,
+                            error = null,
+                            failureContext = null
+                        )
+                    }
+                    currentlyCompletingExerciseId = null
+                    if (state.currentIndex < state.exercises.size - 1) {
+                        advanceToNextExercise()
+                    } else {
+                        completeLesson()
+                    }
+                }
             }
         }
     }
@@ -455,15 +517,40 @@ class LessonViewModel(
 }
 
 /**
- * PATCH 6: Expliciete lesstep state
+ * PATCH 1: Expliciete lesstep state met ERROR
  */
 enum class LessonStepState {
     SHOWING,      // Item wordt getoond, wacht op input
     PROCESSING,   // Bezig met verwerken
     FEEDBACK,     // Feedback wordt getoond
     ADVANCING,    // Bezig met naar volgende gaan
+    ERROR,        // PATCH 1: Fout tijdens afhandeling - expliciete interruptiestatus
     COMPLETED     // Les voltooid
 }
+
+/**
+ * PATCH 2: Expliciete failure stages voor semantisch veilige recovery
+ */
+enum class FailureStage {
+    RESULT_LOGGING,    // Fout bij aanmaken resultaat
+    PROGRESS_UPDATE,   // Fout bij progress/mastery update
+    REWARD_UPDATE,     // Fout bij rewards/badges update
+    STATE_UPDATE,      // Fout bij UI state update
+    ADVANCE,           // Fout bij advance naar volgende oefening
+    UNKNOWN            // Onbekende fase
+}
+
+/**
+ * PATCH 2: Failure context voor veilige recovery
+ */
+data class FailureContext(
+    val errorMessage: String,
+    val exerciseId: String,
+    val exerciseType: ExerciseType,
+    val currentIndex: Int,
+    val stage: FailureStage,
+    val timestamp: Long = System.currentTimeMillis()
+)
 
 data class LessonUiState(
     val exercises: List<Exercise> = emptyList(),
@@ -471,22 +558,24 @@ data class LessonUiState(
     val results: List<DetailedExerciseResult> = emptyList(),
     val isActive: Boolean = false,
     val isLoading: Boolean = false,
-    val stepState: LessonStepState = LessonStepState.SHOWING,  // PATCH 6
+    val stepState: LessonStepState = LessonStepState.SHOWING,  // PATCH 1
     val lastAnswerCorrect: Boolean? = null,
     val currentPhase: LessonPhase = LessonPhase.FOCUS,
     val xpEarnedThisLesson: Int = 0,
     val badgesEarnedThisLesson: List<Badge> = emptyList(),
     val difficultyChanged: Int? = null,
     val error: String? = null,
+    val failureContext: FailureContext? = null,  // PATCH 2
     val lessonPlan: LessonPlan? = null
 ) {
     val currentExercise: Exercise? = exercises.getOrNull(currentIndex)
     val totalExercises: Int = exercises.size
     val progress: Float = if (totalExercises > 0) currentIndex.toFloat() / totalExercises else 0f
-    
-    // PATCH 6: Backwards compatibility
+
+    // PATCH 1: Backwards compatibility
     val showFeedback: Boolean get() = stepState == LessonStepState.FEEDBACK
     val isProcessing: Boolean get() = stepState == LessonStepState.PROCESSING || stepState == LessonStepState.ADVANCING
+    val hasError: Boolean get() = stepState == LessonStepState.ERROR || error != null
 }
 
 sealed class LessonNavigationEvent {

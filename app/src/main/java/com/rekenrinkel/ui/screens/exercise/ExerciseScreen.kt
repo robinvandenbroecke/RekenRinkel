@@ -26,6 +26,7 @@ fun ExerciseScreen(
     showFeedback: Boolean,
     isLastAnswerCorrect: Boolean?,
     error: String? = null,  // PATCH 7: Error tonen
+    stepState: String? = null, // PATCH 1: ERROR state zichtbaar
     onAnswer: (String) -> Unit,
     onSkip: () -> Unit,
     onContinueAfterError: () -> Unit = {},  // PATCH 7: Verder na fout
@@ -139,10 +140,10 @@ fun ExerciseScreen(
             )
         }
         
-        // PATCH 7: Error overlay - fouten zijn zichtbaar
-        if (error != null) {
+        // PATCH 1 & 7: Error overlay - fouten zijn zichtbaar
+        if (error != null || stepState == "ERROR") {
             ErrorOverlay(
-                error = error,
+                error = error ?: "Er ging iets mis bij het verwerken van de oefening",
                 onContinue = onContinueAfterError
             )
         }

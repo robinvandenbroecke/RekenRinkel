@@ -7,13 +7,17 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 
 ## Wat werkt
 
-### Robuuste lessonflow (gecentraliseerd in ViewModel)
-- **Expliciete completion modes**:
-  - `DIRECT_CONTINUE`: worked example, skip (geen feedback)
-  - `FEEDBACK_THEN_ADVANCE`: gewone antwoorden, guided practice
-- **Harde completion guard**: elke oefening maximaal één keer verwerkt
-- **Fail-safe error handling**: fouten zichtbaar in UI, geen silent hang
-- **Dubbele submit protection**: extra submits worden genegeerd
+### Robuuste foutafhandeling (semantisch veilig)
+- **Expliciete ERROR state**: interruptiestatus, niet terug naar SHOWING
+- **Failure stages**: RESULT_LOGGING, PROGRESS_UPDATE, REWARD_UPDATE, STATE_UPDATE, ADVANCE, UNKNOWN
+- **Failure context**: exerciseId, type, index, stage, timestamp
+- **Context-aware recovery**: recovery afhankelijk van failure stage
+- **Geen silent failures**: fouten altijd zichtbaar in UI
+
+### Completion flow
+- **Expliciete modes**: DIRECT_CONTINUE (worked/skip), FEEDBACK_THEN_ADVANCE (normaal)
+- **Harde completion guard**: elke oefening maximaal één keer
+- **Stapsgewijze afhandeling**: result → progress → rewards → state → advance
 
 ### Oefentypen
 - **WORKED_EXAMPLE**: "Begrepen! Verder" → direct door
@@ -21,14 +25,10 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 - **Normale antwoorden**: Validatie → feedback → auto-advance
 - **Skip**: Direct door, blokkeert nooit
 
-### Error handling
-- Fouten in progress/rewards/logging blokkeren de flow niet
+### Error recovery
+- Fouten in progress/rewards/logging blokkeren flow niet
 - Zichtbare error overlay met "Verder" knop
-- Veilige fallback naar volgende oefening of home
-
-### Start op leeftijd
-- Leeftijd bepaalt startniveau (5-6 / 7-8 / 9-11 jaar)
-- Daarna adaptief op basis van prestaties
+- Slimme recovery gebaseerd op failure stage
 
 ## Wat in ontwikkeling is
 
@@ -36,19 +36,10 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 - Parent dashboard
 - Meer oefentypes
 
-## Flow
-
-```
-Onboarding (leeftijd) → Home → Les (fail-safe flow) → Beloningen
-```
-
 ## Build & Test
 
 ```bash
-# Build
 ./gradlew :app:compileDebugKotlin
-
-# Tests
 ./gradlew :app:testDebugUnitTest
 ```
 
