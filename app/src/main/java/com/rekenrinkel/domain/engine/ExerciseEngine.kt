@@ -556,4 +556,83 @@ class ExerciseEngine {
             distractors = generateNumericDistractors(a + b, 1, 20)
         )
     }
+    
+    // ============================================
+    // ERROR TYPE DETECTION
+    // ============================================
+    
+    /**
+     * Detecteer het fouttype op basis van gegeven antwoord vs correct antwoord
+     * Dit helpt bij gerichte remediëring
+     */
+    fun detectErrorType(
+        skillId: String,
+        givenAnswer: String,
+        correctAnswer: String,
+        exercise: Exercise
+    ): com.rekenrinkel.domain.content.ErrorType {
+        // Parse antwoorden naar getallen indien mogelijk
+        val givenNum = givenAnswer.toIntOrNull()
+        val correctNum = correctAnswer.toIntOrNull()
+        
+        // Specifieke checks per skill type
+        return when {
+            // Bridge 10 errors: check of het een tipfout is bij brug over 10
+            skillId.contains("bridge") && givenNum != null && correctNum != null -> {
+                val diff = kotlin.math.abs(givenNum - correctNum)
+                when {
+                    diff == 10 -> com.rekenrinkel.domain.content.ErrorType.BRIDGE_10_ERROR
+                    diff == 1 -> com.rekenrinkel.domain.content.ErrorType.BOND_ERROR
+                    else -> com.rekenrinkel.domain.content.ErrorType.CALCULATION_ERROR
+                }
+            }
+            
+            // Bond errors: off-by-one bij number bonds
+            skillId.contains("bond") || skillId.contains("splits") -> {
+                if (givenNum != null && correctNum != null && kotlin.math.abs(givenNum - correctNum) <= 2) {
+                    com.rekenrinkel.domain.content.ErrorType.BOND_ERROR
+                } else {
+                    com.rekenrinkel.domain.content.ErrorType.CALCULATION_ERROR
+                }
+            }
+            
+            // Place value errors: antwoord is 10x te groot/klein of verkeerde tientallen
+            skillId.contains("place_value") && givenNum != null && correctNum != null -> {
+                when {
+                    givenNum * 10 == correctNum || givenNum == correctNum * 10 -> 
+                        com.rekenrinkel.domain.content.ErrorType.PLACE_VALUE_ERROR
+                    kotlin.math.abs(givenNum - correctNum) % 10 == 0 -> 
+                        com.rekenrinkel.domain.content.ErrorType.PLACE_VALUE_ERROR
+                    else -> com.rekenrinkel.domain.content.ErrorType.CALCULATION_ERROR
+                }
+            }
+            
+            // Counting errors: vaak bij visual quantity
+            skillId.contains("count") || skillId.contains("subitize") -> {
+                com.rekenrinkel.domain.content.ErrorType.COUNTING_ERROR
+            }
+            
+            // Grouping errors: bij vermenigvuldigen/arrays
+            skillId.contains("groups") || skillId.contains("table") -> {
+                if (givenNum != null && correctNum != null) {
+                    val ratio = if (correctNum > 0) givenNum.toFloat() / correctNum else 0f
+                    if (ratio in 0.4f..0.6f || ratio in 1.5f..2.5f) {
+                        com.rekenrinkel.domain.content.ErrorType.GROUPING_ERROR
+                    } else {
+                        com.rekenrinkel.domain.content.ErrorType.CALCULATION_ERROR
+                    }
+                } else {
+                    com.rekenrinkel.domain.content.ErrorType.CALCULATION_ERROR
+                }
+            }
+            
+            // Sequence errors: bij skip counting
+            skillId.contains("count_") -> {
+                com.rekenrinkel.domain.content.ErrorType.SEQUENCE_ERROR
+            }
+            
+            // Default: algemene rekenfout
+            else -> com.rekenrinkel.domain.content.ErrorType.CALCULATION_ERROR
+        }
+    }
 }

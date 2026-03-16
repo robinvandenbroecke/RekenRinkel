@@ -347,15 +347,13 @@ class SessionEngine(
     }
     
     /**
-     * Bepaal moeilijkheid op basis van voortgang
+     * Bepaal moeilijkheid op basis van voortgang en CPA-fase
      */
     private fun determineDifficulty(skill: Skill, progress: SkillProgress?, isFocus: Boolean): Int {
-        return if (isFocus) {
-            // Focus skills: gebruik current difficulty of start bij min
+        val baseDifficulty = if (isFocus) {
             progress?.currentDifficultyTier?.coerceIn(skill.minDifficulty, skill.maxDifficulty)
                 ?: skill.minDifficulty
         } else {
-            // Review skills: iets makkelijker voor zwakke skills
             when {
                 progress == null -> skill.minDifficulty
                 progress.masteryScore < MASTERY_THRESHOLD_WEAK -> skill.minDifficulty
@@ -364,6 +362,66 @@ class SessionEngine(
                 else -> progress.currentDifficultyTier.coerceIn(skill.minDifficulty, skill.maxDifficulty)
             }
         }
+        
+        // Aanpassing op basis van CPA-fase: concrete fase = makkelijker
+        val config = ContentRepository.getConfig(skill.id)
+        return when (config?.cpaPhase) {
+            com.rekenrinkel.domain.content.CpaPhase.CONCRETE -> baseDifficulty.coerceAtMost(2)
+            com.rekenrinkel.domain.content.CpaPhase.PICTORIAL -> baseDifficulty.coerceAtMost(3)
+            else -> baseDifficulty
+        }
+    }
+    
+    /**
+     * Bepaal representatie op basis van skill en voortgang
+     * Respecteert CPA-fase: jongere kinderen/kinderen met fouten krijgen meer concrete representaties
+     */
+    fun determineRepresentation(skillId: String, progress: SkillProgress?): String {
+        val config = ContentRepository.getConfig(skillId) ?: return "SYMBOLS"
+        val representations = config.preferredRepresentations
+        
+        if (representations.isEmpty()) return "SYMBOLS"
+        
+        // Als er fouten zijn in specifieke error types, kies concrete representatie
+        val hasErrors = progress?.errorTypeSummary?.values?.sum() ?: 0 > 0
+        val hasRecentErrors = progress?.streakIncorrect ?: 0 >= 2
+        
+        return when {
+            // Recent fouten: meest concrete representatie
+            hasRecentErrors -> representations.firstOrNull()?.name ?: "DOTS"
+            // Error summary aanwezig: een stap terug in abstractie
+            hasErrors && representations.size > 1 -> representations[representations.size / 2].name
+            // Anders: representatie passend bij mastery niveau
+            progress?.masteryScore ?: 0 < 50 -> representations.firstOrNull()?.name ?: "DOTS"
+            progress?.masteryScore ?: 0 < 75 -> representations.getOrNull(1)?.name ?: representations.last().name
+            else -> representations.lastOrNull()?.name ?: "SYMBOLS"
+        }
+    }
+    
+    /**
+     * Check of remediëring nodig is op basis van fouttypes
+     */
+    fun needsRemediation(skillId: String, progress: SkillProgress?): String? {
+        if (progress == null) return null
+        
+        val config = ContentRepository.getConfig(skillId) ?: return null
+        
+        // Check of er herhaalde fouten zijn van een specifiek type
+        val dominantError = progress.errorTypeSummary.maxByOrNull { it.value }
+        if (dominantError != null && dominantError.value >= 3) {
+            // Als er een remediation skill is voor dit error type, gebruik die
+            if (config.remediationSkill != null) {
+                return config.remediationSkill
+            }
+        }
+        
+        // Check streak
+        if (progress.streakIncorrect >= 3) {
+            // Suggesteer remediation skill of een makkelijkere versie
+            return config.remediationSkill
+        }
+        
+        return null
     }
     
     /**
