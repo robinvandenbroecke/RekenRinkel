@@ -35,8 +35,14 @@ class LessonViewModel(
     // Timer voor response time tracking
     private var exerciseStartTime: Long = 0
 
-    // PATCH 2: Harde completion guard - bijhouden welke oefening momenteel verwerkt wordt
+    // PATCH 2 & 5: Harde completion guard - bijhouden welke oefening momenteel verwerkt wordt
     private var currentlyCompletingExerciseId: String? = null
+    
+    // PATCH 5: Set van definitief afgehandelde oefeningen
+    private val handledExerciseIds = mutableSetOf<String>()
+    
+    // PATCH 1: Expliciete completion status
+    private var currentCompletionStatus = CompletionStatus.NOT_STARTED
 
     /**
      * Start een nieuwe les
@@ -98,7 +104,18 @@ class LessonViewModel(
     }
 
     /**
-     * PATCH 1-3: Centrale helper voor het afronden van een oefening - FAIL-SAFE.
+     * PATCH 1: Expliciete completion status voor veilige recovery
+     */
+    enum class CompletionStatus {
+        NOT_STARTED,        // Nog niet begonnen met afhandeling
+        RESULT_SAVED,       // Resultaat is opgeslagen
+        PROGRESS_UPDATED,   // Progress/mastery is geupdate
+        REWARDS_UPDATED,    // Rewards zijn geupdate
+        READY_TO_ADVANCE    // Klaar om naar volgende oefening te gaan
+    }
+
+    /**
+     * PATCH 1-3 & 8: Centrale helper voor het afronden van een oefening - FAIL-SAFE.
      * Alle paden (submit, worked, skip) eindigen hier.
      * Deze functie regelt ook de feedback delay en auto-advance.
      *
@@ -116,40 +133,62 @@ class LessonViewModel(
             return
         }
 
+        // PATCH 5: Check of oefening al definitief afgehandeld is
+        if (handledExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.d("LessonViewModel", "Exercise ${currentExercise.id} already handled, skipping")
+            return
+        }
+
         // PATCH 2: Harde completion guard
         if (currentlyCompletingExerciseId == currentExercise.id) {
+            android.util.Log.d("LessonViewModel", "Exercise ${currentExercise.id} currently being processed, skipping")
             return // Deze oefening wordt al verwerkt
         }
         currentlyCompletingExerciseId = currentExercise.id
+        currentCompletionStatus = CompletionStatus.NOT_STARTED
+
+        // PATCH 8: Debug logging
+        android.util.Log.d("LessonViewModel", "Starting completion for exercise ${currentExercise.id}, type: ${currentExercise.type}, mode: $mode")
 
         val needsFeedback = mode == CompletionMode.FEEDBACK_THEN_ADVANCE
         val skipMasteryUpdate = mode == CompletionMode.DIRECT_CONTINUE &&
             currentExercise.type == com.rekenrinkel.domain.model.ExerciseType.WORKED_EXAMPLE
 
         try {
-            // PATCH 3: Stap 1 - Resultaat opslaan
+            // PATCH 3 & 8: Stap 1 - Resultaat opslaan
+            currentCompletionStatus = CompletionStatus.NOT_STARTED
+            android.util.Log.d("LessonViewModel", "Step 1: Saving result for ${currentExercise.id}")
+            
             var newResults: List<DetailedExerciseResult>
             try {
                 newResults = state.results + result
+                currentCompletionStatus = CompletionStatus.RESULT_SAVED
+                android.util.Log.d("LessonViewModel", "Step 1: Result saved, status: $currentCompletionStatus")
             } catch (e: Exception) {
+                android.util.Log.e("LessonViewModel", "Step 1 FAILED: Result logging", e)
                 handleCompletionFailure("Resultaat aanmaken mislukt", FailureStage.RESULT_LOGGING, currentExercise)
                 return
             }
 
-            // PATCH 3: Stap 2 - Progress/mastery update (indien niet geskipped/worked)
+            // PATCH 3 & 8: Stap 2 - Progress/mastery update (indien niet geskipped/worked)
             var outcome: ExerciseOutcome? = null
             if (!skipMasteryUpdate) {
                 try {
+                    android.util.Log.d("LessonViewModel", "Step 2: Updating progress for ${currentExercise.id}")
                     val currentProgress = progressRepository.getOrCreateProgress(currentExercise.skillId)
                     outcome = lessonEngine.processExerciseResult(result, currentProgress)
                     progressRepository.updateProgress(outcome.updatedProgress)
+                    currentCompletionStatus = CompletionStatus.PROGRESS_UPDATED
+                    android.util.Log.d("LessonViewModel", "Step 2: Progress updated, status: $currentCompletionStatus")
                 } catch (e: Exception) {
+                    android.util.Log.e("LessonViewModel", "Step 2 FAILED: Progress update", e)
                     // Fout in progress update - log maar ga door
                     outcome = null
                 }
 
-                // PATCH 3: Stap 3 - Rewards update
+                // PATCH 3 & 8: Stap 3 - Rewards update
                 try {
+                    android.util.Log.d("LessonViewModel", "Step 3: Updating rewards for ${currentExercise.id}")
                     if (outcome != null) {
                         val currentRewards = profileRepository.getRewards()
                         val updatedRewards = currentRewards
@@ -166,14 +205,18 @@ class LessonViewModel(
                             rewards.addBadge(badge)
                         }
                         profileRepository.updateRewards(finalRewards)
+                        currentCompletionStatus = CompletionStatus.REWARDS_UPDATED
+                        android.util.Log.d("LessonViewModel", "Step 3: Rewards updated, status: $currentCompletionStatus")
                     }
                 } catch (e: Exception) {
+                    android.util.Log.e("LessonViewModel", "Step 3 FAILED: Rewards update", e)
                     // Fout in rewards update - log maar ga door
                 }
             }
 
-            // PATCH 3: Stap 4 - UI state update
+            // PATCH 3 & 8: Stap 4 - UI state update
             try {
+                android.util.Log.d("LessonViewModel", "Step 4: Updating UI state for ${currentExercise.id}")
                 _uiState.update {
                     it.copy(
                         results = newResults,
@@ -186,29 +229,36 @@ class LessonViewModel(
                         difficultyChanged = outcome?.let { if (it.difficultyChanged) it.newDifficultyTier else null }
                     )
                 }
+                currentCompletionStatus = CompletionStatus.READY_TO_ADVANCE
+                android.util.Log.d("LessonViewModel", "Step 4: UI state updated, status: $currentCompletionStatus")
             } catch (e: Exception) {
+                android.util.Log.e("LessonViewModel", "Step 4 FAILED: State update", e)
                 handleCompletionFailure("State update mislukt", FailureStage.STATE_UPDATE, currentExercise)
                 return
             }
 
-            // PATCH 3: Stap 5 - Advance
+            // PATCH 3 & 8: Stap 5 - Advance
             try {
+                android.util.Log.d("LessonViewModel", "Step 5: Advancing from ${currentExercise.id}")
                 if (needsFeedback) {
                     delay(feedbackDurationMs)
                 }
                 advanceToNextExercise()
+                android.util.Log.d("LessonViewModel", "Step 5: Advance completed for ${currentExercise.id}")
             } catch (e: Exception) {
+                android.util.Log.e("LessonViewModel", "Step 5 FAILED: Advance", e)
                 handleCompletionFailure("Advance mislukt", FailureStage.ADVANCE, currentExercise)
             }
 
         } catch (e: Exception) {
-            // PATCH 1-2: FAIL-SAFE - Geen stil terug naar SHOWING
+            // PATCH 1-2 & 8: FAIL-SAFE - Geen stil terug naar SHOWING
+            android.util.Log.e("LessonViewModel", "Completion failed for ${currentExercise.id}", e)
             handleCompletionFailure(e.message ?: "Onbekende fout", FailureStage.UNKNOWN, currentExercise)
         }
     }
 
     /**
-     * PATCH 2: Fail-safe handler voor completion fouten met expliciete context
+     * PATCH 2 & 8: Fail-safe handler voor completion fouten met expliciete context
      * Zorgt dat de app nooit meer stil blijft hangen
      */
     private fun handleCompletionFailure(
@@ -218,6 +268,10 @@ class LessonViewModel(
     ) {
         val state = _uiState.value
         val currentExercise = exercise ?: state.currentExercise
+
+        // PATCH 8: Debug logging
+        android.util.Log.e("LessonViewModel", "Completion FAILURE for ${currentExercise?.id ?: "unknown"} at stage ${stage.name}: $errorMessage")
+        android.util.Log.e("LessonViewModel", "Completion status at failure: $currentCompletionStatus")
 
         // PATCH 2: Maak expliciete failure context
         val failureContext = currentExercise?.let {
@@ -244,18 +298,30 @@ class LessonViewModel(
     }
 
     /**
-     * PATCH 1: Helper voor direct naar volgende oefening gaan
+     * PATCH 1 & 8: Helper voor direct naar volgende oefening gaan
      */
     private fun advanceToNextExercise() {
         val state = _uiState.value
         val nextIndex = state.currentIndex + 1
+        val currentExercise = state.currentExercise
+
+        // PATCH 5 & 8: Markeer huidige oefening als definitief afgehandeld
+        currentExercise?.let { exercise ->
+            handledExerciseIds.add(exercise.id)
+            android.util.Log.d("LessonViewModel", "Exercise ${exercise.id} marked as handled")
+        }
 
         _uiState.update { it.copy(stepState = LessonStepState.ADVANCING) }
 
         // PATCH 2: Reset completion guard bij advance
         currentlyCompletingExerciseId = null
+        currentCompletionStatus = CompletionStatus.NOT_STARTED
+
+        // PATCH 8: Debug logging
+        android.util.Log.d("LessonViewModel", "Advancing from index ${state.currentIndex} to $nextIndex")
 
         if (nextIndex >= state.exercises.size) {
+            android.util.Log.d("LessonViewModel", "Completing lesson")
             completeLesson()
         } else {
             _uiState.update {
@@ -268,6 +334,7 @@ class LessonViewModel(
                 )
             }
             exerciseStartTime = System.currentTimeMillis()
+            android.util.Log.d("LessonViewModel", "Now showing exercise at index $nextIndex")
         }
     }
 
@@ -376,20 +443,26 @@ class LessonViewModel(
     }
 
     /**
-     * PATCH 4: Verder gaan na een fout - context-aware recovery
+     * PATCH 4 & 6: Verder gaan na een fout - context-aware recovery
      * Gebruikt failure context om veilige recovery te bepalen
      */
     fun continueAfterError() {
         val state = _uiState.value
         val failureContext = state.failureContext
 
-        // PATCH 4: Smart recovery gebaseerd op failure stage
-        when (failureContext?.stage) {
-            FailureStage.RESULT_LOGGING,
-            FailureStage.PROGRESS_UPDATE,
-            FailureStage.REWARD_UPDATE -> {
-                // Deze fouten zijn "veilig" - we kunnen door naar volgende oefening
-                // zonder dubbele logging want de guard is gereset
+        // PATCH 8: Debug logging
+        android.util.Log.d("LessonViewModel", "continueAfterError called")
+        android.util.Log.d("LessonViewModel", "Failure stage: ${failureContext?.stage?.name ?: "null"}")
+        android.util.Log.d("LessonViewModel", "Current completion status: $currentCompletionStatus")
+        android.util.Log.d("LessonViewModel", "Exercise type: ${failureContext?.exerciseType}")
+
+        // PATCH 6 & 9: Recovery afhankelijk van exercise type en failure stage
+        val recoveryAction = determineRecoveryAction(failureContext, currentCompletionStatus)
+        android.util.Log.d("LessonViewModel", "Recovery action: $recoveryAction")
+
+        when (recoveryAction) {
+            RecoveryAction.CONTINUE_TO_NEXT -> {
+                // Veilige continue naar volgende oefening
                 viewModelScope.launch {
                     _uiState.update {
                         it.copy(
@@ -401,9 +474,9 @@ class LessonViewModel(
                     advanceToNextExercise()
                 }
             }
-            FailureStage.STATE_UPDATE,
-            FailureStage.ADVANCE -> {
-                // State was mogelijk deels geupdate - probeer veilig door
+            RecoveryAction.SKIP_TO_NEXT -> {
+                // Markeer huidige als handled en skip
+                failureContext?.let { handledExerciseIds.add(it.exerciseId) }
                 viewModelScope.launch {
                     _uiState.update {
                         it.copy(
@@ -412,31 +485,102 @@ class LessonViewModel(
                             failureContext = null
                         )
                     }
-                    // Reset guard expliciet voor veiligheid
                     currentlyCompletingExerciseId = null
                     advanceToNextExercise()
                 }
             }
-            FailureStage.UNKNOWN,
-            null -> {
-                // Onbekende fout - meest veilige optie
+            RecoveryAction.RETRY_CURRENT -> {
+                // Probeer huidige opnieuw (alleen als veilig)
                 viewModelScope.launch {
                     _uiState.update {
                         it.copy(
-                            stepState = LessonStepState.ADVANCING,
+                            stepState = LessonStepState.SHOWING,
                             error = null,
                             failureContext = null
                         )
                     }
                     currentlyCompletingExerciseId = null
-                    if (state.currentIndex < state.exercises.size - 1) {
-                        advanceToNextExercise()
-                    } else {
-                        completeLesson()
+                    currentCompletionStatus = CompletionStatus.NOT_STARTED
+                }
+            }
+            RecoveryAction.RETURN_TO_HOME -> {
+                // Meest veilige fallback
+                _uiState.update {
+                    it.copy(
+                        stepState = LessonStepState.SHOWING,
+                        error = "Kan niet verder, ga terug naar home",
+                        failureContext = null
+                    )
+                }
+                viewModelScope.launch {
+                    _navigation.emit(LessonNavigationEvent.BackToHome)
+                }
+            }
+        }
+    }
+
+    /**
+     * PATCH 6 & 9: Bepaal veilige recovery actie op basis van context
+     */
+    private fun determineRecoveryAction(
+        failureContext: FailureContext?,
+        completionStatus: CompletionStatus
+    ): RecoveryAction {
+        val stage = failureContext?.stage ?: FailureStage.UNKNOWN
+        val exerciseType = failureContext?.exerciseType
+
+        // PATCH 9: Type-specifieke handling
+        when (exerciseType) {
+            ExerciseType.WORKED_EXAMPLE -> {
+                // Worked example: geen retry nodig, altijd door
+                return RecoveryAction.CONTINUE_TO_NEXT
+            }
+            ExerciseType.GUIDED_PRACTICE -> {
+                // Guided practice: als result al saved, door naar volgende
+                return if (completionStatus >= CompletionStatus.RESULT_SAVED) {
+                    RecoveryAction.CONTINUE_TO_NEXT
+                } else {
+                    RecoveryAction.SKIP_TO_NEXT
+                }
+            }
+            else -> {
+                // Normale antwoorden: context-afhankelijk
+                return when (stage) {
+                    FailureStage.RESULT_LOGGING -> {
+                        // Result niet gelukt - skip veilig
+                        RecoveryAction.SKIP_TO_NEXT
+                    }
+                    FailureStage.PROGRESS_UPDATE,
+                    FailureStage.REWARD_UPDATE -> {
+                        // Progress/rewards mislukt maar result saved - continue
+                        RecoveryAction.CONTINUE_TO_NEXT
+                    }
+                    FailureStage.STATE_UPDATE,
+                    FailureStage.ADVANCE -> {
+                        // State was mogelijk deels geupdate - continue
+                        RecoveryAction.CONTINUE_TO_NEXT
+                    }
+                    FailureStage.UNKNOWN -> {
+                        // Onbekende fout - meest veilige optie
+                        if (completionStatus >= CompletionStatus.RESULT_SAVED) {
+                            RecoveryAction.CONTINUE_TO_NEXT
+                        } else {
+                            RecoveryAction.SKIP_TO_NEXT
+                        }
                     }
                 }
             }
         }
+    }
+
+    /**
+     * PATCH 6: Mogelijke recovery acties
+     */
+    enum class RecoveryAction {
+        CONTINUE_TO_NEXT,   // Ga veilig door naar volgende oefening
+        SKIP_TO_NEXT,       // Skip huidige en ga door
+        RETRY_CURRENT,      // Probeer huidige opnieuw (alleen als veilig)
+        RETURN_TO_HOME      // Terug naar home (meest veilige fallback)
     }
 
     /**

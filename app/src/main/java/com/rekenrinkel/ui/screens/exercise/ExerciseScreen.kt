@@ -152,6 +152,7 @@ fun ExerciseScreen(
 
 /**
  * PATCH 7: Error overlay voor zichtbare foutmeldingen
+ * Maakt fouten duidelijk zichtbaar voor de gebruiker
  */
 @Composable
 private fun ErrorOverlay(
@@ -175,27 +176,44 @@ private fun ErrorOverlay(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Duidelijke fout-indicator
                 Text(
-                    text = "⚠️ Er ging iets mis",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onErrorContainer
+                    text = "⚠️",
+                    style = MaterialTheme.typography.displayMedium
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = error,
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "Er ging iets mis bij deze oefening",
+                    style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onErrorContainer,
                     textAlign = TextAlign.Center
                 )
+                Spacer(modifier = Modifier.height(16.dp))
+                // Technische details (optioneel, voor debugging)
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f),
+                    textAlign = TextAlign.Center
+                )
                 Spacer(modifier = Modifier.height(24.dp))
+                // Duidelijke actie
                 Button(
                     onClick = onContinue,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
-                    )
+                    ),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Verder →")
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+                // Extra uitleg
+                Text(
+                    text = "Druk op 'Verder' om verder te gaan",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.6f)
+                )
             }
         }
     }

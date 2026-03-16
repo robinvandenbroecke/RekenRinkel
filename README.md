@@ -7,28 +7,32 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 
 ## Wat werkt
 
-### Robuuste foutafhandeling (semantisch veilig)
+### Robuuste oefen-afhandeling (FAIL-SAFE)
+- **Harde completion guard**: elke oefening maximaal één keer verwerkt
+  - `currentlyCompletingExerciseId` voor lopende verwerking
+  - `handledExerciseIds` set voor definitief afgehandelde oefeningen
+- **Expliciete completion status**: NOT_STARTED → RESULT_SAVED → PROGRESS_UPDATED → REWARDS_UPDATED → READY_TO_ADVANCE
+- **Expliciete completion modes**: DIRECT_CONTINUE (worked/skip), FEEDBACK_THEN_ADVANCE (normaal)
 - **Expliciete ERROR state**: interruptiestatus, niet terug naar SHOWING
 - **Failure stages**: RESULT_LOGGING, PROGRESS_UPDATE, REWARD_UPDATE, STATE_UPDATE, ADVANCE, UNKNOWN
 - **Failure context**: exerciseId, type, index, stage, timestamp
-- **Context-aware recovery**: recovery afhankelijk van failure stage
-- **Geen silent failures**: fouten altijd zichtbaar in UI
+- **Context-aware recovery**: recovery afhankelijk van failure stage en exercise type
 
-### Completion flow
-- **Expliciete modes**: DIRECT_CONTINUE (worked/skip), FEEDBACK_THEN_ADVANCE (normaal)
-- **Harde completion guard**: elke oefening maximaal één keer
-- **Stapsgewijze afhandeling**: result → progress → rewards → state → advance
+### Debug logging
+- Uitgebreide logging in completion flow
+- Zichtbaar in logcat: start, stages, failures, recovery actions
+- Essentieel voor traceerbaarheid van "hang"-bugs
 
-### Oefentypen
-- **WORKED_EXAMPLE**: "Begrepen! Verder" → direct door
-- **GUIDED_PRACTICE**: Normale antwoordflow met hint
-- **Normale antwoorden**: Validatie → feedback → auto-advance
-- **Skip**: Direct door, blokkeert nooit
+### Oefentypen failure paths
+- **WORKED_EXAMPLE**: geen validator/retry, altijd door naar volgende
+- **GUIDED_PRACTICE**: antwoord/feedback-flow, veilige recovery
+- **Normale antwoorden**: standaard response path
+- **Skip**: direct en veilig, geen antwoord-failure flow
 
-### Error recovery
-- Fouten in progress/rewards/logging blokkeren flow niet
-- Zichtbare error overlay met "Verder" knop
-- Slimme recovery gebaseerd op failure stage
+### Error handling
+- Fouten zichtbaar in UI met duidelijke melding
+- "Verder" knop voor veilige recovery
+- Geen silent failures
 
 ## Wat in ontwikkeling is
 
