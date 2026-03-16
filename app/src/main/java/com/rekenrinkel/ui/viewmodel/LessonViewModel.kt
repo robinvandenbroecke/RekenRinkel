@@ -59,7 +59,7 @@ class LessonViewModel(
                         results = emptyList(),
                         isActive = true,
                         isLoading = false,
-                        showFeedback = false,
+                        stepState = LessonStepState.SHOWING,
                         lastAnswerCorrect = null,
                         currentPhase = determinePhase(0, lessonPlan),
                         xpEarnedThisLesson = 0,
@@ -92,7 +92,7 @@ class LessonViewModel(
     private suspend fun finishCurrentExercise(
         result: DetailedExerciseResult,
         skipMasteryUpdate: Boolean = false,
-        showFeedback: Boolean = true
+        needsFeedback: Boolean = true
     ) {
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
@@ -126,9 +126,8 @@ class LessonViewModel(
                 _uiState.update {
                     it.copy(
                         results = newResults,
-                        showFeedback = showFeedback,
+                        stepState = if (needsFeedback) LessonStepState.FEEDBACK else LessonStepState.ADVANCING,
                         lastAnswerCorrect = result.isCorrect,
-                        isProcessing = false,
                         xpEarnedThisLesson = it.xpEarnedThisLesson + outcome.xpEarned,
                         badgesEarnedThisLesson = it.badgesEarnedThisLesson + newBadges,
                         difficultyChanged = if (outcome.difficultyChanged) outcome.newDifficultyTier else null
@@ -140,22 +139,21 @@ class LessonViewModel(
                 _uiState.update {
                     it.copy(
                         results = newResults,
-                        showFeedback = showFeedback,
-                        lastAnswerCorrect = result.isCorrect,
-                        isProcessing = false
+                        stepState = if (needsFeedback) LessonStepState.FEEDBACK else LessonStepState.ADVANCING,
+                        lastAnswerCorrect = result.isCorrect
                     )
                 }
             }
 
             // 4. Advance beslissing
-            if (!showFeedback) {
+            if (!needsFeedback) {
                 // Direct advance (voor worked example)
                 advanceToNextExercise()
             }
             // Anders: wacht op expliciete nextExercise() call via onFeedbackComplete
 
         } catch (e: Exception) {
-            _uiState.update { it.copy(isProcessing = false, error = e.message) }
+            _uiState.update { it.copy(stepState = LessonStepState.SHOWING, error = e.message) }
         }
     }
 
@@ -166,13 +164,15 @@ class LessonViewModel(
         val state = _uiState.value
         val nextIndex = state.currentIndex + 1
 
+        _uiState.update { it.copy(stepState = LessonStepState.ADVANCING) }
+
         if (nextIndex >= state.exercises.size) {
             completeLesson()
         } else {
             _uiState.update {
                 it.copy(
                     currentIndex = nextIndex,
-                    showFeedback = false,
+                    stepState = LessonStepState.SHOWING,
                     lastAnswerCorrect = null,
                     difficultyChanged = null,
                     currentPhase = determinePhase(nextIndex, it)
@@ -192,10 +192,10 @@ class LessonViewModel(
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
 
-        // Guard: prevent double submit
-        if (state.showFeedback || state.isProcessing) return
+        // PATCH 6: Guard met expliciete state
+        if (state.stepState != LessonStepState.SHOWING) return
 
-        _uiState.update { it.copy(isProcessing = true) }
+        _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
         val responseTimeMs = System.currentTimeMillis() - exerciseStartTime
 
@@ -215,7 +215,7 @@ class LessonViewModel(
             )
 
             // Gebruik uniforme flow
-            finishCurrentExercise(result, skipMasteryUpdate = false, showFeedback = true)
+            finishCurrentExercise(result, skipMasteryUpdate = false, needsFeedback = true)
         }
     }
 
@@ -234,10 +234,10 @@ class LessonViewModel(
             return
         }
 
-        // Guard: prevent double submit
-        if (state.isProcessing) return
+        // PATCH 6: Guard met expliciete state
+        if (state.stepState != LessonStepState.SHOWING) return
 
-        _uiState.update { it.copy(isProcessing = true) }
+        _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
         viewModelScope.launch {
             val result = DetailedExerciseResult(
@@ -252,8 +252,8 @@ class LessonViewModel(
             )
 
             // Gebruik uniforme flow met direct advance
-            finishCurrentExercise(result, skipMasteryUpdate = true, showFeedback = false)
-            // showFeedback = false triggert automatisch advanceToNextExercise()
+            finishCurrentExercise(result, skipMasteryUpdate = true, needsFeedback = false)
+            // needsFeedback = false triggert automatisch advanceToNextExercise()
         }
     }
 
@@ -265,9 +265,10 @@ class LessonViewModel(
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
 
-        if (state.showFeedback || state.isProcessing) return
+        // PATCH 6: Guard met expliciete state
+        if (state.stepState != LessonStepState.SHOWING) return
 
-        _uiState.update { it.copy(isProcessing = true) }
+        _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
         viewModelScope.launch {
             val result = DetailedExerciseResult(
@@ -282,7 +283,7 @@ class LessonViewModel(
             )
 
             // Gebruik uniforme flow
-            finishCurrentExercise(result, skipMasteryUpdate = true, showFeedback = true)
+            finishCurrentExercise(result, skipMasteryUpdate = true, needsFeedback = true)
         }
     }
 
@@ -295,11 +296,14 @@ class LessonViewModel(
     }
 
     /**
-     * Voltooi de les
+     * PATCH 6: Voltooi de les met expliciete state
      */
     private fun completeLesson() {
         viewModelScope.launch {
             val state = _uiState.value
+
+            // PATCH 6: Markeer als completed
+            _uiState.update { it.copy(stepState = LessonStepState.COMPLETED) }
 
             val averageResponseTime = if (state.results.isNotEmpty()) {
                 state.results.map { it.responseTimeMs }.average().toLong()
@@ -368,15 +372,25 @@ class LessonViewModel(
     }
 }
 
+/**
+ * PATCH 6: Expliciete lesstep state
+ */
+enum class LessonStepState {
+    SHOWING,      // Item wordt getoond, wacht op input
+    PROCESSING,   // Bezig met verwerken
+    FEEDBACK,     // Feedback wordt getoond
+    ADVANCING,    // Bezig met naar volgende gaan
+    COMPLETED     // Les voltooid
+}
+
 data class LessonUiState(
     val exercises: List<Exercise> = emptyList(),
     val currentIndex: Int = 0,
     val results: List<DetailedExerciseResult> = emptyList(),
     val isActive: Boolean = false,
     val isLoading: Boolean = false,
-    val showFeedback: Boolean = false,
+    val stepState: LessonStepState = LessonStepState.SHOWING,  // PATCH 6
     val lastAnswerCorrect: Boolean? = null,
-    val isProcessing: Boolean = false,
     val currentPhase: LessonPhase = LessonPhase.FOCUS,
     val xpEarnedThisLesson: Int = 0,
     val badgesEarnedThisLesson: List<Badge> = emptyList(),
@@ -387,6 +401,10 @@ data class LessonUiState(
     val currentExercise: Exercise? = exercises.getOrNull(currentIndex)
     val totalExercises: Int = exercises.size
     val progress: Float = if (totalExercises > 0) currentIndex.toFloat() / totalExercises else 0f
+    
+    // PATCH 6: Backwards compatibility
+    val showFeedback: Boolean get() = stepState == LessonStepState.FEEDBACK
+    val isProcessing: Boolean get() = stepState == LessonStepState.PROCESSING || stepState == LessonStepState.ADVANCING
 }
 
 sealed class LessonNavigationEvent {
