@@ -272,10 +272,12 @@ fun RekenRinkelApp() {
                             totalExercises = uiState.totalExercises,
                             showFeedback = uiState.showFeedback,
                             isLastAnswerCorrect = uiState.lastAnswerCorrect,
+                            error = uiState.error,  // PATCH 7: Error doorgeven
                             onAnswer = { answer ->
                                 viewModel.submitAnswer(answer)
                             },
                             onSkip = { viewModel.skipExercise() },
+                            onContinueAfterError = { viewModel.continueAfterError() },  // PATCH 7
                             // PATCH 3: onFeedbackComplete verwijderd - ViewModel regelt advance
                             onExerciseShown = { viewModel.startExerciseTimer() },
                             onContinueWorkedExample = { viewModel.continueWorkedExample() }

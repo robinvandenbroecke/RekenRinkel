@@ -25,8 +25,10 @@ fun ExerciseScreen(
     totalExercises: Int,
     showFeedback: Boolean,
     isLastAnswerCorrect: Boolean?,
+    error: String? = null,  // PATCH 7: Error tonen
     onAnswer: (String) -> Unit,
     onSkip: () -> Unit,
+    onContinueAfterError: () -> Unit = {},  // PATCH 7: Verder na fout
     // PATCH 3: onFeedbackComplete verwijderd - ViewModel regelt advance intern
     onExerciseShown: () -> Unit = {},
     onContinueWorkedExample: () -> Unit = {},
@@ -135,6 +137,65 @@ fun ExerciseScreen(
                 isCorrect = isLastAnswerCorrect,
                 onDismiss = { /* Handled by LaunchedEffect above */ }
             )
+        }
+        
+        // PATCH 7: Error overlay - fouten zijn zichtbaar
+        if (error != null) {
+            ErrorOverlay(
+                error = error,
+                onContinue = onContinueAfterError
+            )
+        }
+    }
+}
+
+/**
+ * PATCH 7: Error overlay voor zichtbare foutmeldingen
+ */
+@Composable
+private fun ErrorOverlay(
+    error: String,
+    onContinue: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "⚠️ Er ging iets mis",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = onContinue,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Verder →")
+                }
+            }
         }
     }
 }

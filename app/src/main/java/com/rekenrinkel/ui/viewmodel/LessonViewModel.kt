@@ -358,6 +358,26 @@ class LessonViewModel(
     }
 
     /**
+     * PATCH 7: Verder gaan na een fout
+     * Gebruiker kan kiezen om te verdergaan na een zichtbare foutmelding
+     */
+    fun continueAfterError() {
+        val state = _uiState.value
+
+        // Reset error state
+        _uiState.update { it.copy(error = null) }
+
+        // Probeer veilig door te gaan
+        viewModelScope.launch {
+            if (state.currentIndex < state.exercises.size - 1) {
+                advanceToNextExercise()
+            } else {
+                completeLesson()
+            }
+        }
+    }
+
+    /**
      * PATCH 6: Voltooi de les met expliciete state
      */
     private fun completeLesson() {

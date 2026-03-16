@@ -7,45 +7,49 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 
 ## Wat werkt
 
-### Robuuste oefen-afhandeling (FAIL-SAFE)
-- **Harde completion guard**: elke oefening wordt maximaal één keer verwerkt
+### Robuuste lessonflow (gecentraliseerd in ViewModel)
 - **Expliciete completion modes**:
-  - `DIRECT_CONTINUE`: voor worked example en skip (geen feedback)
-  - `FEEDBACK_THEN_ADVANCE`: voor normale antwoorden (feedback + wacht)
-- **Fail-safe error handling**: fouten in progress/rewards logging blokkeren de flow niet
-- **No silent failures**: exceptions resulteren in duidelijke foutmelding + veilige doorloop
-
-### ViewModel-gestuurde flow
-- Alle advance-logica centraal in LessonViewModel
-- UI is puur presentational
-- Expliciete state machine: SHOWING → PROCESSING → FEEDBACK → ADVANCING
+  - `DIRECT_CONTINUE`: worked example, skip (geen feedback)
+  - `FEEDBACK_THEN_ADVANCE`: gewone antwoorden, guided practice
+- **Harde completion guard**: elke oefening maximaal één keer verwerkt
+- **Fail-safe error handling**: fouten zichtbaar in UI, geen silent hang
+- **Dubbele submit protection**: extra submits worden genegeerd
 
 ### Oefentypen
-- **WORKED_EXAMPLE**: Direct verder zonder validatie
+- **WORKED_EXAMPLE**: "Begrepen! Verder" → direct door
 - **GUIDED_PRACTICE**: Normale antwoordflow met hint
-- **Normale antwoorden**: Validatie, feedback, auto-advance
-- **Skip**: Direct door zonder blokkeren
+- **Normale antwoorden**: Validatie → feedback → auto-advance
+- **Skip**: Direct door, blokkeert nooit
 
-### Start op leeftijd, dan adaptief
-- Leeftijd bepaalt de start (5-6 / 7-8 / 9-11 jaar)
-- Daarna sturen prestaties het traject
+### Error handling
+- Fouten in progress/rewards/logging blokkeren de flow niet
+- Zichtbare error overlay met "Verder" knop
+- Veilige fallback naar volgende oefening of home
+
+### Start op leeftijd
+- Leeftijd bepaalt startniveau (5-6 / 7-8 / 9-11 jaar)
+- Daarna adaptief op basis van prestaties
 
 ## Wat in ontwikkeling is
 
-- Progressie-UI verder uitwerken
 - Spaced review algoritme
 - Parent dashboard
+- Meer oefentypes
 
 ## Flow
 
 ```
-Onboarding (leeftijd) → Home → Les (8 items, fail-safe) → Beloningen
+Onboarding (leeftijd) → Home → Les (fail-safe flow) → Beloningen
 ```
 
-## Build
+## Build & Test
 
 ```bash
+# Build
 ./gradlew :app:compileDebugKotlin
+
+# Tests
+./gradlew :app:testDebugUnitTest
 ```
 
 CI: https://github.com/robinvandenbroecke/RekenRinkel/actions
