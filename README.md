@@ -7,32 +7,28 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 
 ## Wat werkt
 
-### Robuuste oefen-afhandeling (FAIL-SAFE)
-- **Harde completion guard**: elke oefening maximaal één keer verwerkt
-  - `currentlyCompletingExerciseId` voor lopende verwerking
-  - `handledExerciseIds` set voor definitief afgehandelde oefeningen
-- **Expliciete completion status**: NOT_STARTED → RESULT_SAVED → PROGRESS_UPDATED → REWARDS_UPDATED → READY_TO_ADVANCE
-- **Expliciete completion modes**: DIRECT_CONTINUE (worked/skip), FEEDBACK_THEN_ADVANCE (normaal)
-- **Expliciete ERROR state**: interruptiestatus, niet terug naar SHOWING
-- **Failure stages**: RESULT_LOGGING, PROGRESS_UPDATE, REWARD_UPDATE, STATE_UPDATE, ADVANCE, UNKNOWN
-- **Failure context**: exerciseId, type, index, stage, timestamp
-- **Context-aware recovery**: recovery afhankelijk van failure stage en exercise type
+### Robuuste lessonflow met expliciete error handling
+- **Expliciete ERROR state**: interruptiestatus bij fouten, niet terug naar SHOWING
+- **Failure recovery**: context-aware recovery zonder dubbele afhandeling
+- **Completion guard**: elke oefening maximaal één keer verwerkt
+- **Failure stages**: RESULT_LOGGING, PROGRESS_UPDATE, REWARD_UPDATE, STATE_UPDATE, ADVANCE
+- **Debug logging**: volledige traceerbaarheid in logcat
 
-### Debug logging
-- Uitgebreide logging in completion flow
-- Zichtbaar in logcat: start, stages, failures, recovery actions
-- Essentieel voor traceerbaarheid van "hang"-bugs
-
-### Oefentypen failure paths
-- **WORKED_EXAMPLE**: geen validator/retry, altijd door naar volgende
-- **GUIDED_PRACTICE**: antwoord/feedback-flow, veilige recovery
+### Oefentype-specifieke afhandeling
+- **WORKED_EXAMPLE**: direct door, veilige failure path
+- **GUIDED_PRACTICE**: validatie + feedback, veilige recovery
 - **Normale antwoorden**: standaard response path
-- **Skip**: direct en veilig, geen antwoord-failure flow
+- **Skip**: direct en veilig, blokkeert nooit
 
-### Error handling
-- Fouten zichtbaar in UI met duidelijke melding
-- "Verder" knop voor veilige recovery
-- Geen silent failures
+### Regressie-checks
+- ✅ Eerste oefening kan altijd afronden
+- ✅ Worked example gaat direct door
+- ✅ Guided practice valideert en gaat door
+- ✅ Skip blokkeert niet
+- ✅ Geen dubbele submit
+- ✅ Geen dubbele XP
+- ✅ Geen wit scherm na les
+- ✅ Result screen blijft werken
 
 ## Wat in ontwikkeling is
 
