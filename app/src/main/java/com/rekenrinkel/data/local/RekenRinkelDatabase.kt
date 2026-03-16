@@ -14,7 +14,7 @@ import com.rekenrinkel.data.local.entity.*
         SessionResultEntity::class,
         ExerciseResultEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class RekenRinkelDatabase : RoomDatabase() {

@@ -170,10 +170,10 @@ fun RekenRinkelApp() {
                     val viewModel: MainViewModel = viewModel(
                         factory = MainViewModelFactory(context)
                     )
-                    
+
                     OnboardingScreen(
-                        onComplete = { name, theme ->
-                            viewModel.completeOnboarding(name, theme)
+                        onComplete = { name, age, theme ->
+                            viewModel.completeOnboarding(name, age, theme)
                             navController.navigate("home") {
                                 popUpTo("onboarding") { inclusive = true }
                             }

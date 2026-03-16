@@ -8,10 +8,13 @@ data class ProfileEntity(
     @PrimaryKey
     val id: String,
     val name: String,
+    val age: Int,
     val theme: String,
     val currentLevel: Int,
     val totalXp: Int,
     val currentStreak: Int,
     val lastSessionDate: Long?,
-    val longestStreak: Int
+    val longestStreak: Int,
+    val placementCompleted: Boolean,
+    val startingBand: String
 )

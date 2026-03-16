@@ -158,9 +158,9 @@ class MainViewModel(
         }
     }
 
-    fun completeOnboarding(name: String, theme: Theme) {
+    fun completeOnboarding(name: String, age: Int, theme: Theme) {
         viewModelScope.launch {
-            profileRepository.createProfile(name, theme)
+            profileRepository.createProfile(name, age, theme)
             settingsDataStore.setProfileName(name)
             settingsDataStore.setTheme(theme)
             settingsDataStore.setOnboardingCompleted(true)

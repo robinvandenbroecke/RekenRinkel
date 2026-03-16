@@ -12,13 +12,14 @@ import com.rekenrinkel.domain.model.Theme
 
 @Composable
 fun OnboardingScreen(
-    onComplete: (name: String, theme: Theme) -> Unit,
+    onComplete: (name: String, age: Int, theme: Theme) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var currentStep by remember { mutableIntStateOf(0) }
     var name by remember { mutableStateOf("") }
+    var selectedAge by remember { mutableIntStateOf(6) }
     var selectedTheme by remember { mutableStateOf(Theme.DINOSAURS) }
-    
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -35,27 +36,32 @@ fun OnboardingScreen(
                 onNameChange = { name = it },
                 onNext = { currentStep = 2 }
             )
-            2 -> ThemeStep(
+            2 -> AgeStep(
+                selectedAge = selectedAge,
+                onAgeSelect = { selectedAge = it },
+                onNext = { currentStep = 3 }
+            )
+            3 -> ThemeStep(
                 selectedTheme = selectedTheme,
                 onThemeSelect = { selectedTheme = it },
-                onComplete = { onComplete(name, selectedTheme) }
+                onComplete = { onComplete(name, selectedAge, selectedTheme) }
             )
         }
-        
+
         // Progress dots
         Spacer(modifier = Modifier.height(32.dp))
         Row(
             horizontalArrangement = Arrangement.Center
         ) {
-            repeat(3) { index ->
+            repeat(4) { index ->
                 Surface(
                     modifier = Modifier
                         .padding(horizontal = 4.dp)
                         .size(12.dp),
                     shape = RoundedCornerShape(6.dp),
-                    color = if (index == currentStep) 
-                        MaterialTheme.colorScheme.primary 
-                    else 
+                    color = if (index == currentStep)
+                        MaterialTheme.colorScheme.primary
+                    else
                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                 ) {}
             }
@@ -74,26 +80,26 @@ private fun WelcomeStep(
             text = "🎯",
             style = MaterialTheme.typography.displayLarge
         )
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         Text(
             text = "Welkom bij RekenRinkel!",
             style = MaterialTheme.typography.headlineMedium,
             textAlign = TextAlign.Center
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         Text(
             text = "Leer rekenen op een leuke manier met korte oefensessies.",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
         )
-        
+
         Spacer(modifier = Modifier.height(32.dp))
-        
+
         Button(
             onClick = onNext,
             modifier = Modifier
@@ -122,16 +128,16 @@ private fun NameStep(
             text = "👋",
             style = MaterialTheme.typography.displayLarge
         )
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         Text(
             text = "Hoe heet je?",
             style = MaterialTheme.typography.headlineMedium
         )
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         OutlinedTextField(
             value = name,
             onValueChange = onNameChange,
@@ -140,12 +146,91 @@ private fun NameStep(
             singleLine = true,
             shape = RoundedCornerShape(12.dp)
         )
-        
+
         Spacer(modifier = Modifier.height(32.dp))
-        
+
         Button(
             onClick = onNext,
             enabled = name.isNotBlank(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                text = "Verder",
+                style = MaterialTheme.typography.titleLarge
+            )
+        }
+    }
+}
+
+@Composable
+private fun AgeStep(
+    selectedAge: Int,
+    onAgeSelect: (Int) -> Unit,
+    onNext: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "🎂",
+            style = MaterialTheme.typography.displayLarge
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "Hoe oud ben je?",
+            style = MaterialTheme.typography.headlineMedium
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "Dit helpt ons om de juiste oefeningen te kiezen.",
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Age selector
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "$selectedAge jaar",
+                style = MaterialTheme.typography.displaySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Slider(
+                value = selectedAge.toFloat(),
+                onValueChange = { onAgeSelect(it.toInt()) },
+                valueRange = 5f..11f,
+                steps = 5,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("5", style = MaterialTheme.typography.bodySmall)
+                Text("11", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = onNext,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -172,16 +257,16 @@ private fun ThemeStep(
             text = "🎨",
             style = MaterialTheme.typography.displayLarge
         )
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         Text(
             text = "Kies een thema",
             style = MaterialTheme.typography.headlineMedium
         )
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
@@ -205,9 +290,9 @@ private fun ThemeStep(
                 onClick = { onThemeSelect(Theme.SPACE) }
             )
         }
-        
+
         Spacer(modifier = Modifier.height(32.dp))
-        
+
         Button(
             onClick = onComplete,
             modifier = Modifier
@@ -234,13 +319,13 @@ private fun ThemeCard(
         onClick = onClick,
         modifier = Modifier.size(100.dp),
         shape = RoundedCornerShape(16.dp),
-        color = if (isSelected) 
-            MaterialTheme.colorScheme.primaryContainer 
-        else 
+        color = if (isSelected)
+            MaterialTheme.colorScheme.primaryContainer
+        else
             MaterialTheme.colorScheme.surface,
-        border = if (isSelected) 
+        border = if (isSelected)
             androidx.compose.foundation.BorderStroke(3.dp, MaterialTheme.colorScheme.primary)
-        else 
+        else
             null
     ) {
         Column(

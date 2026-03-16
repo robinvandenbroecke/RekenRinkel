@@ -27,10 +27,22 @@ data class Profile(
     val totalXp: Int = 0,
     val currentStreak: Int = 0,
     val longestStreak: Int = 0,
-    val lastSessionDate: Long? = null
+    val lastSessionDate: Long? = null,
+    // Placement fields
+    val placementCompleted: Boolean = false,
+    val startingBand: StartingBand = StartingBand.FOUNDATION
 ) : Serializable {
     fun xpForNextLevel(): Int = currentLevel * 150
     fun xpProgress(): Float = (totalXp % xpForNextLevel()).toFloat() / xpForNextLevel()
+}
+
+/**
+ * Startniveau banden gebaseerd op leeftijd en placement
+ */
+enum class StartingBand {
+    FOUNDATION,        // 5-6 jaar: subitizing, telling, number bonds 5
+    EARLY_ARITHMETIC,  // 6-8 jaar: optellen/aftrekken tot 20, brug over 10
+    EXTENDED           // 8-11 jaar: vermenigvuldigen, breuken, redeneren
 }
 
 /**
