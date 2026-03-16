@@ -63,12 +63,13 @@ enum class AgeGroup(val minAge: Int, val maxAge: Int, val displayName: String) {
 }
 
 /**
- * Uitgebreide skill progress met mastery tracking
+ * Uitgebreide skill progress met mastery tracking en CPA
  */
 data class SkillProgress(
     val skillId: String,
     val masteryScore: Int = 0, // 0-100
     val currentDifficultyTier: Int = 1, // 1-5
+    val currentCpaPhase: com.rekenrinkel.domain.content.CpaPhase = com.rekenrinkel.domain.content.CpaPhase.CONCRETE,
     val correctCount: Int = 0,
     val incorrectCount: Int = 0,
     val streakCorrect: Int = 0,
