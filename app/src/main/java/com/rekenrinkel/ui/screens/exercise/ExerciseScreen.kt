@@ -373,6 +373,7 @@ private fun AnswerContent(
         }
     }
 }
+}
 
 private fun handleAnswer(
     answer: String,
