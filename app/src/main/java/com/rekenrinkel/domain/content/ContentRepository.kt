@@ -723,7 +723,7 @@ object ContentRepository {
             description = "De tafel van 2",
             category = SkillCategory.ADVANCED,
             isPremium = false,
-            prerequisites = listOf("advanced_groups"),
+            prerequisites = listOf("advanced_groups", "patterns_count_2"),
             minDifficulty = 3,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC, ExerciseType.MISSING_NUMBER),
@@ -892,13 +892,23 @@ object ContentRepository {
     
     fun getLearningPath(): List<List<String>> {
         return listOf(
+            // Level 0: Foundation (5-6 jaar)
             listOf("foundation_number_images_5"),
-            listOf("foundation_splits_10", "arithmetic_add_10"),
-            listOf("arithmetic_sub_10", "patterns_doubles", "patterns_halves"),
-            listOf("foundation_splits_20", "arithmetic_add_20", "arithmetic_sub_20"),
+            // Level 1: Splitsen + number bonds
+            listOf("foundation_splits_10", "foundation_number_bonds_10"),
+            // Level 2: Rekenen tot 10
+            listOf("arithmetic_add_10", "arithmetic_sub_10"),
+            // Level 3: Patterns
+            listOf("patterns_doubles", "patterns_halves"),
+            // Level 4: Rekenen tot 20 + splitsen 20
+            listOf("foundation_number_bonds_20", "foundation_splits_20", "arithmetic_add_20", "arithmetic_sub_20"),
+            // Level 5: Brug over 10
             listOf("arithmetic_bridge_add", "arithmetic_bridge_sub"),
+            // Level 6: Skip counting
             listOf("patterns_count_2", "patterns_count_5", "patterns_count_10"),
+            // Level 7: Plaatswaarde
             listOf("advanced_compare_100", "advanced_place_value"),
+            // Level 8: Tafels
             listOf("advanced_groups", "advanced_table_2", "advanced_table_5", "advanced_table_10")
         )
     }

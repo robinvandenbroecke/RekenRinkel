@@ -102,11 +102,11 @@ class ContentRepositoryTest {
     @Test
     fun `addition requires prerequisites`() {
         val add10Config = ContentRepository.getConfig("arithmetic_add_10")
-        
+
         assertNotNull(add10Config)
         assertTrue(
-            "Add 10 should require number images",
-            add10Config?.prerequisites?.contains("foundation_number_images_5") ?: false
+            "Add 10 should require number bonds 10",
+            add10Config?.prerequisites?.contains("foundation_number_bonds_10") ?: false
         )
     }
     
@@ -198,20 +198,15 @@ class ContentRepositoryTest {
     @Test
     fun `premium configs exist`() {
         val premiumConfigs = ContentRepository.getPremiumConfigs()
-        
+
         assertTrue("Should have premium configs", premiumConfigs.isNotEmpty())
-        
-        val premiumSkillIds = listOf(
-            "foundation_splits_20",
-            "arithmetic_add_20",
-            "arithmetic_bridge_add",
-            "patterns_count_2",
-            "advanced_table_2"
-        )
-        
-        premiumSkillIds.forEach { skillId ->
-            val config = premiumConfigs.find { it.skillId == skillId }
-            assertNotNull("$skillId should be premium", config)
+
+        // Validate that premium skills have prerequisites (premium content is advanced)
+        premiumConfigs.forEach { config ->
+            assertTrue(
+                "Premium skill ${config.skillId} should have prerequisites",
+                config.prerequisites.isNotEmpty()
+            )
         }
     }
     

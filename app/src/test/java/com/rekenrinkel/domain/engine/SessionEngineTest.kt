@@ -40,12 +40,12 @@ class SessionEngineTest {
     fun `isSkillUnlocked checks prerequisites`() = runBlocking {
         val repo = FakeProgressRepository()
         val engine = SessionEngine(ExerciseEngine(), repo)
-        
+
         // Without mastering prerequisites
         assertFalse(engine.isSkillUnlocked("arithmetic_add_10"))
-        
-        // After mastering prerequisite
-        repo.addMockProgress("foundation_number_images_5", 60)
+
+        // After mastering number bonds 10 (prerequisite for add 10)
+        repo.addMockProgress("foundation_number_bonds_10", 60)
         assertTrue(engine.isSkillUnlocked("arithmetic_add_10"))
     }
     
