@@ -2,141 +2,110 @@
 
 Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 
-**Status**: Privétestfase - in opbouw  
+**Status**: Privétestfase - niet productierijp  
 **Laatste update**: 2026-03-16
 
-## Wat er is (basis aanwezig)
+## Wat er is
 
-### Profiel en start
-- Naam, leeftijd (5-11), thema instellen
+### Kernarchitectuur
 - **Placement verplicht** vóór normaal leerpad
-- Placement: 5 diagnostische items → startband bepaling
-- Rewards systeem: XP, level, streak, badges
+- **LessonEngine** als primaire leermotor
+- **CPA-fases** sturen representatie en oefeningstype
+- **Fouttype-remediëring** gekoppeld aan representaties
+- **Rewards** gekoppeld aan mastery (XP + sterren)
 - 100% offline, lokale Room database
 
-### Content
-- 40+ skills in ContentRepository.kt
-- Microskills met CPA-fasen (CONCRETE → PICTORIAL → ABSTRACT)
-- Skills gegroepeerd per leeftijdsgroep
-- Prerequisites per skill
-- Fouttype-remediëring (BOND_ERROR, BRIDGE_10_ERROR, etc.)
+### Placement
+- 5 diagnostische items bij eerste start
+- Bepaalt start cluster op basis van prestaties
+- Leeftijd = bias, placement resultaat = startniveau
+- Geen normaal leerpad zonder placement
 
-### Oefeningen
-- ExerciseEngine met didactische generatie
-- Oefentypes: TYPED_NUMERIC, VISUAL_GROUPS, MISSING_NUMBER, WORKED_EXAMPLE, GUIDED_PRACTICE
-- Difficulty levels 1-5
-- Representaties: DOTS, BLOCKS, BOND_MODEL, NUMBER_LINE, SYMBOLS
-
-### Sessie/Les (didactisch opgebouwd)
-- LessonEngine: primaire leermotor met fouttype-remediëring
+### LessonEngine (primaire leermotor)
 - 10 items per les: Warm-up (2), Focus (4), Review (2), Challenge (2)
 - Didactische flow: Worked example → Guided → Independent
-- **PATCH 4**: Fouttype-remediëring:
-  * BRIDGE_10_ERROR → bond model
-  * COMPARE_ERROR → getallenlijn
-  * GROUPING_ERROR → arrays
-  * etc.
-- CPA-fase bepaalt oefeningstype:
-  * CONCRETE: veel scaffolding (worked + guided)
-  * PICTORIAL: mix (guided + independent)
-  * ABSTRACT: zelfstandig (independent)
-- Smart shuffle met variatie
-- Exit check na sessie
+- **SessionEngine** is helper/uitgelijnd, geen parallel curriculum
 
-### Voortgang (PATCH 5 & 6)
-- SkillProgress per skill: masteryScore (0-100), difficultyTier, CPA-fase
-- **PATCH 6**: Mastery sterren (0-3⭐) per skill
-- **PATCH 5**: Leerdoelen zichtbaar in UI (focus skill, CPA-fase, voortgang)
-- Rewards: XP, level, streak tracking + gekoppeld aan mastery
-- ProfielRepository: CRUD operaties
-- ProgressRepository: skill resultaten
+### CPA-fases (afdwingbaar)
+- CONCRETE → PICTORIAL: 60% mastery + 5 attempts
+- PICTORIAL → ABSTRACT: 75% mastery + 8 attempts
+- ABSTRACT → MIXED: 85% mastery
+- Fase bepaalt oefeningstype:
+  * CONCRETE: worked + guided
+  * PICTORIAL: guided + independent
+  * ABSTRACT: independent
 
-## Flow (huidige implementatie)
+### Fouttype-remediëring
+- BRIDGE_10_ERROR → bond model
+- COMPARE_ERROR → getallenlijn
+- GROUPING_ERROR → arrays
+- COUNTING_ERROR → subitizing
+- PLACE_VALUE_ERROR → blokken/tientallen
+
+### Zichtbaar in UI
+- Huidige focus skill en CPA-fase
+- Mastery progress (0-100%)
+- 0-3 sterren per skill
+- Volgende skill indicator
+- Review nodig meldingen
+
+### Rewards
+- XP gekoppeld aan: correct, snel, streak, mastered
+- Mastery sterren: ⭐ (50%), ⭐⭐ (70%), ⭐⭐⭐ (90%)
+- Badges voor: skill mastered, streak, speed
+
+## Wat in ontwikkeling is
+
+### In opbouw
+- Spaced review algoritme
+- Meer uitgebreide parent dashboard
+- Extra oefentypes (woordproblemen, etc.)
+- Geluidseffecten
+
+### Gedeeltelijk geïmplementeerd
+- Fouttype-analyse (framework aanwezig, volledige integratie volgt)
+- Adaptieve difficulty (basis werkt, finetuning volgt)
+- Remediëring triggers (logica aanwezig, UI koppeling volgt)
+
+## Flow
 
 ```
 App Start
   ↓
-Onboarding (naam, leeftijd, thema)
+Onboarding
   ↓
 Placement (verplicht)
-  ↓  5 diagnostische items
-  ↓  Bepaalt start cluster
+  ↓  5 items → start cluster
 Home
   ↓
-Start Les → LessonEngine
-  ↓  Warm-up (review)
-  ↓  Focus (50% - CPA-afhankelijk)
-  ↓  Review (spaced)
-  ↓  Challenge (transfer)
-  ↓
-Exit Check → Mastery update
-  ↓
-Rewards (XP, badges)
-  ↓
+Start Les
+  ↓  LessonEngine
+  ↓  ├─ Warm-up (review)
+  ↓  ├─ Focus (50%, CPA-afhankelijk)
+  ↓  ├─ Review (spaced)
+  ↓  └─ Challenge (transfer)
+Exit Check
+  ↓  Mastery update
+Rewards
+  ↓  XP + sterren
 Volgende les
 ```
 
-## Wat in opbouw is
-
-### Leeftijdsadaptatie (PATCH 7 - basis aanwezig)
-- Startband via leeftijd: geïmplementeerd
-- Placement test: verplicht vóór normaal leerpad
-- Placement resultaat bepaalt start cluster
-- **PATCH 7**: Leeftijd = bias, niet dictator
-- Prestaties overrulen leeftijd na placement
-- Dynamische content selectie: in ontwikkeling
-
-### CPA/Singapore Math (gedeeltelijk geïmplementeerd)
-- CPA enum aanwezig (CONCRETE, PICTORIAL, ABSTRACT, MIXED_TRANSFER)
-- Representatie types gedefinieerd
-- Fase-overgangen afdwingbaar in LessonEngine:
-  * CONCRETE → PICTORIAL: 60% mastery + 5 attempts
-  * PICTORIAL → ABSTRACT: 75% mastery + 8 attempts
-  * ABSTRACT → MIXED: 85% mastery
-
-### Mastery engine (PATCH 4, 5, 6 - gedeeltelijk geïmplementeerd)
-- SkillProgress tracking: basis aanwezig
-- Difficulty adjustment: geïmplementeerd
-- CPA-fase tracking: geïmplementeerd
-- **PATCH 4**: Fouttype-remediëring geïmplementeerd
-- **PATCH 5**: Leerdoelen zichtbaar in UI
-- **PATCH 6**: Mastery sterren (0-3⭐) per skill
-
-### Rewards (gedeeltelijk geïmplementeerd)
-- XP systeem: basis aanwezig
-- Badges: structuur aanwezig, inhoud in opbouw
-- Unlock mechanisme: basis aanwezig
-
-### Spaced review (in opbouw)
-- Framework aanwezig
-- Algoritme: in ontwikkeling
-- Prioriteitsscores: gedeeltelijk geïmplementeerd
-
 ## Architectuur
 
-### Data lagen
 ```
-UI (Compose) 
+UI (Compose)
   ↓
-ViewModels 
+ViewModels
   ↓
-Repositories (ProfileRepository, ProgressRepository)
+Repositories
   ↓
-DAO's (ProfileDao, SkillProgressDao)
+LessonEngine (primair)
+  ↓  ├─ ExerciseEngine
+  ↓  └─ SessionEngine (helper)
   ↓
-Room Database
+DAO's → Room
 ```
-
-### Key files
-| Bestand | Functie | Status |
-|---------|---------|--------|
-| `ContentRepository.kt` | 40+ skill definities | basis aanwezig |
-| `ExerciseEngine.kt` | Oefening generatie | basis aanwezig |
-| `LessonEngine.kt` | Didactische les structuur | basis aanwezig |
-| `SessionEngine.kt` | Sessie flow | basis aanwezig |
-| `PlacementEngine.kt` | Startbepaling | geïmplementeerd |
-| `ProfileRepository.kt` | Profiel opslag | basis aanwezig |
-| `ProgressRepository.kt` | Skill voortgang | basis aanwezig |
 
 ## Build
 
@@ -150,12 +119,11 @@ CI via GitHub Actions.
 
 - Android Studio Hedgehog+
 - JDK 17
-- `ANDROID_HOME` environment variable
+- `ANDROID_HOME`
 
 ## Data & Privacy
 
 - 100% offline
-- Room database (lokaal)
 - Geen tracking, geen ads
 - Geen account nodig
 

@@ -64,9 +64,34 @@ class ExerciseEngine {
         }
     }
 
+    // PATCH 8: Recent gegenereerde oefeningen bijhouden om duplicaten te voorkomen
+    private val recentExercises = mutableMapOf<String, MutableSet<String>>()
+    private val maxRecentMemory = 5  // Onthoud laatste 5 oefeningen per skill
+
+    /**
+     * PATCH 8: Check of een oefening recent is gegenereerd (duplicaat)
+     */
+    private fun isRecentDuplicate(skillId: String, question: String): Boolean {
+        val recent = recentExercises.getOrPut(skillId) { mutableSetOf() }
+        return recent.contains(question.hashCode().toString())
+    }
+
+    /**
+     * PATCH 8: Markeer een oefening als recent gegenereerd
+     */
+    private fun markAsRecent(skillId: String, question: String) {
+        val recent = recentExercises.getOrPut(skillId) { mutableSetOf() }
+        recent.add(question.hashCode().toString())
+        // Houd alleen de laatste maxRecentMemory bij
+        if (recent.size > maxRecentMemory) {
+            recent.remove(recent.first())
+        }
+    }
+
     /**
      * Genereer een oefening voor een specifieke skill met het juiste difficulty level.
      * Deze methode gebruikt de content configuratie om didactisch correcte oefeningen te genereren.
+     * PATCH 8: Voorkomt directe duplicaten van identieke items.
      */
     fun generateExercise(skillId: String, difficulty: Int): Exercise {
         val config = ContentRepository.getConfig(skillId)
@@ -110,6 +135,40 @@ class ExerciseEngine {
             "advanced_table_10" -> generateTable(config, clampedDifficulty, multiplier = 10)
             
             else -> generateFallbackExercise(skillId, clampedDifficulty)
+        }.let { exercise ->
+            // PATCH 8: Voorkom directe duplicaten
+            var attempts = 0
+            var result = exercise
+            while (isRecentDuplicate(skillId, result.question) && attempts < 3) {
+                // Genereer opnieuw als het een duplicaat is (max 3 pogingen)
+                result = when (skillId) {
+                    "foundation_subitize_5", "foundation_number_images_5", "foundation_counting" -> generateNumberImages(config!!, clampedDifficulty)
+                    "foundation_number_bonds_5", "foundation_splits_10" -> generateSplits(config!!, clampedDifficulty, 10)
+                    "foundation_number_bonds_10" -> generateSplits(config!!, clampedDifficulty, 10)
+                    "foundation_number_bonds_20", "foundation_splits_20" -> generateSplits(config!!, clampedDifficulty, 20)
+                    "arithmetic_add_10" -> generateAddition(config!!, clampedDifficulty, maxSum = 10, useBridge = false)
+                    "arithmetic_sub_10" -> generateSubtraction(config!!, clampedDifficulty, max = 10, useBridge = false)
+                    "arithmetic_add_20" -> generateAddition(config!!, clampedDifficulty, maxSum = 20, useBridge = false)
+                    "arithmetic_sub_20" -> generateSubtraction(config!!, clampedDifficulty, max = 20, useBridge = false)
+                    "arithmetic_bridge_add" -> generateAddition(config!!, clampedDifficulty, maxSum = 18, useBridge = true)
+                    "arithmetic_bridge_sub" -> generateSubtraction(config!!, clampedDifficulty, max = 18, useBridge = true)
+                    "patterns_doubles" -> generateDoubles(config!!, clampedDifficulty)
+                    "patterns_halves" -> generateHalves(config!!, clampedDifficulty)
+                    "patterns_count_2" -> generateSkipCounting(config!!, clampedDifficulty, step = 2)
+                    "patterns_count_5" -> generateSkipCounting(config!!, clampedDifficulty, step = 5)
+                    "patterns_count_10" -> generateSkipCounting(config!!, clampedDifficulty, step = 10)
+                    "advanced_compare_100" -> generateComparison(config!!, clampedDifficulty)
+                    "advanced_place_value" -> generatePlaceValue(config!!, clampedDifficulty)
+                    "advanced_groups" -> generateGroups(config!!, clampedDifficulty)
+                    "advanced_table_2" -> generateTable(config!!, clampedDifficulty, multiplier = 2)
+                    "advanced_table_5" -> generateTable(config!!, clampedDifficulty, multiplier = 5)
+                    "advanced_table_10" -> generateTable(config!!, clampedDifficulty, multiplier = 10)
+                    else -> generateFallbackExercise(skillId, clampedDifficulty)
+                }
+                attempts++
+            }
+            markAsRecent(skillId, result.question)
+            result
         }
     }
     
