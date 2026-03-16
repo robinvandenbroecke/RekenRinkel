@@ -91,9 +91,18 @@ fun PlacementScreen(
             )
             
             Text(
-                text = "Eerste skills: ${analysis.startSkills.take(2).joinToString(", ")}",
+                text = "Focus: ${analysis.startSkills.take(2).joinToString(", ")}",
                 style = MaterialTheme.typography.bodyMedium
             )
+            
+            if (analysis.weakAreas.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Aandacht nodig: ${analysis.weakAreas.take(2).joinToString(", ")}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
             
             Spacer(modifier = Modifier.height(32.dp))
             
@@ -129,24 +138,16 @@ fun PlacementScreen(
             
             Spacer(modifier = Modifier.height(48.dp))
             
-            // Antwoord knoppen - PATCH: FlowRow vervangen door Columns
-            val answers = when {
-                currentItem.correctAnswer.toIntOrNull() != null -> {
-                    // Numeriek antwoord
-                    (1..10).map { it.toString() }
-                }
-                else -> {
-                    // Textueel antwoord
-                    listOf("links", "rechts", "evenveel", currentItem.correctAnswer)
-                }
-            }.distinct().shuffled().take(6)
+            // Antwoord knoppen - gebruik didactisch correcte opties uit placement item
+            val answers = currentItem.options.shuffled()
+            val columns = if (answers.size <= 3) 1 else if (answers.size <= 6) 2 else 3
             
-            // Gebruik 2 rows van 3 buttons ipv FlowRow
+            // Gebruik dynamische layout gebaseerd op aantal opties
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                answers.chunked(3).forEach { rowAnswers ->
+                answers.chunked(columns).forEach { rowAnswers ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
@@ -166,8 +167,9 @@ fun PlacementScreen(
                                     }
                                 },
                                 modifier = Modifier
-                                    .padding(4.dp)
-                                    .size(64.dp)
+                                    .padding(8.dp)
+                                    .height(56.dp)
+                                    .weight(1f)
                             ) {
                                 Text(
                                     text = answer,
