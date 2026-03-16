@@ -41,26 +41,28 @@ class ExerciseEngine {
     }
 
     private fun generateWorkedExampleHint(exercise: Exercise): String {
+        val hintText = exercise.hint ?: "Let op de stappen"
         return when (exercise.type) {
             ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC -> {
                 "Laten we dit samen bekijken:\n" +
                 "${exercise.question}\n" +
                 "Het antwoord is ${exercise.correctAnswer}.\n" +
-                "Let op: ${exercise.hint}"
+                "Let op: $hintText"
             }
             else -> "Dit is een voorbeeld. Het antwoord is: ${exercise.correctAnswer}"
         }
     }
 
     private fun generateGuidedHint(exercise: Exercise): String {
+        val hintText = exercise.hint ?: "Probeer het stap voor stap"
         return when (exercise.type) {
             ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC -> {
                 "Probeer zelf eerst:\n" +
                 "${exercise.question}\n" +
-                "Tip: ${exercise.hint}\n" +
+                "Tip: $hintText\n" +
                 "(Je krijgt hulp als je er niet uit komt)"
             }
-            else -> exercise.hint
+            else -> hintText
         }
     }
 

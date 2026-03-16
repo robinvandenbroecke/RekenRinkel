@@ -84,10 +84,11 @@ fun RekenRinkelApp() {
                     )
                     
                     val uiState by viewModel.uiState.collectAsState()
+                    val currentProfile = uiState.profile
                     
                     // PATCH 1: Placement verplicht check
-                    LaunchedEffect(uiState.profile) {
-                        if (uiState.profile != null && !uiState.profile.placementCompleted) {
+                    LaunchedEffect(currentProfile) {
+                        if (currentProfile != null && !currentProfile.placementCompleted) {
                             // Redirect naar placement als nog niet voltooid
                             navController.navigate("placement") {
                                 popUpTo("home") { inclusive = true }
@@ -129,10 +130,11 @@ fun RekenRinkelApp() {
                         factory = MainViewModelFactory(context)
                     )
                     val uiState by viewModel.uiState.collectAsState()
+                    val placementProfile = uiState.profile
                     
                     // Laat placement zien en redirect naar home als voltooid
-                    LaunchedEffect(uiState.profile?.placementCompleted) {
-                        if (uiState.profile?.placementCompleted == true) {
+                    LaunchedEffect(placementProfile?.placementCompleted) {
+                        if (placementProfile?.placementCompleted == true) {
                             navController.navigate("home") {
                                 popUpTo("placement") { inclusive = true }
                             }
@@ -141,7 +143,7 @@ fun RekenRinkelApp() {
                     
                     // Placeholder placement screen - gebruikt exercise engine
                     PlacementScreen(
-                        profile = uiState.profile,
+                        profile = placementProfile,
                         onPlacementComplete = { viewModel.completePlacement() },
                         onCancel = { 
                             // Kan niet cancellen - placement is verplicht

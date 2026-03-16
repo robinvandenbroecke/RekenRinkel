@@ -79,8 +79,7 @@ class MainViewModel(
                         id = it.id,
                         name = it.name,
                         age = it.age,
-                        theme = it.theme,
-                        isPremium = isPremium
+                        theme = it.theme
                     ),
                     isPremiumUnlocked = isPremium
                 )

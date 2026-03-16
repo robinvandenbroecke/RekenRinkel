@@ -304,6 +304,73 @@ private fun AnswerContent(
                 currentValue = typedAnswer
             )
         }
+
+        ExerciseType.WORKED_EXAMPLE -> {
+            // Toon uitleg + voorbeeld + knop "verder"
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "📖 Uitgewerkt voorbeeld",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = exercise.hint ?: "Bekijk dit voorbeeld aandachtig",
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = { onConfirmTyped() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Begrepen! Verder →")
+                }
+            }
+        }
+
+        ExerciseType.GUIDED_PRACTICE -> {
+            // Toon vraag met hint/ondersteuning
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "💡 Begeleide oefening",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = exercise.hint ?: "Probeer het met deze tip",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                // Gebruik number pad zoals bij TYPED_NUMERIC
+                NumberPad(
+                    onNumberClick = { num ->
+                        if (enabled && typedAnswer.length < 3) {
+                            onTypedAnswerChange(typedAnswer + num)
+                        }
+                    },
+                    onBackspace = {
+                        if (enabled && typedAnswer.isNotEmpty()) {
+                            onTypedAnswerChange(typedAnswer.dropLast(1))
+                        }
+                    },
+                    onConfirm = {
+                    if (enabled && typedAnswer.isNotEmpty()) {
+                        onConfirmTyped()
+                    }
+                },
+                currentValue = typedAnswer
+            )
+        }
     }
 }
 

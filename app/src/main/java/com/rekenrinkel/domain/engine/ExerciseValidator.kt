@@ -41,6 +41,14 @@ class ExerciseValidator {
             
             ExerciseType.NUMBER_LINE_CLICK -> 
                 validateNumeric(normalizedGiven, normalizedCorrect)
+            
+            ExerciseType.WORKED_EXAMPLE -> 
+                // Worked examples hoeven geen antwoordvalidatie - zijn demonstratief
+                true
+            
+            ExerciseType.GUIDED_PRACTICE -> 
+                // Guided practice gebruikt dezelfde validatie als het onderliggende type
+                validateNumeric(normalizedGiven, normalizedCorrect)
         }
     }
     
