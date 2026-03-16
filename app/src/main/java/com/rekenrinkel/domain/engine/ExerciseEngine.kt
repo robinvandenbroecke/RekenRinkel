@@ -335,42 +335,66 @@ class ExerciseEngine {
     // ============================================
     
     /**
-     * Vergelijken - Duidelijke vraagstelling
+     * Vergelijken - Duidelijke vraagstelling (VEILIG)
+     * Gebruikt kandidaatlijst om ongeldige random ranges te voorkomen
      */
     private fun generateComparison(config: com.rekenrinkel.domain.content.SkillContentConfig, difficulty: Int): Exercise {
         // Bij hogere difficulty: getallen dichter bij elkaar
         val range = when (difficulty) {
-            3 -> 20..100
-            4 -> 50..100
-            else -> 10..100
+            3 -> 10..100
+            4 -> 20..100
+            else -> 1..50
         }
-        
-        val a = random.nextInt(range.first, range.last + 1)
-        
+
         // Zorg voor betekenisvolle verschillen
         val minDiff = when (difficulty) {
-            3 -> 10
-            4 -> 5
+            3 -> 15
+            4 -> 10
             else -> 20
         }
-        
-        val b = if (random.nextBoolean()) {
-            random.nextInt(max(range.first, a - 30), a - minDiff + 1)
+
+        // Genereer eerst a, dan bouw een lijst van geldige b-kandidaten
+        val a = random.nextInt(range.first, range.last + 1)
+
+        // Bouw lijst van alle geldige b-waarden
+        val candidates = mutableListOf<Int>()
+
+        // b < a - minDiff (b is significant kleiner)
+        val lowerMax = a - minDiff
+        if (lowerMax >= range.first) {
+            candidates.addAll((range.first..lowerMax).toList())
+        }
+
+        // b > a + minDiff (b is significant groter)
+        val upperMin = a + minDiff
+        if (upperMin <= range.last) {
+            candidates.addAll((upperMin..range.last).toList())
+        }
+
+        // Fallback: als er geen kandidaten zijn, verruim de criteria
+        val b = if (candidates.isNotEmpty()) {
+            candidates.random(random)
         } else {
-            random.nextInt(a + minDiff, min(range.last, a + 30) + 1)
-        }.coerceIn(range)
-        
+            // Geen significant verschil mogelijk: kies willekeurig uit hele range
+            // maar zorg dat b != a
+            var candidate = random.nextInt(range.first, range.last + 1)
+            while (candidate == a && range.last > range.first) {
+                candidate = random.nextInt(range.first, range.last + 1)
+            }
+            candidate
+        }
+
         val correct = when {
             a > b -> ">"
             a < b -> "<"
             else -> "="
         }
-        
+
         return Exercise(
             skillId = config.skillId,
             type = ExerciseType.COMPARE_NUMBERS,
             difficulty = difficulty,
-            question = "Welk getal is groter?\n$a ${if (a > b) "groter dan" else if (a < b) "kleiner dan" else "gelijk aan"} $b",
+            question = "Welk symbool hoort hier?\n$a __ $b",
             visualData = VisualData(type = VisualType.COMPARISON, firstNumber = a, secondNumber = b),
             options = listOf("<", "=", ">"),
             correctAnswer = correct,
