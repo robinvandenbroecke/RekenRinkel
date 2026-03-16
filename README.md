@@ -5,36 +5,37 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 **Status**: Privétestfase - in opbouw  
 **Laatste update**: 2026-03-16
 
-## Wat er is
+## Wat er is (basis aanwezig)
 
-### Profiel en start (basis aanwezig)
+### Profiel en start
 - Naam, leeftijd (5-11), thema instellen
 - Startband bepaald door leeftijd (FOUNDATION/EARLY_ARITHMETIC/EXTENDED)
-- Rewards systeem: XP, level, streak (gedeeltelijk geïmplementeerd)
+- Placement engine met 6-10 diagnostische items
+- Rewards systeem: XP, level, streak, badges
 - 100% offline, lokale Room database
 
-### Content (basis aanwezig)
-- 30+ skills in ContentRepository.kt
-- Skills gegroepeerd per leeftijdsgroep:
-  - **Foundation (5-6)**: subitize, counting, bonds, splits
-  - **Early Arithmetic (6-8)**: add/sub tot 20, bridge over 10
-  - **Extended (8-11)**: groups, tables, place value, fractions
-- Prerequisites per skill (basis aanwezig)
+### Content
+- 40+ skills in ContentRepository.kt
+- Microskills met CPA-fasen (CONCRETE → PICTORIAL → ABSTRACT)
+- Skills gegroepeerd per leeftijdsgroep
+- Prerequisites per skill
+- Fouttype-remediëring (BOND_ERROR, BRIDGE_10_ERROR, etc.)
 
-### Oefeningen (basis aanwezig)
-- ExerciseEngine genereert oefeningen per skill
-- Oefentypes: TYPED_NUMERIC, VISUAL_GROUPS, MISSING_NUMBER
+### Oefeningen
+- ExerciseEngine met didactische generatie
+- Oefentypes: TYPED_NUMERIC, VISUAL_GROUPS, MISSING_NUMBER, WORKED_EXAMPLE, GUIDED_PRACTICE
 - Difficulty levels 1-5
-- Distractors gegenereerd
+- Representaties: DOTS, BLOCKS, BOND_MODEL, NUMBER_LINE, SYMBOLS
 
-### Sessie/Les (basis aanwezig)
+### Sessie/Les (didactisch opgebouwd)
 - LessonEngine: 10 items per les
 - Fases: Warm-up (2), Focus (4), Review (2), Challenge (2)
+- Didactische flow: Worked example → Guided → Independent
 - Smart shuffle met variatie
-- Exit check na sessie (nog niet volledig coherent)
+- Exit check na sessie
 
-### Voortgang (basis aanwezig)
-- SkillProgress per skill: masteryScore (0-100), difficultyTier
+### Voortgang
+- SkillProgress per skill: masteryScore (0-100), difficultyTier, CPA-fase
 - Rewards: XP, level, streak tracking
 - ProfielRepository: CRUD operaties
 - ProgressRepository: skill resultaten
@@ -43,28 +44,23 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 
 ### Leeftijdsadaptatie (in opbouw)
 - Startband via leeftijd: basis aanwezig
-- Placement test: nog niet volledig geïmplementeerd
+- Placement test: geïmplementeerd, moet nog volledig geïntegreerd
 - Dynamische content selectie: in ontwikkeling
 
 ### CPA/Singapore Math (in opbouw)
 - CPA enum aanwezig (CONCRETE, PICTORIAL, ABSTRACT, MIXED_TRANSFER)
 - Representatie types gedefinieerd
-- Koppeling aan UI/exercise rendering: nog niet volledig coherent
+- Fase-overgangen: framework aanwezig, volledige integratie volgt
 
 ### Mastery engine (gedeeltelijk geïmplementeerd)
 - SkillProgress tracking: basis aanwezig
-- Difficulty adjustment logica: aanwezig
-- Remediëring op basis van fouttypes: in opbouw
+- Difficulty adjustment: geïmplementeerd
+- Remediëring op basis van fouttypes: framework aanwezig
 
 ### Rewards (gedeeltelijk geïmplementeerd)
 - XP systeem: basis aanwezig
 - Badges: structuur aanwezig, inhoud in opbouw
 - Unlock mechanisme: basis aanwezig
-
-### Microskills (basis aanwezig)
-- 30+ skills gedefinieerd
-- Prerequisites: aanwezig
-- Micro-less structuur (10 items): basis aanwezig
 
 ### Spaced review (in opbouw)
 - Framework aanwezig
@@ -89,10 +85,11 @@ Room Database
 ### Key files
 | Bestand | Functie | Status |
 |---------|---------|--------|
-| `ContentRepository.kt` | 30+ skill definities | basis aanwezig |
+| `ContentRepository.kt` | 40+ skill definities | basis aanwezig |
 | `ExerciseEngine.kt` | Oefening generatie | basis aanwezig |
-| `LessonEngine.kt` | Les structuur | basis aanwezig |
+| `LessonEngine.kt` | Didactische les structuur | basis aanwezig |
 | `SessionEngine.kt` | Sessie flow | basis aanwezig |
+| `PlacementEngine.kt` | Startbepaling | geïmplementeerd |
 | `ProfileRepository.kt` | Profiel opslag | basis aanwezig |
 | `ProgressRepository.kt` | Skill voortgang | basis aanwezig |
 
