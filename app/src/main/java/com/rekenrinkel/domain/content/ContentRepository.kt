@@ -297,16 +297,19 @@ object ContentRepository {
             name = "Meer, Minder, Evenveel",
             description = "Vergelijken van hoeveelheden",
             category = SkillCategory.FOUNDATION,
+            cpaPhase = CpaPhase.CONCRETE,
             isPremium = false,
             prerequisites = listOf("foundation_counting"),
             minDifficulty = 1,
             maxDifficulty = 2,
             allowedExerciseTypes = listOf(ExerciseType.COMPARE_NUMBERS, ExerciseType.VISUAL_QUANTITY),
+            preferredRepresentations = listOf(RepresentationType.DOTS, RepresentationType.BLOCKS),
             rules = DidacticRules.build {
                 range(1, 10)
                 requireVisualPrompt()
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.VISUAL,
+            commonErrorTypes = listOf(ErrorType.COMPARE_ERROR, ErrorType.COUNTING_ERROR)
         ),
 
         // === NUMBER BONDS (Leeftijd 5-6) ===
@@ -359,15 +362,18 @@ object ContentRepository {
             name = "Vormen Herkennen",
             description = "Basale geometrische vormen",
             category = SkillCategory.FOUNDATION,
+            cpaPhase = CpaPhase.CONCRETE,
             isPremium = false,
             prerequisites = emptyList(),
             minDifficulty = 1,
             maxDifficulty = 2,
             allowedExerciseTypes = listOf(ExerciseType.MULTIPLE_CHOICE),
+            preferredRepresentations = listOf(RepresentationType.DOTS),
             rules = DidacticRules.build {
                 range(1, 5)
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.VISUAL,
+            commonErrorTypes = listOf(ErrorType.COUNTING_ERROR)
         ),
 
         SkillContentConfig(
@@ -375,16 +381,19 @@ object ContentRepository {
             name = "Patronen Vervolgen",
             description = "Eenvoudige visuele patronen",
             category = SkillCategory.FOUNDATION,
+            cpaPhase = CpaPhase.CONCRETE,
             isPremium = false,
             prerequisites = listOf("foundation_counting"),
             minDifficulty = 1,
             maxDifficulty = 3,
             allowedExerciseTypes = listOf(ExerciseType.SIMPLE_SEQUENCE),
+            preferredRepresentations = listOf(RepresentationType.DOTS),
             rules = DidacticRules.build {
                 range(1, 5)
                 sequenceLength(3)
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.VISUAL,
+            commonErrorTypes = listOf(ErrorType.SEQUENCE_ERROR)
         )
     )
 
@@ -395,16 +404,19 @@ object ContentRepository {
             name = "Getalbeelden tot 5",
             description = "Visueel herkennen van hoeveelheden tot 5",
             category = SkillCategory.FOUNDATION,
+            cpaPhase = CpaPhase.CONCRETE,
             isPremium = false,
             prerequisites = emptyList(),
             minDifficulty = 1,
             maxDifficulty = 3,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_QUANTITY),
+            preferredRepresentations = listOf(RepresentationType.DOTS, RepresentationType.BLOCKS),
             rules = DidacticRules.build {
                 range(1, 5)
                 requireVisualPrompt()
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.VISUAL,
+            commonErrorTypes = listOf(ErrorType.SUBITIZING_ERROR)
         ),
         
         // === NUMBER BONDS 20 (Leeftijd 6-8) ===
@@ -413,16 +425,20 @@ object ContentRepository {
             name = "Number Bonds tot 20",
             description = "Leren welke getallen samen 20 maken",
             category = SkillCategory.FOUNDATION,
+            cpaPhase = CpaPhase.PICTORIAL,
             isPremium = false,
             prerequisites = listOf("foundation_number_bonds_10"),
             minDifficulty = 2,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.MISSING_NUMBER),
+            preferredRepresentations = listOf(RepresentationType.BOND_MODEL, RepresentationType.NUMBER_LINE),
             rules = DidacticRules.build {
                 range(5, 20)
                 maxResult(20)
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.BOND_MODEL,
+            commonErrorTypes = listOf(ErrorType.BOND_ERROR, ErrorType.PLACE_VALUE_ERROR),
+            remediationSkill = "foundation_number_bonds_10"
         ),
 
         SkillContentConfig(
@@ -430,17 +446,21 @@ object ContentRepository {
             name = "Splitsingen tot 10",
             description = "Getallen splitsen in twee delen tot 10",
             category = SkillCategory.FOUNDATION,
+            cpaPhase = CpaPhase.PICTORIAL,
             isPremium = false,
             prerequisites = listOf("foundation_number_images_5"),
             minDifficulty = 1,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.MISSING_NUMBER),
+            preferredRepresentations = listOf(RepresentationType.BOND_MODEL, RepresentationType.BLOCKS),
             rules = DidacticRules.build {
                 range(3, 10)
                 minPart(1)
                 maxPart(9)
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.BOND_MODEL,
+            commonErrorTypes = listOf(ErrorType.BOND_ERROR, ErrorType.MISSING_PART_ERROR),
+            remediationSkill = "foundation_number_bonds_5"
         ),
 
         SkillContentConfig(
@@ -448,17 +468,21 @@ object ContentRepository {
             name = "Splitsingen tot 20",
             description = "Getallen splitsen in twee delen tot 20",
             category = SkillCategory.FOUNDATION,
+            cpaPhase = CpaPhase.MIXED_TRANSFER,
             isPremium = true,
             prerequisites = listOf("foundation_splits_10", "arithmetic_add_10"),
             minDifficulty = 2,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.MISSING_NUMBER, ExerciseType.TYPED_NUMERIC),
+            preferredRepresentations = listOf(RepresentationType.BOND_MODEL, RepresentationType.SYMBOLS),
             rules = DidacticRules.build {
                 range(11, 20)
                 minPart(1)
                 maxPart(19)
             },
-            hintStrategy = HintStrategy.STEP_BY_STEP
+            hintStrategy = HintStrategy.BOND_MODEL,
+            commonErrorTypes = listOf(ErrorType.BOND_ERROR, ErrorType.PLACE_VALUE_ERROR),
+            remediationSkill = "foundation_splits_10"
         ),
 
         // === ARITHMETIC TOT 10 (Leeftijd 6-7) ===
@@ -490,6 +514,7 @@ object ContentRepository {
             name = "Aftrekken tot 10",
             description = "Aftrekken van getallen tot 10",
             category = SkillCategory.ARITHMETIC,
+            cpaPhase = CpaPhase.MIXED_TRANSFER,
             isPremium = false,
             prerequisites = listOf("arithmetic_add_10"),
             minDifficulty = 1,
@@ -500,7 +525,15 @@ object ContentRepository {
                 minResult(1)
                 requireNoBridge()
             },
-            hintStrategy = HintStrategy.VISUAL
+            preferredRepresentations = listOf(RepresentationType.BOND_MODEL, RepresentationType.NUMBER_LINE, RepresentationType.SYMBOLS),
+            rules = DidacticRules.build {
+                range(1, 10)
+                minResult(1)
+                requireNoBridge()
+            },
+            hintStrategy = HintStrategy.BOND_MODEL,
+            commonErrorTypes = listOf(ErrorType.BOND_ERROR, ErrorType.CALCULATION_ERROR),
+            remediationSkill = "foundation_number_bonds_10"
         ),
 
         // === ARITHMETIC TOT 20 (Leeftijd 7-8) ===
@@ -509,18 +542,22 @@ object ContentRepository {
             name = "Optellen tot 20",
             description = "Optellen van getallen met resultaat tot 20",
             category = SkillCategory.ARITHMETIC,
+            cpaPhase = CpaPhase.MIXED_TRANSFER,
             isPremium = false,
             prerequisites = listOf("arithmetic_add_10", "foundation_number_bonds_20"),
             minDifficulty = 2,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
+            preferredRepresentations = listOf(RepresentationType.BOND_MODEL, RepresentationType.NUMBER_LINE, RepresentationType.SYMBOLS),
             rules = DidacticRules.build {
                 range(1, 19)
                 maxResult(20)
                 minResult(11)
                 requireNoBridge()
             },
-            hintStrategy = HintStrategy.STEP_BY_STEP
+            hintStrategy = HintStrategy.BOND_MODEL,
+            commonErrorTypes = listOf(ErrorType.BOND_ERROR, ErrorType.PLACE_VALUE_ERROR),
+            remediationSkill = "foundation_number_bonds_20"
         ),
 
         SkillContentConfig(
@@ -528,17 +565,21 @@ object ContentRepository {
             name = "Aftrekken tot 20",
             description = "Aftrekken van getallen tot 20",
             category = SkillCategory.ARITHMETIC,
+            cpaPhase = CpaPhase.MIXED_TRANSFER,
             isPremium = false,
             prerequisites = listOf("arithmetic_sub_10", "arithmetic_add_20"),
             minDifficulty = 2,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
+            preferredRepresentations = listOf(RepresentationType.BOND_MODEL, RepresentationType.NUMBER_LINE, RepresentationType.SYMBOLS),
             rules = DidacticRules.build {
                 range(11, 20)
                 minResult(1)
                 requireNoBridge()
             },
-            hintStrategy = HintStrategy.STEP_BY_STEP
+            hintStrategy = HintStrategy.BOND_MODEL,
+            commonErrorTypes = listOf(ErrorType.BOND_ERROR, ErrorType.PLACE_VALUE_ERROR),
+            remediationSkill = "foundation_number_bonds_20"
         ),
 
         // === BRIDGE OVER 10 (Leeftijd 7-8) ===
@@ -571,18 +612,22 @@ object ContentRepository {
             name = "Brug over 10 (aftrekken)",
             description = "Aftrekken met brug over 10",
             category = SkillCategory.ARITHMETIC,
+            cpaPhase = CpaPhase.MIXED_TRANSFER,
             isPremium = false,
             prerequisites = listOf("arithmetic_sub_20", "foundation_splits_10", "arithmetic_bridge_add"),
             minDifficulty = 3,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.TYPED_NUMERIC, ExerciseType.MISSING_NUMBER, ExerciseType.VISUAL_GROUPS),
+            preferredRepresentations = listOf(RepresentationType.BOND_MODEL, RepresentationType.NUMBER_LINE, RepresentationType.SYMBOLS),
             rules = DidacticRules.build {
                 range(11, 18)
                 minResult(1)
                 resultUnder(10)
                 requireBridgeThroughTen()
             },
-            hintStrategy = HintStrategy.STEP_BY_STEP
+            hintStrategy = HintStrategy.STEP_BY_STEP,
+            commonErrorTypes = listOf(ErrorType.BRIDGE_10_ERROR, ErrorType.BOND_ERROR),
+            remediationSkill = "arithmetic_bridge_add"
         ),
 
         // === DOUBLES & HALVES (Leeftijd 6-8) ===
@@ -591,15 +636,18 @@ object ContentRepository {
             name = "Dubbelen tot 20",
             description = "Dubbelen van getallen tot 20",
             category = SkillCategory.PATTERNS,
+            cpaPhase = CpaPhase.CONCRETE,
             isPremium = false,
             prerequisites = listOf("arithmetic_add_10"),
             minDifficulty = 1,
             maxDifficulty = 3,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
+            preferredRepresentations = listOf(RepresentationType.GROUPS, RepresentationType.DOTS),
             rules = DidacticRules.build {
                 range(1, 10)
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.VISUAL,
+            commonErrorTypes = listOf(ErrorType.CALCULATION_ERROR)
         ),
 
         SkillContentConfig(
@@ -607,16 +655,20 @@ object ContentRepository {
             name = "Helften tot 20",
             description = "Helften van even getallen tot 20",
             category = SkillCategory.PATTERNS,
+            cpaPhase = CpaPhase.CONCRETE,
             isPremium = false,
             prerequisites = listOf("patterns_doubles"),
             minDifficulty = 1,
             maxDifficulty = 3,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
+            preferredRepresentations = listOf(RepresentationType.GROUPS),
             rules = DidacticRules.build {
                 range(2, 20)
                 requireEven()
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.VISUAL,
+            commonErrorTypes = listOf(ErrorType.CALCULATION_ERROR),
+            remediationSkill = "patterns_doubles"
         ),
         
         // === SKIP COUNTING (Leeftijd 7-8) ===
@@ -625,17 +677,20 @@ object ContentRepository {
             name = "Tellen per 2",
             description = "Tellen met sprongen van 2",
             category = SkillCategory.PATTERNS,
+            cpaPhase = CpaPhase.PICTORIAL,
             isPremium = false,
             prerequisites = listOf("patterns_doubles"),
             minDifficulty = 2,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.SIMPLE_SEQUENCE, ExerciseType.MISSING_NUMBER),
+            preferredRepresentations = listOf(RepresentationType.NUMBER_LINE),
             rules = DidacticRules.build {
                 range(2, 20)
                 exactStep(2)
                 sequenceLength(4)
             },
-            hintStrategy = HintStrategy.COUNTING_AID
+            hintStrategy = HintStrategy.NUMBER_LINE,
+            commonErrorTypes = listOf(ErrorType.SEQUENCE_ERROR)
         ),
 
         SkillContentConfig(
@@ -643,17 +698,21 @@ object ContentRepository {
             name = "Tellen per 5",
             description = "Tellen met sprongen van 5",
             category = SkillCategory.PATTERNS,
+            cpaPhase = CpaPhase.ABSTRACT,
             isPremium = false,
             prerequisites = listOf("patterns_count_2"),
             minDifficulty = 2,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.SIMPLE_SEQUENCE, ExerciseType.MISSING_NUMBER),
+            preferredRepresentations = listOf(RepresentationType.NUMBER_LINE),
             rules = DidacticRules.build {
                 range(5, 50)
                 exactStep(5)
                 sequenceLength(4)
             },
-            hintStrategy = HintStrategy.COUNTING_AID
+            hintStrategy = HintStrategy.NUMBER_LINE,
+            commonErrorTypes = listOf(ErrorType.SEQUENCE_ERROR),
+            remediationSkill = "patterns_count_2"
         ),
 
         SkillContentConfig(
@@ -661,17 +720,21 @@ object ContentRepository {
             name = "Tellen per 10",
             description = "Tellen met sprongen van 10",
             category = SkillCategory.PATTERNS,
+            cpaPhase = CpaPhase.ABSTRACT,
             isPremium = false,
             prerequisites = listOf("patterns_count_5"),
             minDifficulty = 2,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.SIMPLE_SEQUENCE, ExerciseType.MISSING_NUMBER),
+            preferredRepresentations = listOf(RepresentationType.NUMBER_LINE),
             rules = DidacticRules.build {
                 range(10, 100)
                 exactStep(10)
                 sequenceLength(4)
             },
-            hintStrategy = HintStrategy.COUNTING_AID
+            hintStrategy = HintStrategy.NUMBER_LINE,
+            commonErrorTypes = listOf(ErrorType.SEQUENCE_ERROR, ErrorType.PLACE_VALUE_ERROR),
+            remediationSkill = "patterns_count_5"
         ),
 
         // === WORD PROBLEMS EENVoudig (Leeftijd 6-8) ===
@@ -680,16 +743,19 @@ object ContentRepository {
             name = "Eenvoudige Sommen in Context",
             description = "Rekenen in eenvoudige verhaaltjes",
             category = SkillCategory.ARITHMETIC,
+            cpaPhase = CpaPhase.MIXED_TRANSFER,
             isPremium = false,
             prerequisites = listOf("arithmetic_add_10", "arithmetic_sub_10"),
             minDifficulty = 2,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.TYPED_NUMERIC, ExerciseType.MULTIPLE_CHOICE),
+            preferredRepresentations = listOf(RepresentationType.CONTEXT),
             rules = DidacticRules.build {
                 range(1, 10)
                 maxResult(10)
             },
-            hintStrategy = HintStrategy.STEP_BY_STEP
+            hintStrategy = HintStrategy.STEP_BY_STEP,
+            commonErrorTypes = listOf(ErrorType.CALCULATION_ERROR)
         )
     )
 
@@ -701,17 +767,20 @@ object ContentRepository {
             name = "Vergelijken tot 100",
             description = "Getallen vergelijken tot 100",
             category = SkillCategory.ADVANCED,
+            cpaPhase = CpaPhase.PICTORIAL,
             isPremium = false,
             prerequisites = listOf("patterns_count_10"),
             minDifficulty = 3,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.COMPARE_NUMBERS, ExerciseType.NUMBER_LINE_CLICK),
+            preferredRepresentations = listOf(RepresentationType.NUMBER_LINE, RepresentationType.SYMBOLS),
             rules = DidacticRules.build {
                 range(1, 100)
                 minDifference(5)
                 allowEqual()
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.NUMBER_LINE,
+            commonErrorTypes = listOf(ErrorType.COMPARE_ERROR, ErrorType.PLACE_VALUE_ERROR)
         ),
 
         SkillContentConfig(
@@ -719,16 +788,19 @@ object ContentRepository {
             name = "Tientallen en Eenheden",
             description = "Tientallen en eenheden herkennen en gebruiken",
             category = SkillCategory.ADVANCED,
+            cpaPhase = CpaPhase.CONCRETE,
             isPremium = false,
             prerequisites = listOf("advanced_compare_100"),
             minDifficulty = 3,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.MISSING_NUMBER, ExerciseType.VISUAL_GROUPS),
+            preferredRepresentations = listOf(RepresentationType.BLOCKS, RepresentationType.SYMBOLS),
             rules = DidacticRules.build {
                 range(10, 99)
                 allowZero()
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.VISUAL,
+            commonErrorTypes = listOf(ErrorType.PLACE_VALUE_ERROR)
         ),
 
         SkillContentConfig(
@@ -736,15 +808,19 @@ object ContentRepository {
             name = "Plaatswaarde tot 1000",
             description = "Honderdtallen, tientallen, eenheden",
             category = SkillCategory.ADVANCED,
+            cpaPhase = CpaPhase.ABSTRACT,
             isPremium = true,
             prerequisites = listOf("advanced_place_value"),
             minDifficulty = 4,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.MISSING_NUMBER, ExerciseType.TYPED_NUMERIC),
+            preferredRepresentations = listOf(RepresentationType.SYMBOLS),
             rules = DidacticRules.build {
                 range(100, 999)
             },
-            hintStrategy = HintStrategy.STEP_BY_STEP
+            hintStrategy = HintStrategy.STEP_BY_STEP,
+            commonErrorTypes = listOf(ErrorType.PLACE_VALUE_ERROR),
+            remediationSkill = "advanced_place_value"
         ),
 
         // === VERMENIGvULDIGEN ALS GROEPJES (Leeftijd 8-9) ===
@@ -774,17 +850,21 @@ object ContentRepository {
             name = "Arrays en Roosters",
             description = "Vermenigvuldigen met rijen en kolommen",
             category = SkillCategory.ADVANCED,
+            cpaPhase = CpaPhase.PICTORIAL,
             isPremium = false,
             prerequisites = listOf("advanced_groups"),
             minDifficulty = 3,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
+            preferredRepresentations = listOf(RepresentationType.ARRAY, RepresentationType.GROUPS),
             rules = DidacticRules.build {
                 range(2, 10)
                 maxGroups(10)
                 maxPerGroup(10)
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.VISUAL,
+            commonErrorTypes = listOf(ErrorType.GROUPING_ERROR),
+            remediationSkill = "advanced_groups"
         ),
 
         // === TAFELS (Leeftijd 8-11) ===
@@ -814,16 +894,20 @@ object ContentRepository {
             name = "Tafel van 5",
             description = "De tafel van 5",
             category = SkillCategory.ADVANCED,
+            cpaPhase = CpaPhase.ABSTRACT,
             isPremium = false,
             prerequisites = listOf("advanced_table_2"),
             minDifficulty = 3,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC, ExerciseType.MISSING_NUMBER),
+            preferredRepresentations = listOf(RepresentationType.SYMBOLS, RepresentationType.ARRAY),
             rules = DidacticRules.build {
                 range(1, 10)
                 exactMultiplier(5)
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.NUMBER_LINE,
+            commonErrorTypes = listOf(ErrorType.SEQUENCE_ERROR),
+            remediationSkill = "patterns_count_5"
         ),
 
         SkillContentConfig(
@@ -831,16 +915,20 @@ object ContentRepository {
             name = "Tafel van 10",
             description = "De tafel van 10",
             category = SkillCategory.ADVANCED,
+            cpaPhase = CpaPhase.ABSTRACT,
             isPremium = false,
             prerequisites = listOf("advanced_table_5"),
             minDifficulty = 3,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.TYPED_NUMERIC, ExerciseType.MISSING_NUMBER),
+            preferredRepresentations = listOf(RepresentationType.SYMBOLS, RepresentationType.NUMBER_LINE),
             rules = DidacticRules.build {
                 range(1, 10)
                 exactMultiplier(10)
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.NUMBER_LINE,
+            commonErrorTypes = listOf(ErrorType.PLACE_VALUE_ERROR, ErrorType.SEQUENCE_ERROR),
+            remediationSkill = "patterns_count_10"
         ),
 
         SkillContentConfig(
@@ -848,16 +936,20 @@ object ContentRepository {
             name = "Tafel van 3",
             description = "De tafel van 3",
             category = SkillCategory.ADVANCED,
+            cpaPhase = CpaPhase.ABSTRACT,
             isPremium = true,
             prerequisites = listOf("advanced_table_2"),
             minDifficulty = 4,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.TYPED_NUMERIC, ExerciseType.MISSING_NUMBER),
+            preferredRepresentations = listOf(RepresentationType.SYMBOLS, RepresentationType.ARRAY),
             rules = DidacticRules.build {
                 range(1, 10)
                 exactMultiplier(3)
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.STEP_BY_STEP,
+            commonErrorTypes = listOf(ErrorType.CALCULATION_ERROR),
+            remediationSkill = "advanced_table_2"
         ),
 
         SkillContentConfig(
@@ -865,16 +957,20 @@ object ContentRepository {
             name = "Tafel van 4",
             description = "De tafel van 4",
             category = SkillCategory.ADVANCED,
+            cpaPhase = CpaPhase.ABSTRACT,
             isPremium = true,
             prerequisites = listOf("advanced_table_3"),
             minDifficulty = 4,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.TYPED_NUMERIC, ExerciseType.MISSING_NUMBER),
+            preferredRepresentations = listOf(RepresentationType.SYMBOLS, RepresentationType.ARRAY),
             rules = DidacticRules.build {
                 range(1, 10)
                 exactMultiplier(4)
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.STEP_BY_STEP,
+            commonErrorTypes = listOf(ErrorType.CALCULATION_ERROR),
+            remediationSkill = "advanced_table_2"
         ),
 
         // === DELING (Leeftijd 9-11) ===
@@ -883,16 +979,20 @@ object ContentRepository {
             name = "Delen als Groepjes Maken",
             description = "Introductie tot delen",
             category = SkillCategory.ADVANCED,
+            cpaPhase = CpaPhase.CONCRETE,
             isPremium = true,
             prerequisites = listOf("advanced_table_5"),
             minDifficulty = 4,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
+            preferredRepresentations = listOf(RepresentationType.GROUPS, RepresentationType.ARRAY),
             rules = DidacticRules.build {
                 range(2, 10)
                 maxResult(50)
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.VISUAL,
+            commonErrorTypes = listOf(ErrorType.GROUPING_ERROR),
+            remediationSkill = "advanced_groups"
         ),
 
         // === BREUKEN (Leeftijd 9-11) ===
@@ -901,15 +1001,19 @@ object ContentRepository {
             name = "Breuken: Deel van het Geheel",
             description = "Basale breuken begrijpen",
             category = SkillCategory.ADVANCED,
+            cpaPhase = CpaPhase.PICTORIAL,
             isPremium = true,
             prerequisites = listOf("advanced_division_intro"),
             minDifficulty = 4,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.MULTIPLE_CHOICE),
+            preferredRepresentations = listOf(RepresentationType.GROUPS, RepresentationType.DOTS),
             rules = DidacticRules.build {
                 range(1, 8)
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.VISUAL,
+            commonErrorTypes = listOf(ErrorType.GROUPING_ERROR, ErrorType.CALCULATION_ERROR),
+            remediationSkill = "advanced_division_intro"
         ),
 
         // === MEERSTAPSPROBLEMEN (Leeftijd 9-11) ===
@@ -918,15 +1022,18 @@ object ContentRepository {
             name = "Meerstapsproblemen",
             description = "Sommen met meerdere stappen",
             category = SkillCategory.ADVANCED,
+            cpaPhase = CpaPhase.MIXED_TRANSFER,
             isPremium = true,
             prerequisites = listOf("advanced_table_5", "advanced_division_intro"),
             minDifficulty = 4,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.TYPED_NUMERIC, ExerciseType.MULTIPLE_CHOICE),
+            preferredRepresentations = listOf(RepresentationType.CONTEXT, RepresentationType.SYMBOLS),
             rules = DidacticRules.build {
                 range(1, 100)
             },
-            hintStrategy = HintStrategy.STEP_BY_STEP
+            hintStrategy = HintStrategy.STEP_BY_STEP,
+            commonErrorTypes = listOf(ErrorType.CALCULATION_ERROR)
         ),
 
         // === REDENEEROPGAVEN (Leeftijd 10-11) ===
@@ -935,15 +1042,18 @@ object ContentRepository {
             name = "Redeneeropgaven",
             description = "Wiskundig denken en redeneren",
             category = SkillCategory.ADVANCED,
+            cpaPhase = CpaPhase.ABSTRACT,
             isPremium = true,
             prerequisites = listOf("advanced_multistep", "advanced_fractions_basics"),
             minDifficulty = 5,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.MULTIPLE_CHOICE, ExerciseType.TYPED_NUMERIC),
+            preferredRepresentations = listOf(RepresentationType.CONTEXT, RepresentationType.SYMBOLS),
             rules = DidacticRules.build {
                 range(1, 100)
             },
-            hintStrategy = HintStrategy.STEP_BY_STEP
+            hintStrategy = HintStrategy.STEP_BY_STEP,
+            commonErrorTypes = listOf(ErrorType.CALCULATION_ERROR)
         )
     )
 
