@@ -16,5 +16,9 @@ data class ProfileEntity(
     val lastSessionDate: Long?,
     val longestStreak: Int,
     val placementCompleted: Boolean,
-    val startingBand: String
+    val startingBand: String,
+    // PATCH 2: Leeftijdsgebaseerde start configuratie
+    val startSkills: String? = null,  // Komma-gescheiden lijst
+    val startCpaPhase: String? = null,
+    val difficultyOffset: Int = 0
 )

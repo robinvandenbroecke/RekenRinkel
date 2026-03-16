@@ -85,18 +85,6 @@ fun RekenRinkelApp() {
                     )
                     
                     val uiState by viewModel.uiState.collectAsState()
-                    val currentProfile = uiState.profile
-                    val placementCompleted = currentProfile?.placementCompleted ?: false
-                    
-                    // PATCH 1: Placement verplicht check
-                    LaunchedEffect(placementCompleted) {
-                        if (!placementCompleted) {
-                            // Redirect naar placement als nog niet voltooid
-                            navController.navigate("placement") {
-                                popUpTo("home") { inclusive = true }
-                            }
-                        }
-                    }
                     
                     // Handle navigation events
                     LaunchedEffect(Unit) {
@@ -127,32 +115,28 @@ fun RekenRinkelApp() {
                     )
                 }
                 
-                // PATCH 2: Placement route functioneel gemaakt
+                // PATCH 1: Placement route - OPTIONEEL, niet verplicht
                 composable("placement") {
                     val viewModel: MainViewModel = viewModel(
                         factory = MainViewModelFactory(context)
                     )
                     val uiState by viewModel.uiState.collectAsState()
                     val placementProfile = uiState.profile
-                    val isPlacementCompleted = placementProfile?.placementCompleted ?: false
                     
-                    // Laat placement zien en redirect naar home als voltooid
-                    LaunchedEffect(isPlacementCompleted) {
-                        if (isPlacementCompleted) {
-                            navController.navigate("home") {
-                                popUpTo("placement") { inclusive = true }
-                            }
-                        }
-                    }
-                    
-                    // Echte placement screen met analyse
+                    // Optionele placement screen - gebruiker kan terug naar home
                     PlacementScreen(
                         profile = placementProfile,
                         onPlacementComplete = { analysis ->
                             viewModel.completePlacement(analysis)
+                            navController.navigate("home") {
+                                popUpTo("placement") { inclusive = true }
+                            }
                         },
                         onCancel = { 
-                            // Kan niet cancellen - placement is verplicht
+                            // Terug naar home - placement is optioneel
+                            navController.navigate("home") {
+                                popUpTo("placement") { inclusive = true }
+                            }
                         }
                     )
                 }

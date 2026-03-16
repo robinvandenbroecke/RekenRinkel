@@ -8,6 +8,7 @@ import com.rekenrinkel.domain.model.Rewards
 import com.rekenrinkel.domain.model.StartingBand
 import com.rekenrinkel.domain.model.Theme
 import com.rekenrinkel.domain.model.Badge
+import com.rekenrinkel.domain.model.PlacementAnalysisResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
@@ -36,6 +37,42 @@ class ProfileRepository(
             rewards = Rewards(),
             placementCompleted = false,
             startingBand = startingBand
+        )
+        profileDao.insertProfile(profile.toEntity())
+        settingsDataStore.setProfileName(name)
+        settingsDataStore.setTheme(theme)
+        return profile
+    }
+
+    /**
+     * PATCH 2: Maak profiel met leeftijdsbepaalde startconfiguratie
+     * Geen placement verplicht - leeftijd bepaalt start
+     */
+    suspend fun createProfileWithStartConfig(
+        name: String,
+        age: Int,
+        theme: Theme,
+        startingBand: StartingBand,
+        startSkills: List<String>,
+        startCpaPhase: com.rekenrinkel.domain.content.CpaPhase
+    ): Profile {
+        val profile = Profile(
+            name = name,
+            age = age,
+            theme = theme,
+            rewards = Rewards(),
+            placementCompleted = true,  // PATCH 1: Geen verplichte placement
+            startingBand = startingBand,
+            placementAnalysisResult = PlacementAnalysisResult(
+                recommendedBand = startingBand,
+                startSkills = startSkills,
+                startCpaPhase = startCpaPhase,
+                difficultyOffset = when (age) {
+                    5, 6 -> 0
+                    7, 8 -> 1
+                    else -> 2
+                }
+            )
         )
         profileDao.insertProfile(profile.toEntity())
         settingsDataStore.setProfileName(name)
@@ -144,7 +181,16 @@ class ProfileRepository(
                 lastSessionDate = lastSessionDate
             ),
             placementCompleted = placementCompleted,
-            startingBand = StartingBand.valueOf(startingBand)
+            startingBand = StartingBand.valueOf(startingBand),
+            // PATCH 2: Herstel placementAnalysisResult uit opgeslagen velden
+            placementAnalysisResult = if (startSkills != null && startCpaPhase != null) {
+                PlacementAnalysisResult(
+                    recommendedBand = StartingBand.valueOf(startingBand),
+                    startSkills = startSkills.split(","),
+                    startCpaPhase = com.rekenrinkel.domain.content.CpaPhase.valueOf(startCpaPhase),
+                    difficultyOffset = difficultyOffset
+                )
+            } else null
         )
     }
 
@@ -160,7 +206,11 @@ class ProfileRepository(
             longestStreak = rewards.longestStreak,
             lastSessionDate = rewards.lastSessionDate,
             placementCompleted = placementCompleted,
-            startingBand = startingBand.name
+            startingBand = startingBand.name,
+            // PATCH 2: Sla placement analyse op
+            startSkills = placementAnalysisResult?.startSkills?.joinToString(","),
+            startCpaPhase = placementAnalysisResult?.startCpaPhase?.name,
+            difficultyOffset = placementAnalysisResult?.difficultyOffset ?: 0
         )
     }
 }

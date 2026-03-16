@@ -182,13 +182,76 @@ class MainViewModel(
         }
     }
 
+    /**
+     * PATCH 2: Leeftijd bepaalt startband en initiële skillset
+     * Geen verplichte placement meer - direct naar home
+     */
     fun completeOnboarding(name: String, age: Int, theme: Theme) {
         viewModelScope.launch {
-            profileRepository.createProfile(name, age, theme)
+            // Bepaal startband op basis van leeftijd
+            val startingBand = determineStartingBand(age)
+            val startSkills = determineStartSkillsForAge(age)
+            val startCpaPhase = determineStartCpaPhaseForAge(age)
+            
+            // Maak profiel met leeftijdsbepaalde startinstellingen
+            profileRepository.createProfileWithStartConfig(
+                name = name,
+                age = age,
+                theme = theme,
+                startingBand = startingBand,
+                startSkills = startSkills,
+                startCpaPhase = startCpaPhase
+            )
+            
             settingsDataStore.setProfileName(name)
             settingsDataStore.setTheme(theme)
             settingsDataStore.setOnboardingCompleted(true)
-            // Niet direct naar home - placement komt eerst
+            // PATCH 1: Direct naar home, geen placement verplicht
+        }
+    }
+    
+    /**
+     * PATCH 2: Bepaal start skills op basis van leeftijd
+     * Afgestemd op NL/BE curriculum
+     */
+    private fun determineStartSkillsForAge(age: Int): List<String> {
+        return when (age) {
+            5, 6 -> listOf(
+                "foundation_subitize_5",
+                "foundation_counting", 
+                "foundation_more_less",
+                "foundation_number_bonds_5",
+                "foundation_number_bonds_10"
+            )
+            7, 8 -> listOf(
+                "foundation_number_bonds_20",
+                "arithmetic_add_10_concrete",
+                "arithmetic_sub_10_concrete",
+                "patterns_doubles",
+                "patterns_halves",
+                "patterns_count_2"
+            )
+            9, 10, 11 -> listOf(
+                "arithmetic_bridge_add",
+                "arithmetic_bridge_sub",
+                "patterns_count_5",
+                "patterns_count_10",
+                "advanced_groups",
+                "advanced_table_2",
+                "advanced_place_value"
+            )
+            else -> listOf("foundation_subitize_5", "foundation_counting")
+        }
+    }
+    
+    /**
+     * PATCH 2: Bepaal start CPA fase op basis van leeftijd
+     */
+    private fun determineStartCpaPhaseForAge(age: Int): com.rekenrinkel.domain.content.CpaPhase {
+        return when (age) {
+            5, 6 -> com.rekenrinkel.domain.content.CpaPhase.CONCRETE
+            7, 8 -> com.rekenrinkel.domain.content.CpaPhase.PICTORIAL
+            else -> com.rekenrinkel.domain.content.CpaPhase.ABSTRACT
         }
     }
     
