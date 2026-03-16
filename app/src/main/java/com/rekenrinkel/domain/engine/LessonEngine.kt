@@ -310,29 +310,93 @@ class LessonEngine(
     ): List<Exercise> {
         val progress = progressMap[focusSkill.id]
         val difficulty = progress?.currentDifficultyTier ?: 1
+        
+        // PATCH 3: CPA-overgangen afdwingen
+        val config = ContentRepository.getConfig(focusSkill.id)
+        val skillCpaPhase = config?.cpaPhase ?: com.rekenrinkel.domain.content.CpaPhase.CONCRETE
+        val currentCpaPhase = progress?.currentCpaPhase ?: com.rekenrinkel.domain.content.CpaPhase.CONCRETE
+        
+        // Bepaal toegestane CPA-fase op basis van mastery
+        val allowedCpaPhase = determineAllowedCpaPhase(currentCpaPhase, progress)
+        
+        // Gebruik de strengere van skill-fase en toegestane fase
+        val effectiveCpaPhase = minOf(skillCpaPhase, allowedCpaPhase)
 
         // DIDACTISCHE STRUCTUUR: worked example -> guided -> independent
-        return when {
-            // Als skill net gestart is (weinig attempts), begin met worked example
-            progress == null || progress.totalAttempts() < 3 -> {
+        // Aangepast voor CPA-fase
+        return when (effectiveCpaPhase) {
+            com.rekenrinkel.domain.content.CpaPhase.CONCRETE -> {
+                // Alleen concrete oefeningen, veel scaffolding
                 listOf(
-                    exerciseEngine.generateWorkedExample(focusSkill.id, difficulty),
+                    exerciseEngine.generateWorkedExample(focusSkill.id, difficulty)
+                ) + (1 until count).map {
                     exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty)
-                ) + (2 until count).map {
-                    exerciseEngine.generateExercise(focusSkill.id, difficulty)
                 }
             }
-            // Als mastery laag is, meer guided practice
-            progress.masteryScore < 50 -> {
+            com.rekenrinkel.domain.content.CpaPhase.PICTORIAL -> {
+                // Picturale oefeningen, mix van guided en independent
                 listOf(
                     exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty)
                 ) + (1 until count).map {
                     exerciseEngine.generateExercise(focusSkill.id, difficulty)
                 }
             }
-            // Anders: alleen independent practice
-            else -> (0 until count).map {
-                exerciseEngine.generateExercise(focusSkill.id, difficulty)
+            com.rekenrinkel.domain.content.CpaPhase.ABSTRACT,
+            com.rekenrinkel.domain.content.CpaPhase.MIXED_TRANSFER -> {
+                // Abstract, voornamelijk independent
+                if (progress == null || progress.totalAttempts() < 3) {
+                    listOf(
+                        exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty)
+                    ) + (1 until count).map {
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty)
+                    }
+                } else {
+                    (0 until count).map {
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty)
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * PATCH 3: Bepaal welke CPA-fase toegestaan is op basis van mastery
+     * CONCRETE nodig voor PICTORIAL, PICTORIAL nodig voor ABSTRACT
+     */
+    private fun determineAllowedCpaPhase(
+        currentPhase: com.rekenrinkel.domain.content.CpaPhase,
+        progress: SkillProgress?
+    ): com.rekenrinkel.domain.content.CpaPhase {
+        if (progress == null) return com.rekenrinkel.domain.content.CpaPhase.CONCRETE
+        
+        val mastery = progress.masteryScore
+        val attempts = progress.totalAttempts()
+        
+        return when (currentPhase) {
+            com.rekenrinkel.domain.content.CpaPhase.CONCRETE -> {
+                // Naar PICTORIAL als voldoende mastery in CONCRETE
+                if (mastery >= 60 && attempts >= 5) {
+                    com.rekenrinkel.domain.content.CpaPhase.PICTORIAL
+                } else {
+                    com.rekenrinkel.domain.content.CpaPhase.CONCRETE
+                }
+            }
+            com.rekenrinkel.domain.content.CpaPhase.PICTORIAL -> {
+                // Naar ABSTRACT als voldoende mastery in PICTORIAL
+                if (mastery >= 75 && attempts >= 8) {
+                    com.rekenrinkel.domain.content.CpaPhase.ABSTRACT
+                } else {
+                    com.rekenrinkel.domain.content.CpaPhase.PICTORIAL
+                }
+            }
+            com.rekenrinkel.domain.content.CpaPhase.ABSTRACT,
+            com.rekenrinkel.domain.content.CpaPhase.MIXED_TRANSFER -> {
+                // MIXED_TRANSFER na voldoende abstracte beheersing
+                if (mastery >= 85) {
+                    com.rekenrinkel.domain.content.CpaPhase.MIXED_TRANSFER
+                } else {
+                    com.rekenrinkel.domain.content.CpaPhase.ABSTRACT
+                }
             }
         }
     }
