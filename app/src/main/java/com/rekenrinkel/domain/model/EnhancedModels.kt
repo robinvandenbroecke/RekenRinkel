@@ -248,3 +248,26 @@ data class DetailedExerciseResult(
 ) : Serializable
 
 // Backwards compatibility aliases verwijderd - gebruik expliciet UserProfile en DetailedExerciseResult
+
+/**
+ * Placement resultaat voor één placement item
+ */
+data class PlacementResult(
+    val skillId: String,
+    val isCorrect: Boolean,
+    val responseTimeMs: Long,
+    val givenAnswer: String,
+    val correctAnswer: String,
+    val timestamp: Long = System.currentTimeMillis()
+) : Serializable
+
+/**
+ * Placement analyse resultaat
+ */
+data class PlacementAnalysisResult(
+    val recommendedBand: StartingBand,
+    val startSkills: List<String>,
+    val startCpaPhase: com.rekenrinkel.domain.content.CpaPhase,
+    val difficultyOffset: Int,
+    val timestamp: Long = System.currentTimeMillis()
+) : Serializable

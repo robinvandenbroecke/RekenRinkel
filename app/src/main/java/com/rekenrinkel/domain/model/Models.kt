@@ -2,6 +2,7 @@ package com.rekenrinkel.domain.model
 
 import com.rekenrinkel.domain.content.ContentRepository
 import com.rekenrinkel.domain.model.Rewards
+import com.rekenrinkel.domain.model.PlacementAnalysisResult
 import java.io.Serializable
 import java.util.UUID
 
@@ -27,6 +28,7 @@ data class Profile(
     val rewards: Rewards = Rewards(),
     // Placement fields
     val placementCompleted: Boolean = false,
+    val placementAnalysisResult: PlacementAnalysisResult? = null,
     val startingBand: StartingBand = StartingBand.FOUNDATION
 ) : Serializable {
     // Delegated properties voor backwards compatibility
