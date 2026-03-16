@@ -7,46 +7,40 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 
 ## Wat werkt
 
-### Oefenflow (gestabiliseerd)
-- Uniforme flow voor alle oefentypen
-- WORKED_EXAMPLE en GUIDED_PRACTICE worden ondersteund
-- Expliciete state machine (SHOWING → PROCESSING → FEEDBACK → ADVANCING)
+### Oefenflow (volledig ViewModel-gestuurd)
+- **Alle advance-logica centraal in LessonViewModel**
+- UI is puur presentational (alleen tonen en input verzamelen)
+- Expliciete state machine: SHOWING → PROCESSING → FEEDBACK → ADVANCING
+- Feedback-delay en auto-advance volledig in ViewModel
 - Geen vastlopers op eerste oefening
-- Automatische advance na feedback
+
+### Oefentypen
+- **WORKED_EXAMPLE**: Direct verder zonder validatie
+- **GUIDED_PRACTICE**: Normale antwoordflow met hint
+- **Normale antwoorden**: Validatie, feedback, auto-advance
+- **Skip**: Direct door zonder blokkeren
 
 ### Start op leeftijd, dan adaptief
 1. **Leeftijd bepaalt de start** (5-6 / 7-8 / 9-11 jaar)
-2. **Daarna sturen prestaties** het traject:
-   - Snelle correcte antwoorden → sneller naar hogere difficulty of volgende CPA-fase
-   - Herhaalde fouten → meer steun, lagere difficulty
+2. **Daarna sturen prestaties** het traject
 
 ### Curriculum NL/Vlaanderen
-Inhoud afgestemd op:
-- **Nederland**: Kerndoelen rekenen-wiskunde PO
-- **Vlaanderen**: Minimumdoelen wiskunde lager onderwijs
+Inhoud afgestemd op Nederlandse kerndoelen en Vlaamse minimumdoelen.
 
 ### Lesstructuur
 - **Duur**: 5-10 minuten
 - **Aantal**: 8 items per les
-- **Opbouw**: 1 warm-up, 4 focus, 2 review, 1 challenge
-
-### Progressie-UI (in ontwikkeling)
-- Huidige focus skill met mastery score
-- Mastery sterren: ⭐ (50%), ⭐⭐ (70%), ⭐⭐⭐ (90%)
 
 ## Wat in ontwikkeling is
 
 - Progressie-UI verder uitwerken
 - Spaced review algoritme
 - Parent dashboard
-- Meer oefentypes
 
 ## Flow
 
 ```
-Onboarding (leeftijd) → Home → Les (8 items) → Beloningen
-                              ↓
-                        Adaptieve bijsturing
+Onboarding (leeftijd) → Home → Les (8 items, ViewModel-gestuurd) → Beloningen
 ```
 
 ## Build

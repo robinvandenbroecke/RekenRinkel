@@ -276,7 +276,7 @@ fun RekenRinkelApp() {
                                 viewModel.submitAnswer(answer)
                             },
                             onSkip = { viewModel.skipExercise() },
-                            onFeedbackComplete = { viewModel.nextExercise() },
+                            // PATCH 3: onFeedbackComplete verwijderd - ViewModel regelt advance
                             onExerciseShown = { viewModel.startExerciseTimer() },
                             onContinueWorkedExample = { viewModel.continueWorkedExample() }
                         )

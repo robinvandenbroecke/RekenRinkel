@@ -8,6 +8,7 @@ import com.rekenrinkel.data.repository.ProgressRepository
 import com.rekenrinkel.domain.engine.*
 import com.rekenrinkel.domain.model.*
 import com.rekenrinkel.domain.model.UserProfile as ProfileModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -88,11 +89,13 @@ class LessonViewModel(
     /**
      * PATCH 1: Centrale helper voor het afronden van een oefening.
      * Alle paden (submit, worked, skip) eindigen hier.
+     * Deze functie regelt ook de feedback delay en auto-advance.
      */
     private suspend fun finishCurrentExercise(
         result: DetailedExerciseResult,
         skipMasteryUpdate: Boolean = false,
-        needsFeedback: Boolean = true
+        needsFeedback: Boolean = true,
+        feedbackDurationMs: Long = 800
     ) {
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
@@ -145,12 +148,15 @@ class LessonViewModel(
                 }
             }
 
-            // 4. Advance beslissing
-            if (!needsFeedback) {
-                // Direct advance (voor worked example)
+            // 4. Advance beslissing - VOLLEDIG IN VIEWMODEL
+            if (needsFeedback) {
+                // Toon feedback, wacht, dan advance
+                delay(feedbackDurationMs)
+                advanceToNextExercise()
+            } else {
+                // Direct advance (voor worked example en skip)
                 advanceToNextExercise()
             }
-            // Anders: wacht op expliciete nextExercise() call via onFeedbackComplete
 
         } catch (e: Exception) {
             _uiState.update { it.copy(stepState = LessonStepState.SHOWING, error = e.message) }
@@ -258,8 +264,8 @@ class LessonViewModel(
     }
 
     /**
-     * PATCH 1: Sla oefening over
-     * Gebruikt de uniforme finishCurrentExercise helper
+     * PATCH 6: Sla oefening over - eenvoudig en niet-blokkerend
+     * Geen feedback, direct door naar volgende oefening
      */
     fun skipExercise() {
         val state = _uiState.value
@@ -282,17 +288,9 @@ class LessonViewModel(
                 representationUsed = "SKIPPED"
             )
 
-            // Gebruik uniforme flow
-            finishCurrentExercise(result, skipMasteryUpdate = true, needsFeedback = true)
+            // PATCH 6: Skip = geen feedback, direct advance
+            finishCurrentExercise(result, skipMasteryUpdate = true, needsFeedback = false)
         }
-    }
-
-    /**
-     * PATCH 4: Eenduidige advance - aangeroepen na feedback
-     * Gebruikt dezelfde advanceToNextExercise als worked example
-     */
-    fun nextExercise() {
-        advanceToNextExercise()
     }
 
     /**

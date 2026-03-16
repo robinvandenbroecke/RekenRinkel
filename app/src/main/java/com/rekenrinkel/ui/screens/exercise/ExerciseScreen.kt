@@ -27,7 +27,7 @@ fun ExerciseScreen(
     isLastAnswerCorrect: Boolean?,
     onAnswer: (String) -> Unit,
     onSkip: () -> Unit,
-    onFeedbackComplete: () -> Unit,
+    // PATCH 3: onFeedbackComplete verwijderd - ViewModel regelt advance intern
     onExerciseShown: () -> Unit = {},
     onContinueWorkedExample: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -35,20 +35,15 @@ fun ExerciseScreen(
     var typedAnswer by remember { mutableStateOf("") }
     var selectedOption by remember { mutableStateOf<String?>(null) }
 
-    // Reset state when exercise changes and start timer
+    // PATCH 2: Reset state when exercise changes and start timer
     LaunchedEffect(exercise.id) {
         typedAnswer = ""
         selectedOption = null
         onExerciseShown() // Start de timer voor response time tracking
     }
-
-    // Handle feedback auto-advance
-    LaunchedEffect(showFeedback) {
-        if (showFeedback) {
-            delay(800)
-            onFeedbackComplete()
-        }
-    }
+    
+    // PATCH 2: GEEN LaunchedEffect voor auto-advance meer
+    // De ViewModel regelt nu volledig wanneer naar volgende oefening gegaan wordt
     
     Scaffold(
         topBar = {
