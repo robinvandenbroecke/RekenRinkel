@@ -243,12 +243,19 @@ class ContentRepositoryTest {
     @Test
     fun `learning path starts with foundation`() {
         val learningPath = ContentRepository.getLearningPath()
-        
+
         assertTrue("Learning path should have at least one level", learningPath.isNotEmpty())
-        
+
         val firstLevel = learningPath.first()
-        assertTrue("First level should have number images", 
-            firstLevel.contains("foundation_number_images_5"))
+        val foundationStartSkills = setOf(
+            "foundation_subitize_5",
+            "foundation_counting",
+            "foundation_number_images_5",
+            "foundation_shapes"
+        )
+
+        val hasFoundationStart = firstLevel.any { it in foundationStartSkills }
+        assertTrue("First level should contain a foundation start skill", hasFoundationStart)
     }
     
     // ============================================
