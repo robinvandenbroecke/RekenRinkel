@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.map
  */
 open class ProgressRepository(private val skillProgressDao: SkillProgressDao) : ProgressRepositoryInterface {
 
-    open fun getProgress(skillId: String): Flow<SkillProgress?> {
+    override fun getProgress(skillId: String): Flow<SkillProgress?> {
         return skillProgressDao.getProgress(skillId).map { entity ->
             entity?.let {
                 SkillProgress(
@@ -35,7 +35,7 @@ open class ProgressRepository(private val skillProgressDao: SkillProgressDao) : 
         }
     }
 
-    open fun getAllProgress(): Flow<List<SkillProgress>> {
+    override fun getAllProgress(): Flow<List<SkillProgress>> {
         return skillProgressDao.getAllProgress().map { entities ->
             entities.map {
                 SkillProgress(
@@ -81,10 +81,6 @@ open class ProgressRepository(private val skillProgressDao: SkillProgressDao) : 
     }
 
     suspend fun updateProgress(progress: SkillProgress) {
-        skillProgressDao.updateProgress(progress.toEntity())
-    }
-
-    suspend fun updateProgress(progress: com.rekenrinkel.domain.model.SkillProgress) {
         skillProgressDao.updateProgress(progress.toEntity())
     }
 

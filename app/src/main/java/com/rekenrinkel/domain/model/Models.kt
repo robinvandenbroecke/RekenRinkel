@@ -21,8 +21,17 @@ data class Profile(
     val name: String = "",
     val age: Int = 6,
     val theme: Theme = Theme.DINOSAURS,
-    val createdAt: Long = System.currentTimeMillis()
-) : Serializable
+    val createdAt: Long = System.currentTimeMillis(),
+    // Rewards fields
+    val currentLevel: Int = 1,
+    val totalXp: Int = 0,
+    val currentStreak: Int = 0,
+    val longestStreak: Int = 0,
+    val lastSessionDate: Long? = null
+) : Serializable {
+    fun xpForNextLevel(): Int = currentLevel * 150
+    fun xpProgress(): Float = (totalXp % xpForNextLevel()).toFloat() / xpForNextLevel()
+}
 
 /**
  * Mastery levels voor vaardigheden

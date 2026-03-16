@@ -3,13 +3,11 @@ package com.rekenrinkel.data.repository
 import com.rekenrinkel.data.datastore.SettingsDataStore
 import com.rekenrinkel.data.local.dao.ProfileDao
 import com.rekenrinkel.data.local.entity.ProfileEntity
-import com.rekenrinkel.domain.model.Badge
 import com.rekenrinkel.domain.model.Profile
 import com.rekenrinkel.domain.model.Rewards
 import com.rekenrinkel.domain.model.Theme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import java.util.*
 
@@ -19,21 +17,14 @@ class ProfileRepository(
 ) {
     fun getProfile(): Flow<Profile?> {
         return profileDao.getProfile().map { entity ->
-            entity?.let {
-                Profile(
-                    id = it.id,
-                    name = it.name,
-                    theme = Theme.valueOf(it.theme),
-                    currentLevel = it.currentLevel,
-                    totalXp = it.totalXp,
-                    currentStreak = it.currentStreak,
-                    lastSessionDate = it.lastSessionDate,
-                    longestStreak = it.longestStreak
-                )
-            }
+            entity?.toProfile()
         }
     }
-    
+
+    suspend fun getProfileSync(): Profile? {
+        return profileDao.getProfileSync()?.toProfile()
+    }
+
     suspend fun createProfile(name: String, theme: Theme = Theme.DINOSAURS): Profile {
         val profile = Profile(
             name = name,
@@ -41,15 +32,15 @@ class ProfileRepository(
             currentLevel = 1,
             totalXp = 0,
             currentStreak = 0,
-            lastSessionDate = null,
-            longestStreak = 0
+            longestStreak = 0,
+            lastSessionDate = null
         )
         profileDao.insertProfile(profile.toEntity())
         settingsDataStore.setProfileName(name)
         settingsDataStore.setTheme(theme)
         return profile
     }
-    
+
     suspend fun updateProfile(profile: Profile) {
         profileDao.updateProfile(profile.toEntity())
     }
@@ -73,7 +64,6 @@ class ProfileRepository(
             currentStreak = profile.currentStreak,
             longestStreak = profile.longestStreak,
             lastSessionDate = profile.lastSessionDate
-            // Badges worden opgeslagen in SettingsDataStore of aparte tabel
         )
     }
 
@@ -111,5 +101,35 @@ class ProfileRepository(
         val newRewards = current.updateStreak()
         updateRewards(newRewards)
         return newRewards
+    }
+
+    // ============ MAPPERS ============
+
+    private fun ProfileEntity.toProfile(): Profile {
+        return Profile(
+            id = id,
+            name = name,
+            age = 6, // Default, kan uitgebreid worden in entity
+            theme = Theme.valueOf(theme),
+            createdAt = System.currentTimeMillis(), // Default, kan uitgebreid worden in entity
+            currentLevel = currentLevel,
+            totalXp = totalXp,
+            currentStreak = currentStreak,
+            longestStreak = longestStreak,
+            lastSessionDate = lastSessionDate
+        )
+    }
+
+    private fun Profile.toEntity(): ProfileEntity {
+        return ProfileEntity(
+            id = id,
+            name = name,
+            theme = theme.name,
+            currentLevel = currentLevel,
+            totalXp = totalXp,
+            currentStreak = currentStreak,
+            longestStreak = longestStreak,
+            lastSessionDate = lastSessionDate
+        )
     }
 }
