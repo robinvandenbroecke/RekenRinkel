@@ -17,6 +17,54 @@ class ExerciseEngine {
     private val random = Random(System.currentTimeMillis())
     
     /**
+     * Genereer een worked example voor een skill (uitgewerkt voorbeeld met uitleg)
+     */
+    fun generateWorkedExample(skillId: String, difficulty: Int): Exercise {
+        val baseExercise = generateExercise(skillId, difficulty)
+        return baseExercise.copy(
+            type = ExerciseType.WORKED_EXAMPLE,
+            hint = generateWorkedExampleHint(baseExercise),
+            isScaffolded = true
+        )
+    }
+
+    /**
+     * Genereer een guided exercise (begeleide oefening met tussenstappen)
+     */
+    fun generateGuidedExercise(skillId: String, difficulty: Int): Exercise {
+        val baseExercise = generateExercise(skillId, difficulty)
+        return baseExercise.copy(
+            type = ExerciseType.GUIDED_PRACTICE,
+            hint = generateGuidedHint(baseExercise),
+            isScaffolded = true
+        )
+    }
+
+    private fun generateWorkedExampleHint(exercise: Exercise): String {
+        return when (exercise.type) {
+            ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC -> {
+                "Laten we dit samen bekijken:\n" +
+                "${exercise.question}\n" +
+                "Het antwoord is ${exercise.correctAnswer}.\n" +
+                "Let op: ${exercise.hint}"
+            }
+            else -> "Dit is een voorbeeld. Het antwoord is: ${exercise.correctAnswer}"
+        }
+    }
+
+    private fun generateGuidedHint(exercise: Exercise): String {
+        return when (exercise.type) {
+            ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC -> {
+                "Probeer zelf eerst:\n" +
+                "${exercise.question}\n" +
+                "Tip: ${exercise.hint}\n" +
+                "(Je krijgt hulp als je er niet uit komt)"
+            }
+            else -> exercise.hint
+        }
+    }
+
+    /**
      * Genereer een oefening voor een specifieke skill met het juiste difficulty level.
      * Deze methode gebruikt de content configuratie om didactisch correcte oefeningen te genereren.
      */

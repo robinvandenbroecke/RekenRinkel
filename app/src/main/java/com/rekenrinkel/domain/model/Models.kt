@@ -114,7 +114,9 @@ enum class ExerciseType : Serializable {
     VISUAL_GROUPS,
     SIMPLE_SEQUENCE,
     COMPARE_NUMBERS,
-    NUMBER_LINE_CLICK
+    NUMBER_LINE_CLICK,
+    WORKED_EXAMPLE,      // Uitgewerkt voorbeeld met uitleg
+    GUIDED_PRACTICE      // Begeleide oefening met hints
 }
 
 /**
@@ -130,7 +132,8 @@ data class Exercise(
     val options: List<String>? = null,
     val correctAnswer: String,
     val distractors: List<String> = emptyList(),
-    val hint: String? = null
+    val hint: String? = null,
+    val isScaffolded: Boolean = false  // True voor worked examples en guided practice
 ) : Serializable
 
 /**

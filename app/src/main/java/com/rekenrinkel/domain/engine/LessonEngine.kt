@@ -311,8 +311,29 @@ class LessonEngine(
         val progress = progressMap[focusSkill.id]
         val difficulty = progress?.currentDifficultyTier ?: 1
 
-        return (0 until count).map {
-            exerciseEngine.generateExercise(focusSkill.id, difficulty)
+        // DIDACTISCHE STRUCTUUR: worked example -> guided -> independent
+        return when {
+            // Als skill net gestart is (weinig attempts), begin met worked example
+            progress == null || progress.totalAttempts() < 3 -> {
+                listOf(
+                    exerciseEngine.generateWorkedExample(focusSkill.id, difficulty),
+                    exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty)
+                ) + (2 until count).map {
+                    exerciseEngine.generateExercise(focusSkill.id, difficulty)
+                }
+            }
+            // Als mastery laag is, meer guided practice
+            progress.masteryScore < 50 -> {
+                listOf(
+                    exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty)
+                ) + (1 until count).map {
+                    exerciseEngine.generateExercise(focusSkill.id, difficulty)
+                }
+            }
+            // Anders: alleen independent practice
+            else -> (0 until count).map {
+                exerciseEngine.generateExercise(focusSkill.id, difficulty)
+            }
         }
     }
 
