@@ -35,6 +35,9 @@ class LessonViewModel(
     // Timer voor response time tracking
     private var exerciseStartTime: Long = 0
 
+    // PATCH 2: Harde completion guard - bijhouden welke oefening momenteel verwerkt wordt
+    private var currentlyCompletingExerciseId: String? = null
+
     /**
      * Start een nieuwe les
      */
@@ -84,60 +87,92 @@ class LessonViewModel(
         exerciseStartTime = System.currentTimeMillis()
     }
 
-    // ============ PATCH 1: UNIFORME OEFEN-AFRONDINGSFLOW ============
+    // ============ PATCH 1-3: FAIL-SAFE COMPLETION FLOW ============
 
     /**
-     * PATCH 1: Centrale helper voor het afronden van een oefening.
+     * PATCH 3: Expliciete completion modes
+     */
+    enum class CompletionMode {
+        DIRECT_CONTINUE,      // Geen feedback, direct door (worked example, skip)
+        FEEDBACK_THEN_ADVANCE // Toon feedback, wacht, dan door (normale antwoorden)
+    }
+
+    /**
+     * PATCH 1: Centrale helper voor het afronden van een oefening - FAIL-SAFE.
      * Alle paden (submit, worked, skip) eindigen hier.
      * Deze functie regelt ook de feedback delay en auto-advance.
+     *
+     * BELANGRIJK: Bij exceptions gaan we NOOIT meer stil terug naar SHOWING.
      */
     private suspend fun finishCurrentExercise(
         result: DetailedExerciseResult,
-        skipMasteryUpdate: Boolean = false,
-        needsFeedback: Boolean = true,
+        mode: CompletionMode,
         feedbackDurationMs: Long = 800
     ) {
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
 
+        // PATCH 2: Harde completion guard
+        if (currentlyCompletingExerciseId == currentExercise.id) {
+            return // Deze oefening wordt al verwerkt
+        }
+        currentlyCompletingExerciseId = currentExercise.id
+
+        val needsFeedback = mode == CompletionMode.FEEDBACK_THEN_ADVANCE
+        val skipMasteryUpdate = mode == CompletionMode.DIRECT_CONTINUE &&
+            currentExercise.type == com.rekenrinkel.domain.model.ExerciseType.WORKED_EXAMPLE
+
         try {
-            // 1. Update progress/mastery (indien niet geskipped)
+            // 1. Update progress/mastery (indien niet geskipped/worked)
             if (!skipMasteryUpdate) {
-                val currentProgress = progressRepository.getOrCreateProgress(currentExercise.skillId)
-                val outcome = lessonEngine.processExerciseResult(result, currentProgress)
-                progressRepository.updateProgress(outcome.updatedProgress)
+                try {
+                    val currentProgress = progressRepository.getOrCreateProgress(currentExercise.skillId)
+                    val outcome = lessonEngine.processExerciseResult(result, currentProgress)
+                    progressRepository.updateProgress(outcome.updatedProgress)
 
-                // 2. Update rewards (XP, streak, badges)
-                val currentRewards = profileRepository.getRewards()
-                val updatedRewards = currentRewards
-                    .addXp(outcome.xpEarned)
-                    .updateStreak()
+                    // 2. Update rewards (XP, streak, badges)
+                    val currentRewards = profileRepository.getRewards()
+                    val updatedRewards = currentRewards
+                        .addXp(outcome.xpEarned)
+                        .updateStreak()
 
-                val newBadges = lessonEngine.checkBadges(
-                    outcome,
-                    currentRewards,
-                    currentExercise.skillId
-                )
-
-                val finalRewards = newBadges.fold(updatedRewards) { rewards, badge ->
-                    rewards.addBadge(badge)
-                }
-                profileRepository.updateRewards(finalRewards)
-
-                // 3. Update UI state met resultaten
-                val newResults = state.results + result
-                _uiState.update {
-                    it.copy(
-                        results = newResults,
-                        stepState = if (needsFeedback) LessonStepState.FEEDBACK else LessonStepState.ADVANCING,
-                        lastAnswerCorrect = result.isCorrect,
-                        xpEarnedThisLesson = it.xpEarnedThisLesson + outcome.xpEarned,
-                        badgesEarnedThisLesson = it.badgesEarnedThisLesson + newBadges,
-                        difficultyChanged = if (outcome.difficultyChanged) outcome.newDifficultyTier else null
+                    val newBadges = lessonEngine.checkBadges(
+                        outcome,
+                        currentRewards,
+                        currentExercise.skillId
                     )
+
+                    val finalRewards = newBadges.fold(updatedRewards) { rewards, badge ->
+                        rewards.addBadge(badge)
+                    }
+                    profileRepository.updateRewards(finalRewards)
+
+                    // 3. Update UI state met resultaten
+                    val newResults = state.results + result
+                    _uiState.update {
+                        it.copy(
+                            results = newResults,
+                            stepState = if (needsFeedback) LessonStepState.FEEDBACK else LessonStepState.ADVANCING,
+                            lastAnswerCorrect = result.isCorrect,
+                            xpEarnedThisLesson = it.xpEarnedThisLesson + outcome.xpEarned,
+                            badgesEarnedThisLesson = it.badgesEarnedThisLesson + newBadges,
+                            difficultyChanged = if (outcome.difficultyChanged) outcome.newDifficultyTier else null
+                        )
+                    }
+                } catch (e: Exception) {
+                    // PATCH 1: Fout in progress/rewards mag flow niet blokkeren
+                    val newResults = state.results + result
+                    _uiState.update {
+                        it.copy(
+                            results = newResults,
+                            stepState = if (needsFeedback) LessonStepState.FEEDBACK else LessonStepState.ADVANCING,
+                            lastAnswerCorrect = result.isCorrect,
+                            error = "Progress update mislukt, maar je kunt verder"
+                        )
+                    }
                 }
             } else {
-                // Skip: alleen resultaat opslaan, geen mastery/rewards update
+                // Skip/Worked: alleen resultaat opslaan
                 val newResults = state.results + result
                 _uiState.update {
                     it.copy(
@@ -159,7 +194,34 @@ class LessonViewModel(
             }
 
         } catch (e: Exception) {
-            _uiState.update { it.copy(stepState = LessonStepState.SHOWING, error = e.message) }
+            // PATCH 1: FAIL-SAFE - Geen stil terug naar SHOWING
+            handleCompletionFailure(e.message ?: "Onbekende fout")
+        }
+    }
+
+    /**
+     * PATCH 1: Fail-safe handler voor completion fouten
+     * Zorgt dat de app nooit meer stil blijft hangen
+     */
+    private fun handleCompletionFailure(errorMessage: String) {
+        val state = _uiState.value
+
+        // Log de fout duidelijk
+        _uiState.update {
+            it.copy(
+                error = "Oefening afhandeling mislukt: $errorMessage",
+                stepState = LessonStepState.SHOWING
+            )
+        }
+
+        // PATCH 1: Probeer VEILIG door te gaan naar volgende oefening
+        viewModelScope.launch {
+            delay(500) // Korte pauze zodat gebruiker fout kan zien
+            if (state.currentIndex < state.exercises.size - 1) {
+                advanceToNextExercise()
+            } else {
+                completeLesson()
+            }
         }
     }
 
@@ -171,6 +233,9 @@ class LessonViewModel(
         val nextIndex = state.currentIndex + 1
 
         _uiState.update { it.copy(stepState = LessonStepState.ADVANCING) }
+
+        // PATCH 2: Reset completion guard bij advance
+        currentlyCompletingExerciseId = null
 
         if (nextIndex >= state.exercises.size) {
             completeLesson()
@@ -220,8 +285,8 @@ class LessonViewModel(
                 errorType = if (!isCorrect) determineErrorType(currentExercise, answer) else null
             )
 
-            // Gebruik uniforme flow
-            finishCurrentExercise(result, skipMasteryUpdate = false, needsFeedback = true)
+            // PATCH 3: Gebruik expliciete completion mode
+            finishCurrentExercise(result, mode = CompletionMode.FEEDBACK_THEN_ADVANCE)
         }
     }
 
@@ -257,9 +322,8 @@ class LessonViewModel(
                 representationUsed = "WORKED_EXAMPLE"
             )
 
-            // Gebruik uniforme flow met direct advance
-            finishCurrentExercise(result, skipMasteryUpdate = true, needsFeedback = false)
-            // needsFeedback = false triggert automatisch advanceToNextExercise()
+            // PATCH 3: Gebruik expliciete completion mode
+            finishCurrentExercise(result, mode = CompletionMode.DIRECT_CONTINUE)
         }
     }
 
@@ -288,8 +352,8 @@ class LessonViewModel(
                 representationUsed = "SKIPPED"
             )
 
-            // PATCH 6: Skip = geen feedback, direct advance
-            finishCurrentExercise(result, skipMasteryUpdate = true, needsFeedback = false)
+            // PATCH 3 & 6: Skip = DIRECT_CONTINUE mode
+            finishCurrentExercise(result, mode = CompletionMode.DIRECT_CONTINUE)
         }
     }
 

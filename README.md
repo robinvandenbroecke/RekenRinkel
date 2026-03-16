@@ -7,12 +7,18 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 
 ## Wat werkt
 
-### Oefenflow (volledig ViewModel-gestuurd)
-- **Alle advance-logica centraal in LessonViewModel**
-- UI is puur presentational (alleen tonen en input verzamelen)
+### Robuuste oefen-afhandeling (FAIL-SAFE)
+- **Harde completion guard**: elke oefening wordt maximaal één keer verwerkt
+- **Expliciete completion modes**:
+  - `DIRECT_CONTINUE`: voor worked example en skip (geen feedback)
+  - `FEEDBACK_THEN_ADVANCE`: voor normale antwoorden (feedback + wacht)
+- **Fail-safe error handling**: fouten in progress/rewards logging blokkeren de flow niet
+- **No silent failures**: exceptions resulteren in duidelijke foutmelding + veilige doorloop
+
+### ViewModel-gestuurde flow
+- Alle advance-logica centraal in LessonViewModel
+- UI is puur presentational
 - Expliciete state machine: SHOWING → PROCESSING → FEEDBACK → ADVANCING
-- Feedback-delay en auto-advance volledig in ViewModel
-- Geen vastlopers op eerste oefening
 
 ### Oefentypen
 - **WORKED_EXAMPLE**: Direct verder zonder validatie
@@ -21,15 +27,8 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 - **Skip**: Direct door zonder blokkeren
 
 ### Start op leeftijd, dan adaptief
-1. **Leeftijd bepaalt de start** (5-6 / 7-8 / 9-11 jaar)
-2. **Daarna sturen prestaties** het traject
-
-### Curriculum NL/Vlaanderen
-Inhoud afgestemd op Nederlandse kerndoelen en Vlaamse minimumdoelen.
-
-### Lesstructuur
-- **Duur**: 5-10 minuten
-- **Aantal**: 8 items per les
+- Leeftijd bepaalt de start (5-6 / 7-8 / 9-11 jaar)
+- Daarna sturen prestaties het traject
 
 ## Wat in ontwikkeling is
 
@@ -40,7 +39,7 @@ Inhoud afgestemd op Nederlandse kerndoelen en Vlaamse minimumdoelen.
 ## Flow
 
 ```
-Onboarding (leeftijd) → Home → Les (8 items, ViewModel-gestuurd) → Beloningen
+Onboarding (leeftijd) → Home → Les (8 items, fail-safe) → Beloningen
 ```
 
 ## Build
