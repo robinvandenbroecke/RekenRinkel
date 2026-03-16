@@ -250,6 +250,53 @@ data class SkillContentConfig(
 )
 
 /**
+ * PATCH 3: Curriculum mapping Nederland & Vlaanderen
+ * 
+ * === NEDERLAND - Kerndoelen Rekenen-Wiskunde PO ===
+ * 
+ * Getallenkennis (Number Sense):
+ * - Subitizing tot 5: hoofdstroom 1F (direct herkennen)
+ * - Tellen en kardinaliteit: hoofdstroom 1F
+ * - Number bonds 5/10/20: hoofdstroom 1F/1S (splitsen)
+ * - Plaatswaarde tientallen/eenheden: hoofdstroom 1S
+ * 
+ * Bewerkingen (Operations):
+ * - Optellen/aftrekken tot 10: hoofdstroom 1F
+ * - Optellen/aftrekken tot 20: hoofdstroom 1F (met brug over 10)
+ * - Automatiseren tot 20: hoofdstroom 1S
+ * - Tafels 2,5,10: hoofdstroom 1S
+ * 
+ * Vergelijken & Relaties:
+ * - Meer/minder/evenveel: hoofdstroom 1F
+ * - Getallenlijn vergelijken: hoofdstroom 1S
+ * 
+ * Metend rekenen & Meetkunde:
+ * - Patroonherkenning (doubles/halves): hoofdstroom 1F
+ * - Tellen per 2,5,10: hoofdstroom 1S
+ * 
+ * === VLAANDEREN - Minimumdoelen Wiskunde LO ===
+ * 
+ * Getalbegrip:
+ * - Structuur van natuurlijke getallen tot 20: ontwikkelingsdoel
+ * - Splitsingen tot 10/20: ontwikkelingsdoel
+ * - Getalbeelden: ontwikkelingsdoel
+ * 
+ * Bewerkingen:
+ * - Optellen/aftrekken tot 20: ontwikkelingsdoel
+ * - Automatiseren: ontwikkelingsdoel
+ * - Vermenigvuldigen als herhaald optellen: ontwikkelingsdoel
+ * 
+ * Toepassingen:
+ * - Contextuele problemen tot 20: ontwikkelingsdoel
+ * - Redeneren over patronen: ontwikkelingsdoel
+ * 
+ * === LEEFTIJDSINDELING ===
+ * 5-6 jaar: FOUNDATION (NL groep 3 / Vlaanderen 1e leerjaar)
+ * 6-8 jaar: EARLY_ARITHMETIC (NL groep 4 / Vlaanderen 2e leerjaar)  
+ * 8-11 jaar: EXTENDED (NL groep 5-6 / Vlaanderen 3e-4e leerjaar)
+ */
+
+/**
  * Content repository met alle skill configuraties (met typed rules)
  */
 object ContentRepository {
@@ -1240,5 +1287,84 @@ object ContentRepository {
             // Level 10: Tafels
             listOf("advanced_groups", "advanced_table_2", "advanced_table_5", "advanced_table_10")
         )
+    }
+
+    /**
+     * PATCH 3: Haal start skills op voor een specifieke leeftijd
+     * Gebaseerd op NL/Vlaamse curriculum verwachtingen
+     */
+    fun getStartSkillsForAge(age: Int): List<String> {
+        return when (age) {
+            5, 6 -> listOf(
+                // Foundation: Subitizing, telling, bonds 5
+                "foundation_subitize_5",
+                "foundation_counting",
+                "foundation_number_bonds_5",
+                "foundation_more_less"
+            )
+            7, 8 -> listOf(
+                // Early Arithmetic: Bonds 10/20, optellen/aftrekken
+                "foundation_number_bonds_10",
+                "foundation_splits_10",
+                "arithmetic_add_10_concrete",
+                "arithmetic_sub_10_concrete",
+                "patterns_doubles"
+            )
+            9, 10, 11 -> listOf(
+                // Extended: Brug over 10, tafels, plaatswaarde
+                "arithmetic_bridge_add",
+                "patterns_count_2",
+                "patterns_count_5",
+                "advanced_groups",
+                "advanced_table_2"
+            )
+            else -> listOf("foundation_subitize_5", "foundation_counting")
+        }
+    }
+
+    /**
+     * PATCH 3: Haal skills op per curriculum domein
+     */
+    fun getSkillsByDomain(domain: CurriculumDomain): List<String> {
+        return when (domain) {
+            CurriculumDomain.NUMBER_SENSE -> listOf(
+                "foundation_subitize_5", "foundation_counting",
+                "foundation_number_bonds_5", "foundation_number_bonds_10", "foundation_number_bonds_20",
+                "foundation_splits_10", "foundation_splits_20",
+                "advanced_compare_100", "advanced_place_value"
+            )
+            CurriculumDomain.OPERATIONS -> listOf(
+                "arithmetic_add_10_concrete", "arithmetic_add_10_pictorial", "arithmetic_add_10_abstract",
+                "arithmetic_sub_10_concrete", "arithmetic_sub_10_pictorial", "arithmetic_sub_10_abstract",
+                "arithmetic_add_20", "arithmetic_sub_20",
+                "arithmetic_bridge_add", "arithmetic_bridge_sub"
+            )
+            CurriculumDomain.PATTERNS -> listOf(
+                "foundation_patterns", "patterns_doubles", "patterns_halves",
+                "patterns_count_2", "patterns_count_5", "patterns_count_10"
+            )
+            CurriculumDomain.MULTIPLICATION -> listOf(
+                "advanced_groups", "advanced_arrays",
+                "advanced_table_2", "advanced_table_5", "advanced_table_10"
+            )
+            CurriculumDomain.FRACTIONS -> listOf(
+                "advanced_fractions_basics"
+            )
+            CurriculumDomain.REASONING -> listOf(
+                "advanced_multistep", "advanced_reasoning"
+            )
+        }
+    }
+
+    /**
+     * PATCH 3: Curriculum domeinen voor NL/Vlaanderen
+     */
+    enum class CurriculumDomain {
+        NUMBER_SENSE,      // Getalbegrip (subitizing, bonds, plaatswaarde)
+        OPERATIONS,        // Bewerkingen (optellen, aftrekken)
+        PATTERNS,          // Patronen en relaties
+        MULTIPLICATION,    // Vermenigvuldigen (groepjes, tafels)
+        FRACTIONS,         // Breuken
+        REASONING          // Redeneren en probleemoplossing
     }
 }
