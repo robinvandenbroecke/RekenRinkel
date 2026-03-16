@@ -117,6 +117,7 @@ fun ExerciseScreen(
                         onConfirmTyped = {
                             handleAnswer(typedAnswer, exercise, onAnswer)
                         },
+                        onContinueWorkedExample = onContinueWorkedExample,
                         enabled = !showFeedback
                     )
                 }
@@ -181,6 +182,7 @@ private fun AnswerContent(
     onTypedAnswerChange: (String) -> Unit,
     onOptionSelected: (String) -> Unit,
     onConfirmTyped: () -> Unit,
+    onContinueWorkedExample: () -> Unit = {},
     enabled: Boolean
 ) {
     when (exercise.type) {
@@ -325,7 +327,7 @@ private fun AnswerContent(
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 Button(
-                    onClick = { onContinueWorkedExample() },
+                    onClick = onContinueWorkedExample,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Begrepen! Verder →")
@@ -373,6 +375,7 @@ private fun AnswerContent(
                 )
             }
         }
+    }
 }
 
 private fun handleAnswer(
