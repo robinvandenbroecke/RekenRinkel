@@ -9,8 +9,8 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 
 ### Profiel en start
 - Naam, leeftijd (5-11), thema instellen
-- Startband bepaald door leeftijd (FOUNDATION/EARLY_ARITHMETIC/EXTENDED)
-- Placement engine met 6-10 diagnostische items
+- **Placement verplicht** vóór normaal leerpad
+- Placement: 5 diagnostische items → startband bepaling
 - Rewards systeem: XP, level, streak, badges
 - 100% offline, lokale Room database
 
@@ -28,9 +28,13 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 - Representaties: DOTS, BLOCKS, BOND_MODEL, NUMBER_LINE, SYMBOLS
 
 ### Sessie/Les (didactisch opgebouwd)
-- LessonEngine: 10 items per les
-- Fases: Warm-up (2), Focus (4), Review (2), Challenge (2)
+- LessonEngine: primaire leermotor
+- 10 items per les: Warm-up (2), Focus (4), Review (2), Challenge (2)
 - Didactische flow: Worked example → Guided → Independent
+- CPA-fase bepaalt oefeningstype:
+  * CONCRETE: veel scaffolding (worked + guided)
+  * PICTORIAL: mix (guided + independent)
+  * ABSTRACT: zelfstandig (independent)
 - Smart shuffle met variatie
 - Exit check na sessie
 
@@ -40,21 +44,51 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 - ProfielRepository: CRUD operaties
 - ProgressRepository: skill resultaten
 
+## Flow (huidige implementatie)
+
+```
+App Start
+  ↓
+Onboarding (naam, leeftijd, thema)
+  ↓
+Placement (verplicht)
+  ↓  5 diagnostische items
+  ↓  Bepaalt start cluster
+Home
+  ↓
+Start Les → LessonEngine
+  ↓  Warm-up (review)
+  ↓  Focus (50% - CPA-afhankelijk)
+  ↓  Review (spaced)
+  ↓  Challenge (transfer)
+  ↓
+Exit Check → Mastery update
+  ↓
+Rewards (XP, badges)
+  ↓
+Volgende les
+```
+
 ## Wat in opbouw is
 
-### Leeftijdsadaptatie (in opbouw)
-- Startband via leeftijd: basis aanwezig
-- Placement test: geïmplementeerd, moet nog volledig geïntegreerd
+### Leeftijdsadaptatie (basis aanwezig)
+- Startband via leeftijd: geïmplementeerd
+- Placement test: verplicht vóór normaal leerpad
+- Placement resultaat bepaalt start cluster
 - Dynamische content selectie: in ontwikkeling
 
-### CPA/Singapore Math (in opbouw)
+### CPA/Singapore Math (gedeeltelijk geïmplementeerd)
 - CPA enum aanwezig (CONCRETE, PICTORIAL, ABSTRACT, MIXED_TRANSFER)
 - Representatie types gedefinieerd
-- Fase-overgangen: framework aanwezig, volledige integratie volgt
+- Fase-overgangen afdwingbaar in LessonEngine:
+  * CONCRETE → PICTORIAL: 60% mastery + 5 attempts
+  * PICTORIAL → ABSTRACT: 75% mastery + 8 attempts
+  * ABSTRACT → MIXED: 85% mastery
 
 ### Mastery engine (gedeeltelijk geïmplementeerd)
 - SkillProgress tracking: basis aanwezig
 - Difficulty adjustment: geïmplementeerd
+- CPA-fase tracking: geïmplementeerd
 - Remediëring op basis van fouttypes: framework aanwezig
 
 ### Rewards (gedeeltelijk geïmplementeerd)
