@@ -134,7 +134,7 @@ class SessionEngine(
 
         challengeCandidates.take(challengeCount).forEach { skill ->
             val progress = progressMap[skill.id]
-            val challengeDifficulty = ((progress?.currentDifficulty ?: 1) + 1)
+            val challengeDifficulty = ((progress?.currentDifficultyTier ?: 1) + 1)
                 .coerceIn(skill.minDifficulty, skill.maxDifficulty)
             exercises.add(exerciseEngine.generateExercise(skill.id, challengeDifficulty))
         }
@@ -249,31 +249,31 @@ class SessionEngine(
         emerging.filter { it.id != focusSkill.id }.forEach { skill ->
             val progress = progressMap[skill.id]!!
             // Prioriteit op basis van: laag mastery, veel fouten, niet recent
-            val recencyPenalty = if (isRecent(progress.lastPracticed)) 0 else 10
-            val errorScore = progress.wrongAnswers * 2
+            val recencyPenalty = if (isRecent(progress.lastPracticedAt)) 0 else 10
+            val errorScore = progress.incorrectCount * 2
             candidates.add(ReviewCandidate(
                 skill = skill,
                 progress = progress,
                 priorityScore = 80 + recencyPenalty + errorScore - progress.masteryScore
             ))
         }
-        
+
         // Practicing skills - sorteer op zwakte en fouten
         practicing.filter { it.id != focusSkill.id }.forEach { skill ->
             val progress = progressMap[skill.id]!!
-            val recencyPenalty = if (isRecent(progress.lastPracticed)) 0 else 15
-            val errorScore = progress.wrongAnswers
+            val recencyPenalty = if (isRecent(progress.lastPracticedAt)) 0 else 15
+            val errorScore = progress.incorrectCount
             candidates.add(ReviewCandidate(
                 skill = skill,
                 progress = progress,
                 priorityScore = 50 + recencyPenalty + errorScore - (progress.masteryScore / 2)
             ))
         }
-        
+
         // Solid skills alleen als ze niet recent zijn geoefend
         solid.filter { it.id != focusSkill.id }.forEach { skill ->
             val progress = progressMap[skill.id]!!
-            if (!isRecent(progress.lastPracticed)) {
+            if (!isRecent(progress.lastPracticedAt)) {
                 candidates.add(ReviewCandidate(
                     skill = skill,
                     progress = progress,
@@ -301,15 +301,15 @@ class SessionEngine(
         // 1. Solid skills met ruimte voor hogere difficulty
         solid.forEach { skill ->
             val progress = progressMap[skill.id]
-            if (progress != null && progress.currentDifficulty < skill.maxDifficulty) {
+            if (progress != null && progress.currentDifficultyTier < skill.maxDifficulty) {
                 challenges.add(skill)
             }
         }
-        
+
         // 2. Mastered skills die uitgebreid kunnen worden
         mastered.forEach { skill ->
             val progress = progressMap[skill.id]
-            if (progress != null && progress.currentDifficulty < skill.maxDifficulty) {
+            if (progress != null && progress.currentDifficultyTier < skill.maxDifficulty) {
                 challenges.add(skill)
             }
         }
@@ -351,16 +351,16 @@ class SessionEngine(
     private fun determineDifficulty(skill: Skill, progress: SkillProgress?, isFocus: Boolean): Int {
         return if (isFocus) {
             // Focus skills: gebruik current difficulty of start bij min
-            progress?.currentDifficulty?.coerceIn(skill.minDifficulty, skill.maxDifficulty)
+            progress?.currentDifficultyTier?.coerceIn(skill.minDifficulty, skill.maxDifficulty)
                 ?: skill.minDifficulty
         } else {
             // Review skills: iets makkelijker voor zwakke skills
             when {
                 progress == null -> skill.minDifficulty
                 progress.masteryScore < MASTERY_THRESHOLD_WEAK -> skill.minDifficulty
-                progress.masteryScore < MASTERY_THRESHOLD_SOLID -> 
-                    (progress.currentDifficulty).coerceIn(skill.minDifficulty, skill.maxDifficulty)
-                else -> progress.currentDifficulty.coerceIn(skill.minDifficulty, skill.maxDifficulty)
+                progress.masteryScore < MASTERY_THRESHOLD_SOLID ->
+                    (progress.currentDifficultyTier).coerceIn(skill.minDifficulty, skill.maxDifficulty)
+                else -> progress.currentDifficultyTier.coerceIn(skill.minDifficulty, skill.maxDifficulty)
             }
         }
     }

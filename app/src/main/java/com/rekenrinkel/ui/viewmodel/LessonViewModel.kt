@@ -99,9 +99,8 @@ class LessonViewModel(
                 // Valideer antwoord
                 val isCorrect = exerciseValidator.validate(currentExercise, answer)
 
-                // Haal huidige progress op
+                // Haal huidige progress op (enhanced model)
                 val currentProgress = progressRepository.getOrCreateProgress(currentExercise.skillId)
-                    .toEnhanced()
 
                 // Verwerk resultaat met LessonEngine
                 val result = DetailedExerciseResult(
@@ -119,7 +118,7 @@ class LessonViewModel(
                 val outcome = lessonEngine.processExerciseResult(result, currentProgress)
 
                 // Update progress in database
-                progressRepository.updateProgress(outcome.updatedProgress.toLegacy())
+                progressRepository.updateProgress(outcome.updatedProgress)
 
                 // Update rewards (XP, streak, badges)
                 val currentRewards = profileRepository.getRewards()
@@ -186,10 +185,9 @@ class LessonViewModel(
 
                 // Sla skip op maar zonder XP
                 val currentProgress = progressRepository.getOrCreateProgress(currentExercise.skillId)
-                    .toEnhanced()
 
                 val outcome = lessonEngine.processExerciseResult(skippedResult, currentProgress)
-                progressRepository.updateProgress(outcome.updatedProgress.toLegacy())
+                progressRepository.updateProgress(outcome.updatedProgress)
 
                 val newResults = state.results + skippedResult
                 _uiState.update {

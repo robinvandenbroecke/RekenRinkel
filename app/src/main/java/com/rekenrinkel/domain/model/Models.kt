@@ -78,22 +78,12 @@ enum class SkillCategory {
     ADVANCED
 }
 
-/**
- * Skill progress voor een gebruiker
- */
-data class SkillProgress(
-    val skillId: String,
-    val masteryScore: Int = 0, // 0-100
-    val correctAnswers: Int = 0,
-    val wrongAnswers: Int = 0,
-    val averageResponseTimeMs: Long = 0,
-    val lastPracticed: Long? = null,
-    val currentDifficulty: Int = 1
-) {
-    fun totalAttempts(): Int = correctAnswers + wrongAnswers
-    fun successRate(): Float = if (totalAttempts() > 0) correctAnswers.toFloat() / totalAttempts() else 0f
-    fun masteryLevel(): MasteryLevel = masteryScore.toMasteryLevel()
-}
+// SkillProgress is nu gedefinieerd in EnhancedModels.kt met uitgebreide velden:
+// - correctCount (was: correctAnswers)
+// - incorrectCount (was: wrongAnswers)
+// - lastPracticedAt (was: lastPracticed)
+// - currentDifficultyTier (was: currentDifficulty)
+// + streakCorrect, streakIncorrect, errorTypeSummary, isUnlocked, masteredAt
 
 /**
  * Oefentypes

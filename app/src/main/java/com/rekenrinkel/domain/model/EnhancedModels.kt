@@ -249,39 +249,3 @@ data class DetailedExerciseResult(
 // Backwards compatibility aliases
 typealias Profile = UserProfile
 typealias ExerciseResult = DetailedExerciseResult
-
-/**
- * Extension om oude SkillProgress te converteren naar nieuwe versie
- */
-fun SkillProgress.toEnhanced(): SkillProgress {
-    return SkillProgress(
-        skillId = this.skillId,
-        masteryScore = this.masteryScore,
-        currentDifficultyTier = this.currentDifficulty,
-        correctCount = this.correctAnswers,
-        incorrectCount = this.wrongAnswers,
-        streakCorrect = 0,
-        streakIncorrect = 0,
-        averageResponseTimeMs = this.averageResponseTimeMs,
-        lastPracticedAt = this.lastPracticed,
-        lastRepresentationUsed = null,
-        errorTypeSummary = emptyMap(),
-        isUnlocked = this.masteryScore > 0,
-        masteredAt = if (this.masteryScore >= 90) System.currentTimeMillis() else null
-    )
-}
-
-/**
- * Extension om nieuwe SkillProgress terug te converteren naar oude (voor database)
- */
-fun SkillProgress.toLegacy(): com.rekenrinkel.domain.model.SkillProgress {
-    return com.rekenrinkel.domain.model.SkillProgress(
-        skillId = this.skillId,
-        masteryScore = this.masteryScore,
-        correctAnswers = this.correctCount,
-        wrongAnswers = this.incorrectCount,
-        averageResponseTimeMs = this.averageResponseTimeMs,
-        lastPracticed = this.lastPracticedAt,
-        currentDifficulty = this.currentDifficultyTier
-    )
-}
