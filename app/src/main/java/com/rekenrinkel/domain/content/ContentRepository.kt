@@ -492,6 +492,29 @@ object ContentRepository {
 
         // === ARITHMETIC TOT 10 - MICROSKILLS MET CPA (Leeftijd 6-7) ===
         // Optellen CONCREET
+        // Aggregatie skill voor optellen tot 10 (gebruikt abstracte versie)
+        SkillContentConfig(
+            skillId = "arithmetic_add_10",
+            name = "Optellen tot 10",
+            description = "Optellen van getallen met resultaat tot 10",
+            category = SkillCategory.ARITHMETIC,
+            cpaPhase = CpaPhase.MIXED_TRANSFER,
+            isPremium = false,
+            prerequisites = listOf("foundation_number_bonds_10"),
+            minDifficulty = 1,
+            maxDifficulty = 4,
+            allowedExerciseTypes = listOf(ExerciseType.TYPED_NUMERIC, ExerciseType.VISUAL_GROUPS),
+            preferredRepresentations = listOf(RepresentationType.SYMBOLS, RepresentationType.BOND_MODEL),
+            rules = DidacticRules.build {
+                range(1, 9)
+                maxResult(10)
+                minResult(2)
+                requireNoBridge()
+            },
+            hintStrategy = HintStrategy.BOND_MODEL,
+            commonErrorTypes = listOf(ErrorType.CALCULATION_ERROR, ErrorType.BOND_ERROR)
+        ),
+
         SkillContentConfig(
             skillId = "arithmetic_add_10_concrete",
             name = "Optellen tot 10 (concreet)",
@@ -562,6 +585,28 @@ object ContentRepository {
             remediationSkill = "arithmetic_add_10_pictorial"
         ),
 
+        // Aggregatie skill voor aftrekken tot 10
+        SkillContentConfig(
+            skillId = "arithmetic_sub_10",
+            name = "Aftrekken tot 10",
+            description = "Aftrekken van getallen tot 10",
+            category = SkillCategory.ARITHMETIC,
+            cpaPhase = CpaPhase.MIXED_TRANSFER,
+            isPremium = false,
+            prerequisites = listOf("arithmetic_add_10"),
+            minDifficulty = 1,
+            maxDifficulty = 4,
+            allowedExerciseTypes = listOf(ExerciseType.TYPED_NUMERIC, ExerciseType.VISUAL_GROUPS),
+            preferredRepresentations = listOf(RepresentationType.SYMBOLS, RepresentationType.BOND_MODEL),
+            rules = DidacticRules.build {
+                range(1, 10)
+                minResult(0)
+                requireNoBridge()
+            },
+            hintStrategy = HintStrategy.BOND_MODEL,
+            commonErrorTypes = listOf(ErrorType.CALCULATION_ERROR, ErrorType.BOND_ERROR)
+        ),
+
         // Aftrekken CONCREET
         SkillContentConfig(
             skillId = "arithmetic_sub_10_concrete",
@@ -570,7 +615,7 @@ object ContentRepository {
             category = SkillCategory.ARITHMETIC,
             cpaPhase = CpaPhase.CONCRETE,
             isPremium = false,
-            prerequisites = listOf("arithmetic_add_10_concrete"),
+            prerequisites = listOf("arithmetic_sub_10"),
             minDifficulty = 1,
             maxDifficulty = 2,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS),
@@ -631,6 +676,7 @@ object ContentRepository {
         ),
 
         // === ARITHMETIC TOT 20 (Leeftijd 7-8) ===
+        // Aggregatie skill voor optellen tot 20
         SkillContentConfig(
             skillId = "arithmetic_add_20",
             name = "Optellen tot 20",
@@ -641,7 +687,7 @@ object ContentRepository {
             prerequisites = listOf("arithmetic_add_10", "foundation_number_bonds_20"),
             minDifficulty = 2,
             maxDifficulty = 4,
-            allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
+            allowedExerciseTypes = listOf(ExerciseType.TYPED_NUMERIC, ExerciseType.VISUAL_GROUPS),
             preferredRepresentations = listOf(RepresentationType.BOND_MODEL, RepresentationType.NUMBER_LINE, RepresentationType.SYMBOLS),
             rules = DidacticRules.build {
                 range(1, 19)

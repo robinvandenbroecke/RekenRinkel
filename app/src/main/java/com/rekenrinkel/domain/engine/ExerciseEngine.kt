@@ -113,13 +113,21 @@ class ExerciseEngine {
             "foundation_splits_10" -> generateSplits(config, clampedDifficulty, 10)
             "foundation_splits_20" -> generateSplits(config, clampedDifficulty, 20)
             
-            // ARITHMETIC
+            // ARITHMETIC - Aggregatie skills (gebruiken abstracte logica)
             "arithmetic_add_10" -> generateAddition(config, clampedDifficulty, maxSum = 10, useBridge = false)
             "arithmetic_sub_10" -> generateSubtraction(config, clampedDifficulty, max = 10, useBridge = false)
             "arithmetic_add_20" -> generateAddition(config, clampedDifficulty, maxSum = 20, useBridge = false)
             "arithmetic_sub_20" -> generateSubtraction(config, clampedDifficulty, max = 20, useBridge = false)
             "arithmetic_bridge_add" -> generateAddition(config, clampedDifficulty, maxSum = 18, useBridge = true)
             "arithmetic_bridge_sub" -> generateSubtraction(config, clampedDifficulty, max = 18, useBridge = true)
+            
+            // ARITHMETIC - CPA varianten (gebruiken zelfde logica als aggregatie)
+            "arithmetic_add_10_concrete" -> generateAddition(config, clampedDifficulty, maxSum = 10, useBridge = false)
+            "arithmetic_add_10_pictorial" -> generateAddition(config, clampedDifficulty, maxSum = 10, useBridge = false)
+            "arithmetic_add_10_abstract" -> generateAddition(config, clampedDifficulty, maxSum = 10, useBridge = false)
+            "arithmetic_sub_10_concrete" -> generateSubtraction(config, clampedDifficulty, max = 10, useBridge = false)
+            "arithmetic_sub_10_pictorial" -> generateSubtraction(config, clampedDifficulty, max = 10, useBridge = false)
+            "arithmetic_sub_10_abstract" -> generateSubtraction(config, clampedDifficulty, max = 10, useBridge = false)
             
             // PATTERNS
             "patterns_doubles" -> generateDoubles(config, clampedDifficulty)
@@ -148,8 +156,9 @@ class ExerciseEngine {
                     "foundation_number_bonds_5", "foundation_splits_10" -> generateSplits(config!!, clampedDifficulty, 10)
                     "foundation_number_bonds_10" -> generateSplits(config!!, clampedDifficulty, 10)
                     "foundation_number_bonds_20", "foundation_splits_20" -> generateSplits(config!!, clampedDifficulty, 20)
-                    "arithmetic_add_10" -> generateAddition(config!!, clampedDifficulty, maxSum = 10, useBridge = false)
-                    "arithmetic_sub_10" -> generateSubtraction(config!!, clampedDifficulty, max = 10, useBridge = false)
+                    // Aggregatie skills en CPA varianten gebruiken zelfde logica
+                    "arithmetic_add_10", "arithmetic_add_10_concrete", "arithmetic_add_10_pictorial", "arithmetic_add_10_abstract" -> generateAddition(config!!, clampedDifficulty, maxSum = 10, useBridge = false)
+                    "arithmetic_sub_10", "arithmetic_sub_10_concrete", "arithmetic_sub_10_pictorial", "arithmetic_sub_10_abstract" -> generateSubtraction(config!!, clampedDifficulty, max = 10, useBridge = false)
                     "arithmetic_add_20" -> generateAddition(config!!, clampedDifficulty, maxSum = 20, useBridge = false)
                     "arithmetic_sub_20" -> generateSubtraction(config!!, clampedDifficulty, max = 20, useBridge = false)
                     "arithmetic_bridge_add" -> generateAddition(config!!, clampedDifficulty, maxSum = 18, useBridge = true)
