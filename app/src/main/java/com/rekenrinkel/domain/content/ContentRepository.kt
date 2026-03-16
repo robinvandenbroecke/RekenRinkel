@@ -4,6 +4,47 @@ import com.rekenrinkel.domain.model.ExerciseType
 import com.rekenrinkel.domain.model.SkillCategory
 
 /**
+ * CPA (Concrete-Pictorial-Abstract) fasen
+ * Singapore Math didactiek
+ */
+enum class CpaPhase {
+    CONCRETE,      // Fysieke objecten, manipulatieve materialen
+    PICTORIAL,     // Visuele representaties, diagrammen
+    ABSTRACT,      // Symbolische notatie, cijfers
+    MIXED_TRANSFER // Gemengd, contextoefeningen
+}
+
+/**
+ * Fouttypen voor gestuurde remediëring
+ */
+enum class ErrorType {
+    COUNTING_ERROR,      // Fout in tellen
+    SUBITIZING_ERROR,    // Fout in direct herkennen
+    BOND_ERROR,          // Fout in number bonds
+    PLACE_VALUE_ERROR,   // Fout in plaatswaarde
+    COMPARE_ERROR,       // Fout in vergelijken
+    BRIDGE_10_ERROR,     // Fout in brug over 10
+    GROUPING_ERROR,      // Fout in groepjes
+    SEQUENCE_ERROR,      // Fout in patronen/reeksen
+    MISSING_PART_ERROR,  // Fout in missing number
+    CALCULATION_ERROR    // Algemene rekenfout
+}
+
+/**
+ * Representatie types voor verschillende denkniveaus
+ */
+enum class RepresentationType {
+    DOTS,           // Stippen (meest concreet)
+    BLOCKS,         // Blokjes
+    NUMBER_LINE,    // Getallenlijn
+    BOND_MODEL,     // Part-part-whole model
+    GROUPS,         // Groepjes
+    ARRAY,          // Rooster/array
+    SYMBOLS,        // Symbolen/cijfers (meest abstract)
+    CONTEXT         // Context/woordproblem
+}
+
+/**
  * Typed didactische regels voor oefeninggeneratie.
  * Vervangt losse Map<String, String> configuratie.
  */
@@ -178,13 +219,17 @@ data class SkillContentConfig(
     val name: String,
     val description: String,
     val category: SkillCategory,
+    val cpaPhase: CpaPhase = CpaPhase.CONCRETE,
     val isPremium: Boolean = false,
     val prerequisites: List<String> = emptyList(),
     val minDifficulty: Int = 1,
     val maxDifficulty: Int = 5,
     val allowedExerciseTypes: List<ExerciseType>,
+    val preferredRepresentations: List<RepresentationType> = emptyList(),
     val rules: DidacticRules,
-    val hintStrategy: HintStrategy = HintStrategy.NONE
+    val hintStrategy: HintStrategy = HintStrategy.NONE,
+    val commonErrorTypes: List<ErrorType> = emptyList(),
+    val remediationSkill: String? = null
 )
 
 /**
@@ -194,7 +239,9 @@ enum class HintStrategy {
     NONE,
     VISUAL,
     STEP_BY_STEP,
-    COUNTING_AID
+    COUNTING_AID,
+    BOND_MODEL,
+    NUMBER_LINE
 }
 
 /**
@@ -210,16 +257,19 @@ object ContentRepository {
             name = "Herkennen tot 5",
             description = "Direct herkennen van hoeveelheden zonder te tellen (subitizing)",
             category = SkillCategory.FOUNDATION,
+            cpaPhase = CpaPhase.CONCRETE,
             isPremium = false,
             prerequisites = emptyList(),
             minDifficulty = 1,
             maxDifficulty = 3,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_QUANTITY),
+            preferredRepresentations = listOf(RepresentationType.DOTS, RepresentationType.BLOCKS),
             rules = DidacticRules.build {
                 range(1, 5)
                 requireVisualPrompt()
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.VISUAL,
+            commonErrorTypes = listOf(ErrorType.SUBITIZING_ERROR, ErrorType.COUNTING_ERROR)
         ),
 
         SkillContentConfig(
@@ -227,16 +277,19 @@ object ContentRepository {
             name = "Tellen",
             description = "Tellen en kardinaliteit begrijpen",
             category = SkillCategory.FOUNDATION,
+            cpaPhase = CpaPhase.CONCRETE,
             isPremium = false,
             prerequisites = listOf("foundation_subitize_5"),
             minDifficulty = 1,
             maxDifficulty = 3,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_QUANTITY, ExerciseType.SIMPLE_SEQUENCE),
+            preferredRepresentations = listOf(RepresentationType.DOTS, RepresentationType.BLOCKS),
             rules = DidacticRules.build {
                 range(1, 10)
                 requireVisualPrompt()
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.COUNTING_AID,
+            commonErrorTypes = listOf(ErrorType.COUNTING_ERROR)
         ),
 
         SkillContentConfig(
@@ -262,17 +315,20 @@ object ContentRepository {
             name = "Number Bonds tot 5",
             description = "Leren welke getallen samen 5 maken",
             category = SkillCategory.FOUNDATION,
+            cpaPhase = CpaPhase.CONCRETE,
             isPremium = false,
             prerequisites = listOf("foundation_counting"),
             minDifficulty = 1,
             maxDifficulty = 3,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.MISSING_NUMBER),
+            preferredRepresentations = listOf(RepresentationType.BOND_MODEL, RepresentationType.BLOCKS),
             rules = DidacticRules.build {
                 range(2, 5)
                 maxResult(5)
                 requireVisualPrompt()
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.BOND_MODEL,
+            commonErrorTypes = listOf(ErrorType.BOND_ERROR)
         ),
 
         SkillContentConfig(
@@ -280,17 +336,21 @@ object ContentRepository {
             name = "Number Bonds tot 10",
             description = "Leren welke getallen samen 10 maken",
             category = SkillCategory.FOUNDATION,
+            cpaPhase = CpaPhase.PICTORIAL,
             isPremium = false,
             prerequisites = listOf("foundation_number_bonds_5"),
             minDifficulty = 2,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.MISSING_NUMBER),
+            preferredRepresentations = listOf(RepresentationType.BOND_MODEL, RepresentationType.NUMBER_LINE),
             rules = DidacticRules.build {
                 range(3, 10)
                 maxResult(10)
                 requireVisualPrompt()
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.BOND_MODEL,
+            commonErrorTypes = listOf(ErrorType.BOND_ERROR),
+            remediationSkill = "foundation_number_bonds_5"
         ),
 
         // === SHAPES & PATTERNS (Leeftijd 5-6) ===
@@ -407,18 +467,22 @@ object ContentRepository {
             name = "Optellen tot 10",
             description = "Optellen van getallen met resultaat tot 10",
             category = SkillCategory.ARITHMETIC,
+            cpaPhase = CpaPhase.MIXED_TRANSFER,
             isPremium = false,
             prerequisites = listOf("foundation_number_bonds_10"),
             minDifficulty = 1,
             maxDifficulty = 3,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
+            preferredRepresentations = listOf(RepresentationType.BOND_MODEL, RepresentationType.SYMBOLS),
             rules = DidacticRules.build {
                 range(1, 9)
                 maxResult(10)
                 minResult(2)
                 requireNoBridge()
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.BOND_MODEL,
+            commonErrorTypes = listOf(ErrorType.BOND_ERROR, ErrorType.CALCULATION_ERROR),
+            remediationSkill = "foundation_number_bonds_10"
         ),
 
         SkillContentConfig(
@@ -483,11 +547,13 @@ object ContentRepository {
             name = "Brug over 10 (optellen)",
             description = "Optellen met brug over 10",
             category = SkillCategory.ARITHMETIC,
+            cpaPhase = CpaPhase.MIXED_TRANSFER,
             isPremium = false,
             prerequisites = listOf("arithmetic_add_20", "foundation_splits_10"),
             minDifficulty = 3,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.TYPED_NUMERIC, ExerciseType.MISSING_NUMBER, ExerciseType.VISUAL_GROUPS),
+            preferredRepresentations = listOf(RepresentationType.BOND_MODEL, RepresentationType.NUMBER_LINE, RepresentationType.SYMBOLS),
             rules = DidacticRules.build {
                 range(2, 9)
                 maxResult(18)
@@ -495,7 +561,9 @@ object ContentRepository {
                 requireBridgeThroughTen()
                 bothOperandsUnder(10)
             },
-            hintStrategy = HintStrategy.STEP_BY_STEP
+            hintStrategy = HintStrategy.STEP_BY_STEP,
+            commonErrorTypes = listOf(ErrorType.BRIDGE_10_ERROR, ErrorType.BOND_ERROR),
+            remediationSkill = "foundation_number_bonds_10"
         ),
 
         SkillContentConfig(
@@ -685,17 +753,20 @@ object ContentRepository {
             name = "Vermenigvuldigen als Groepjes",
             description = "Groepjes tellen als introductie tot vermenigvuldigen",
             category = SkillCategory.ADVANCED,
+            cpaPhase = CpaPhase.CONCRETE,
             isPremium = false,
             prerequisites = listOf("patterns_doubles", "patterns_count_2"),
             minDifficulty = 3,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
+            preferredRepresentations = listOf(RepresentationType.GROUPS, RepresentationType.ARRAY),
             rules = DidacticRules.build {
                 range(2, 5)
                 maxGroups(5)
                 maxPerGroup(5)
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.VISUAL,
+            commonErrorTypes = listOf(ErrorType.GROUPING_ERROR, ErrorType.COUNTING_ERROR)
         ),
 
         SkillContentConfig(
@@ -722,16 +793,20 @@ object ContentRepository {
             name = "Tafel van 2",
             description = "De tafel van 2",
             category = SkillCategory.ADVANCED,
+            cpaPhase = CpaPhase.MIXED_TRANSFER,
             isPremium = false,
             prerequisites = listOf("advanced_groups", "patterns_count_2"),
             minDifficulty = 3,
             maxDifficulty = 5,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC, ExerciseType.MISSING_NUMBER),
+            preferredRepresentations = listOf(RepresentationType.ARRAY, RepresentationType.GROUPS, RepresentationType.SYMBOLS),
             rules = DidacticRules.build {
                 range(1, 10)
                 exactMultiplier(2)
             },
-            hintStrategy = HintStrategy.VISUAL
+            hintStrategy = HintStrategy.VISUAL,
+            commonErrorTypes = listOf(ErrorType.GROUPING_ERROR, ErrorType.SEQUENCE_ERROR),
+            remediationSkill = "advanced_groups"
         ),
 
         SkillContentConfig(
