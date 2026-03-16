@@ -525,11 +525,6 @@ object ContentRepository {
             minDifficulty = 1,
             maxDifficulty = 3,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC),
-            rules = DidacticRules.build {
-                range(1, 10)
-                minResult(1)
-                requireNoBridge()
-            },
             preferredRepresentations = listOf(RepresentationType.BOND_MODEL, RepresentationType.NUMBER_LINE, RepresentationType.SYMBOLS),
             rules = DidacticRules.build {
                 range(1, 10)

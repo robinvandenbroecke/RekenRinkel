@@ -29,7 +29,12 @@ class ExerciseEngine {
         
         return when (skillId) {
             // FOUNDATION
+            "foundation_subitize_5" -> generateNumberImages(config, clampedDifficulty)
             "foundation_number_images_5" -> generateNumberImages(config, clampedDifficulty)
+            "foundation_counting" -> generateNumberImages(config, clampedDifficulty)
+            "foundation_number_bonds_5" -> generateSplits(config, clampedDifficulty, 5)
+            "foundation_number_bonds_10" -> generateSplits(config, clampedDifficulty, 10)
+            "foundation_number_bonds_20" -> generateSplits(config, clampedDifficulty, 20)
             "foundation_splits_10" -> generateSplits(config, clampedDifficulty, 10)
             "foundation_splits_20" -> generateSplits(config, clampedDifficulty, 20)
             

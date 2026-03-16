@@ -7,6 +7,7 @@ import com.rekenrinkel.domain.model.Profile
 import com.rekenrinkel.domain.model.Rewards
 import com.rekenrinkel.domain.model.StartingBand
 import com.rekenrinkel.domain.model.Theme
+import com.rekenrinkel.domain.model.Badge
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
@@ -32,11 +33,7 @@ class ProfileRepository(
             name = name,
             age = age,
             theme = theme,
-            currentLevel = 1,
-            totalXp = 0,
-            currentStreak = 0,
-            longestStreak = 0,
-            lastSessionDate = null,
+            rewards = Rewards(),
             placementCompleted = false,
             startingBand = startingBand
         )
@@ -51,9 +48,9 @@ class ProfileRepository(
     }
 
     suspend fun completePlacement(profileId: String) {
-        val current = profileDao.getProfileSync() ?: return
+        val current = profileDao.getProfileSync()?.toProfile() ?: return
         val updated = current.copy(placementCompleted = true)
-        profileDao.updateProfile(updated)
+        profileDao.updateProfile(updated.toEntity())
     }
 
     suspend fun clearAll() {
@@ -62,10 +59,6 @@ class ProfileRepository(
 
     // ============ PLACEMENT METHODS ============
 
-    /**
-     * Bepaal startband op basis van leeftijd
-     * Dit is de initiale inschatting, placement test verfijnt dit
-     */
     fun determineStartingBand(age: Int): StartingBand {
         return when (age) {
             in 5..6 -> StartingBand.FOUNDATION
@@ -74,10 +67,6 @@ class ProfileRepository(
         }
     }
 
-    /**
-     * Genereer placement items op basis van startband
-     * 6-10 items om het werkelijke niveau te bepalen
-     */
     fun getPlacementSkills(band: StartingBand): List<String> {
         return when (band) {
             StartingBand.FOUNDATION -> listOf(
@@ -108,56 +97,34 @@ class ProfileRepository(
 
     // ============ REWARDS METHODS ============
 
-    /**
-     * Haal huidige rewards op (van profile)
-     */
     suspend fun getRewards(): Rewards {
-        val profile = profileDao.getProfileSync()
-            ?: return Rewards()
-
-        return Rewards(
-            totalXp = profile.totalXp,
-            currentLevel = profile.currentLevel,
-            currentStreak = profile.currentStreak,
-            longestStreak = profile.longestStreak,
-            lastSessionDate = profile.lastSessionDate
-        )
+        return getProfileSync()?.rewards ?: Rewards()
     }
 
-    /**
-     * Update rewards
-     */
     suspend fun updateRewards(rewards: Rewards) {
-        val current = profileDao.getProfileSync() ?: return
-
-        val updated = current.copy(
-            totalXp = rewards.totalXp,
-            currentLevel = rewards.currentLevel,
-            currentStreak = rewards.currentStreak,
-            longestStreak = rewards.longestStreak,
-            lastSessionDate = rewards.lastSessionDate
-        )
-        profileDao.updateProfile(updated)
+        val current = getProfileSync() ?: return
+        val updated = current.copy(rewards = rewards)
+        profileDao.updateProfile(updated.toEntity())
     }
 
-    /**
-     * Voeg XP toe en update level
-     */
     suspend fun addXp(amount: Int): Rewards {
-        val current = getRewards()
-        val newRewards = current.addXp(amount)
-        updateRewards(newRewards)
-        return newRewards
+        val current = getProfileSync() ?: return Rewards()
+        val updated = current.addXp(amount)
+        profileDao.updateProfile(updated.toEntity())
+        return updated.rewards
     }
 
-    /**
-     * Update daily streak
-     */
     suspend fun updateStreak(): Rewards {
-        val current = getRewards()
-        val newRewards = current.updateStreak()
-        updateRewards(newRewards)
-        return newRewards
+        val current = getProfileSync() ?: return Rewards()
+        val updated = current.updateStreak()
+        profileDao.updateProfile(updated.toEntity())
+        return updated.rewards
+    }
+
+    suspend fun addBadge(badge: Badge) {
+        val current = getProfileSync() ?: return
+        val updated = current.copy(rewards = current.rewards.addBadge(badge))
+        profileDao.updateProfile(updated.toEntity())
     }
 
     // ============ MAPPERS ============
@@ -169,11 +136,13 @@ class ProfileRepository(
             age = age,
             theme = Theme.valueOf(theme),
             createdAt = System.currentTimeMillis(),
-            currentLevel = currentLevel,
-            totalXp = totalXp,
-            currentStreak = currentStreak,
-            longestStreak = longestStreak,
-            lastSessionDate = lastSessionDate,
+            rewards = Rewards(
+                totalXp = totalXp,
+                currentLevel = currentLevel,
+                currentStreak = currentStreak,
+                longestStreak = longestStreak,
+                lastSessionDate = lastSessionDate
+            ),
             placementCompleted = placementCompleted,
             startingBand = StartingBand.valueOf(startingBand)
         )
@@ -185,11 +154,11 @@ class ProfileRepository(
             name = name,
             age = age,
             theme = theme.name,
-            currentLevel = currentLevel,
-            totalXp = totalXp,
-            currentStreak = currentStreak,
-            longestStreak = longestStreak,
-            lastSessionDate = lastSessionDate,
+            currentLevel = rewards.currentLevel,
+            totalXp = rewards.totalXp,
+            currentStreak = rewards.currentStreak,
+            longestStreak = rewards.longestStreak,
+            lastSessionDate = rewards.lastSessionDate,
             placementCompleted = placementCompleted,
             startingBand = startingBand.name
         )

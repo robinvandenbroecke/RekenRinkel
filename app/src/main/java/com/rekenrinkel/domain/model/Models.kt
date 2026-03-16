@@ -1,6 +1,7 @@
 package com.rekenrinkel.domain.model
 
 import com.rekenrinkel.domain.content.ContentRepository
+import com.rekenrinkel.domain.model.Rewards
 import java.io.Serializable
 import java.util.UUID
 
@@ -14,7 +15,7 @@ enum class Theme {
 }
 
 /**
- * Gebruikersprofiel
+ * Gebruikersprofiel - Canonical model met Rewards
  */
 data class Profile(
     val id: String = UUID.randomUUID().toString(),
@@ -22,18 +23,24 @@ data class Profile(
     val age: Int = 6,
     val theme: Theme = Theme.DINOSAURS,
     val createdAt: Long = System.currentTimeMillis(),
-    // Rewards fields
-    val currentLevel: Int = 1,
-    val totalXp: Int = 0,
-    val currentStreak: Int = 0,
-    val longestStreak: Int = 0,
-    val lastSessionDate: Long? = null,
+    // Rewards via Rewards class
+    val rewards: Rewards = Rewards(),
     // Placement fields
     val placementCompleted: Boolean = false,
     val startingBand: StartingBand = StartingBand.FOUNDATION
 ) : Serializable {
-    fun xpForNextLevel(): Int = currentLevel * 150
-    fun xpProgress(): Float = (totalXp % xpForNextLevel()).toFloat() / xpForNextLevel()
+    // Delegated properties voor backwards compatibility
+    val currentLevel: Int get() = rewards.currentLevel
+    val totalXp: Int get() = rewards.totalXp
+    val currentStreak: Int get() = rewards.currentStreak
+    val longestStreak: Int get() = rewards.longestStreak
+    val lastSessionDate: Long? get() = rewards.lastSessionDate
+    
+    fun xpForNextLevel(): Int = rewards.xpForNextLevel()
+    fun xpProgress(): Float = rewards.xpProgress()
+    
+    fun addXp(amount: Int): Profile = copy(rewards = rewards.addXp(amount))
+    fun updateStreak(): Profile = copy(rewards = rewards.updateStreak())
 }
 
 /**
