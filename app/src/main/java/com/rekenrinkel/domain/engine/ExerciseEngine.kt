@@ -2,6 +2,7 @@ package com.rekenrinkel.domain.engine
 
 import com.rekenrinkel.domain.content.ContentRepository
 import com.rekenrinkel.domain.content.DidacticRule
+import com.rekenrinkel.domain.content.ErrorType
 import com.rekenrinkel.domain.model.*
 import kotlin.math.max
 import kotlin.math.min
