@@ -8,23 +8,25 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 ## Wat er is
 
 ### Kernarchitectuur
-- **Placement verplicht** vóór normaal leerpad
-- **LessonEngine** als primaire leermotor
+- **Placement verplicht** vóór normaal leerpad (PATCH 2)
+- **LessonEngine** als EXCLUSIEVE leermotor (PATCH 3)
 - **CPA-fases** sturen representatie en oefeningstype
 - **Fouttype-remediëring** gekoppeld aan representaties
 - **Rewards** gekoppeld aan mastery (XP + sterren)
 - 100% offline, lokale Room database
 
-### Placement
-- 5 diagnostische items bij eerste start
-- Bepaalt start cluster op basis van prestaties
+### Placement (PATCH 2)
+- 6-8 diagnostische items bij eerste start
+- Echte analyse van antwoorden en response tijd
+- Bepaalt start cluster, focus skills, CPA-fase
 - Leeftijd = bias, placement resultaat = startniveau
 - Geen normaal leerpad zonder placement
 
-### LessonEngine (primaire leermotor)
+### LessonEngine (EXCLUSIEVE leermotor - PATCH 3)
 - 10 items per les: Warm-up (2), Focus (4), Review (2), Challenge (2)
 - Didactische flow: Worked example → Guided → Independent
 - **SessionEngine** is helper/uitgelijnd, geen parallel curriculum
+- Geen fallback - LessonEngine bepaalt alles
 
 ### CPA-fases (afdwingbaar)
 - CONCRETE → PICTORIAL: 60% mastery + 5 attempts
