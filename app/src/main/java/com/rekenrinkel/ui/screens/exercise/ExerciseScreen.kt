@@ -29,6 +29,7 @@ fun ExerciseScreen(
     onSkip: () -> Unit,
     onFeedbackComplete: () -> Unit,
     onExerciseShown: () -> Unit = {},
+    onContinueWorkedExample: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var typedAnswer by remember { mutableStateOf("") }
@@ -306,7 +307,7 @@ private fun AnswerContent(
         }
 
         ExerciseType.WORKED_EXAMPLE -> {
-            // Toon uitleg + voorbeeld + knop "verder"
+            // Toon uitleg + voorbeeld + knop "verder" - geen validatie nodig
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -324,7 +325,7 @@ private fun AnswerContent(
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 Button(
-                    onClick = { onConfirmTyped() },
+                    onClick = { onContinueWorkedExample() },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Begrepen! Verder →")
@@ -364,15 +365,14 @@ private fun AnswerContent(
                         }
                     },
                     onConfirm = {
-                    if (enabled && typedAnswer.isNotEmpty()) {
-                        onConfirmTyped()
-                    }
-                },
-                currentValue = typedAnswer
-            )
+                        if (enabled && typedAnswer.isNotEmpty()) {
+                            onConfirmTyped()
+                        }
+                    },
+                    currentValue = typedAnswer
+                )
+            }
         }
-    }
-}
 }
 
 private fun handleAnswer(

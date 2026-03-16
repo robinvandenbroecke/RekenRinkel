@@ -63,7 +63,8 @@ class LessonViewModel(
                         lastAnswerCorrect = null,
                         currentPhase = determinePhase(0, lessonPlan),
                         xpEarnedThisLesson = 0,
-                        badgesEarnedThisLesson = emptyList()
+                        badgesEarnedThisLesson = emptyList(),
+                        lessonPlan = lessonPlan
                     )
                 }
 
@@ -154,6 +155,52 @@ class LessonViewModel(
                         difficultyChanged = if (outcome.difficultyChanged) outcome.newDifficultyTier else null
                     )
                 }
+
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isProcessing = false, error = e.message) }
+            }
+        }
+    }
+
+    /**
+     * Ga verder bij WORKED_EXAMPLE - geen validatie, alleen logging
+     */
+    fun continueWorkedExample() {
+        val state = _uiState.value
+        val currentExercise = state.currentExercise ?: return
+
+        // Guard: alleen voor WORKED_EXAMPLE
+        if (currentExercise.type != com.rekenrinkel.domain.model.ExerciseType.WORKED_EXAMPLE) return
+
+        _uiState.update { it.copy(isProcessing = true) }
+
+        viewModelScope.launch {
+            try {
+                // Minimale logging zonder answer-validatie
+                val workedResult = DetailedExerciseResult(
+                    exerciseId = currentExercise.id,
+                    skillId = currentExercise.skillId,
+                    isCorrect = true, // WORKED_EXAMPLE telt altijd als "gezien"
+                    responseTimeMs = System.currentTimeMillis() - exerciseStartTime,
+                    givenAnswer = "[worked_example_viewed]",
+                    correctAnswer = currentExercise.correctAnswer,
+                    difficultyTier = currentExercise.difficulty,
+                    representationUsed = "WORKED_EXAMPLE"
+                )
+
+                // Sla op in results
+                val newResults = state.results + workedResult
+                _uiState.update {
+                    it.copy(
+                        results = newResults,
+                        showFeedback = false, // Geen feedback overlay voor worked example
+                        lastAnswerCorrect = null,
+                        isProcessing = false
+                    )
+                }
+
+                // Direct doorgaan naar volgende oefening
+                nextExercise()
 
             } catch (e: Exception) {
                 _uiState.update { it.copy(isProcessing = false, error = e.message) }

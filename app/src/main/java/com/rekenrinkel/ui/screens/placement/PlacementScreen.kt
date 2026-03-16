@@ -48,17 +48,21 @@ fun PlacementScreen(
     ) {
         if (isComplete) {
             // Completing state - toon analyse
+            // PATCH 5: Pass placement items voor cluster-analyse
+            val placementResults = results.mapIndexed { index, (isCorrect, responseTime) ->
+                com.rekenrinkel.domain.model.PlacementResult(
+                    skillId = placementItems.getOrNull(index)?.skillId ?: "",
+                    isCorrect = isCorrect,
+                    responseTimeMs = responseTime,
+                    givenAnswer = if (isCorrect) "correct" else "incorrect",
+                    correctAnswer = "correct"
+                )
+            }
+            
             val analysis = placementEngine.analyzePlacement(
                 profile.startingBand,
-                results.mapIndexed { index, (isCorrect, responseTime) ->
-                    com.rekenrinkel.domain.model.PlacementResult(
-                        skillId = placementItems.getOrNull(index)?.skillId ?: "",
-                        isCorrect = isCorrect,
-                        responseTimeMs = responseTime,
-                        givenAnswer = if (isCorrect) "correct" else "incorrect",
-                        correctAnswer = "correct"
-                    )
-                }
+                placementResults,
+                placementItems  // Pass items voor cluster context
             )
             
             Text(
@@ -94,6 +98,29 @@ fun PlacementScreen(
                 text = "Focus: ${analysis.startSkills.take(2).joinToString(", ")}",
                 style = MaterialTheme.typography.bodyMedium
             )
+            
+            // PATCH 5: Toon cluster scores
+            if (analysis.clusterScores.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Vaardigheidsclusters:",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                
+                analysis.clusterScores.forEach { (area, score) ->
+                    val emoji = when (score.recommendation) {
+                        PlacementEngine.ClusterRecommendation.STRONG -> "✅"
+                        PlacementEngine.ClusterRecommendation.DEVELOPING -> "📈"
+                        PlacementEngine.ClusterRecommendation.NEEDS_WORK -> "🎯"
+                    }
+                    val cpaPhase = analysis.cpaPreferencePerCluster[area]?.name?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Mixed"
+                    
+                    Text(
+                        text = "$emoji ${area.name}: ${(score.accuracy * 100).toInt()}% ($cpaPhase)",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
             
             if (analysis.weakAreas.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))

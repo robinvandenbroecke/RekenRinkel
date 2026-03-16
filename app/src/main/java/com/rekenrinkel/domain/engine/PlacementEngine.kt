@@ -235,31 +235,68 @@ class PlacementEngine {
     }
 
     /**
-     * Analyseer placement resultaten per vaardigheidscluster
+     * PATCH 5: Analyseer placement resultaten per vaardigheidscluster met scores
      */
     fun analyzePlacement(
         band: StartingBand,
-        results: List<PlacementResult>
+        results: List<PlacementResult>,
+        items: List<PlacementItem> = emptyList()  // Optioneel: originele items voor context
     ): PlacementAnalysis {
         // Groepeer resultaten per skill area
-        val areaResults = results.groupBy { itemForResult(it)?.skillArea ?: SkillArea.NUMBER_SENSE }
-        
-        // Bereken accuracy per area
-        val areaAccuracy = areaResults.mapValues { (_, items) ->
-            items.count { it.isCorrect }.toFloat() / items.size
+        val areaResults = results.groupBy { result ->
+            items.find { it.skillId == result.skillId }?.skillArea 
+                ?: itemForResult(result)?.skillArea 
+                ?: SkillArea.NUMBER_SENSE
         }
+        
+        // Bereken gedetailleerde cluster scores
+        val clusterScores = areaResults.map { (area, areaResults) ->
+            val correct = areaResults.count { it.isCorrect }
+            val total = areaResults.size
+            val accuracy = if (total > 0) correct.toFloat() / total else 0f
+            val avgTime = if (areaResults.isNotEmpty()) 
+                areaResults.map { it.responseTimeMs }.average().toLong() 
+            else 0L
+            
+            val recommendation = when {
+                accuracy >= 0.7f -> ClusterRecommendation.STRONG
+                accuracy >= 0.4f -> ClusterRecommendation.DEVELOPING
+                else -> ClusterRecommendation.NEEDS_WORK
+            }
+            
+            area to ClusterScore(
+                skillArea = area,
+                correct = correct,
+                total = total,
+                accuracy = accuracy,
+                avgResponseTimeMs = avgTime,
+                recommendation = recommendation
+            )
+        }.toMap()
+        
+        // Bereken accuracy per area (voor backwards compat)
+        val areaAccuracy = clusterScores.mapValues { it.value.accuracy }
         
         val overallAccuracy = results.count { it.isCorrect }.toFloat() / results.size
         val avgResponseTime = results.map { it.responseTimeMs }.average()
         
         // Bepaal zwakke en sterke areas
-        val weakAreas = areaAccuracy.filter { it.value < 0.5 }.keys.toList()
-        val strongAreas = areaAccuracy.filter { it.value >= 0.7 }.keys.toList()
+        val weakAreas = clusterScores.filter { it.value.recommendation == ClusterRecommendation.NEEDS_WORK }.keys.toList()
+        val strongAreas = clusterScores.filter { it.value.recommendation == ClusterRecommendation.STRONG }.keys.toList()
+        
+        // PATCH 5: CPA voorkeur per cluster
+        val cpaPreferencePerCluster = clusterScores.mapValues { (_, score) ->
+            when (score.recommendation) {
+                ClusterRecommendation.STRONG -> CpaPhase.ABSTRACT
+                ClusterRecommendation.DEVELOPING -> CpaPhase.PICTORIAL
+                ClusterRecommendation.NEEDS_WORK -> CpaPhase.CONCRETE
+            }
+        }
 
         return when (band) {
-            StartingBand.FOUNDATION -> analyzeFoundation(overallAccuracy, avgResponseTime, areaAccuracy, weakAreas, strongAreas)
-            StartingBand.EARLY_ARITHMETIC -> analyzeEarlyArithmetic(overallAccuracy, avgResponseTime, areaAccuracy, weakAreas, strongAreas)
-            StartingBand.EXTENDED -> analyzeExtended(overallAccuracy, avgResponseTime, areaAccuracy, weakAreas, strongAreas)
+            StartingBand.FOUNDATION -> analyzeFoundation(overallAccuracy, avgResponseTime, areaAccuracy, weakAreas, strongAreas, clusterScores, cpaPreferencePerCluster)
+            StartingBand.EARLY_ARITHMETIC -> analyzeEarlyArithmetic(overallAccuracy, avgResponseTime, areaAccuracy, weakAreas, strongAreas, clusterScores, cpaPreferencePerCluster)
+            StartingBand.EXTENDED -> analyzeExtended(overallAccuracy, avgResponseTime, areaAccuracy, weakAreas, strongAreas, clusterScores, cpaPreferencePerCluster)
         }
     }
 
@@ -268,7 +305,9 @@ class PlacementEngine {
         avgResponseTime: Double,
         areaAccuracy: Map<SkillArea, Float>,
         weakAreas: List<SkillArea>,
-        strongAreas: List<SkillArea>
+        strongAreas: List<SkillArea>,
+        clusterScores: Map<SkillArea, ClusterScore> = emptyMap(),
+        cpaPreferencePerCluster: Map<SkillArea, CpaPhase> = emptyMap()
     ): PlacementAnalysis {
         return when {
             accuracy >= 0.8 && avgResponseTime < 5000 -> PlacementAnalysis(
@@ -277,7 +316,9 @@ class PlacementEngine {
                 startCpaPhase = CpaPhase.PICTORIAL,
                 difficultyOffset = 1,
                 weakAreas = emptyList(),
-                strongAreas = listOf(SkillArea.NUMBER_SENSE, SkillArea.COMPARISON)
+                strongAreas = listOf(SkillArea.NUMBER_SENSE, SkillArea.COMPARISON),
+                clusterScores = clusterScores,
+                cpaPreferencePerCluster = cpaPreferencePerCluster
             )
             accuracy >= 0.5 -> PlacementAnalysis(
                 recommendedBand = StartingBand.FOUNDATION,
@@ -285,7 +326,9 @@ class PlacementEngine {
                 startCpaPhase = CpaPhase.CONCRETE,
                 difficultyOffset = 1,
                 weakAreas = weakAreas,
-                strongAreas = strongAreas
+                strongAreas = strongAreas,
+                clusterScores = clusterScores,
+                cpaPreferencePerCluster = cpaPreferencePerCluster
             )
             else -> PlacementAnalysis(
                 recommendedBand = StartingBand.FOUNDATION,
@@ -293,7 +336,9 @@ class PlacementEngine {
                 startCpaPhase = CpaPhase.CONCRETE,
                 difficultyOffset = 0,
                 weakAreas = weakAreas,
-                strongAreas = emptyList()
+                strongAreas = emptyList(),
+                clusterScores = clusterScores,
+                cpaPreferencePerCluster = cpaPreferencePerCluster
             )
         }
     }
@@ -303,7 +348,9 @@ class PlacementEngine {
         avgResponseTime: Double,
         areaAccuracy: Map<SkillArea, Float>,
         weakAreas: List<SkillArea>,
-        strongAreas: List<SkillArea>
+        strongAreas: List<SkillArea>,
+        clusterScores: Map<SkillArea, ClusterScore> = emptyMap(),
+        cpaPreferencePerCluster: Map<SkillArea, CpaPhase> = emptyMap()
     ): PlacementAnalysis {
         return when {
             accuracy >= 0.75 && avgResponseTime < 6000 -> PlacementAnalysis(
@@ -312,7 +359,9 @@ class PlacementEngine {
                 startCpaPhase = CpaPhase.CONCRETE,
                 difficultyOffset = 1,
                 weakAreas = emptyList(),
-                strongAreas = listOf(SkillArea.ARITHMETIC)
+                strongAreas = listOf(SkillArea.ARITHMETIC),
+                clusterScores = clusterScores,
+                cpaPreferencePerCluster = cpaPreferencePerCluster
             )
             accuracy >= 0.5 -> PlacementAnalysis(
                 recommendedBand = StartingBand.EARLY_ARITHMETIC,
@@ -320,7 +369,9 @@ class PlacementEngine {
                 startCpaPhase = CpaPhase.MIXED_TRANSFER,
                 difficultyOffset = 1,
                 weakAreas = weakAreas,
-                strongAreas = strongAreas
+                strongAreas = strongAreas,
+                clusterScores = clusterScores,
+                cpaPreferencePerCluster = cpaPreferencePerCluster
             )
             else -> PlacementAnalysis(
                 recommendedBand = StartingBand.FOUNDATION,
@@ -328,7 +379,9 @@ class PlacementEngine {
                 startCpaPhase = CpaPhase.CONCRETE,
                 difficultyOffset = 0,
                 weakAreas = weakAreas,
-                strongAreas = emptyList()
+                strongAreas = emptyList(),
+                clusterScores = clusterScores,
+                cpaPreferencePerCluster = cpaPreferencePerCluster
             )
         }
     }
@@ -338,7 +391,9 @@ class PlacementEngine {
         avgResponseTime: Double,
         areaAccuracy: Map<SkillArea, Float>,
         weakAreas: List<SkillArea>,
-        strongAreas: List<SkillArea>
+        strongAreas: List<SkillArea>,
+        clusterScores: Map<SkillArea, ClusterScore> = emptyMap(),
+        cpaPreferencePerCluster: Map<SkillArea, CpaPhase> = emptyMap()
     ): PlacementAnalysis {
         return when {
             accuracy >= 0.7 && avgResponseTime < 7000 -> PlacementAnalysis(
@@ -347,7 +402,9 @@ class PlacementEngine {
                 startCpaPhase = CpaPhase.ABSTRACT,
                 difficultyOffset = 2,
                 weakAreas = emptyList(),
-                strongAreas = listOf(SkillArea.MULTIPLICATION, SkillArea.PLACE_VALUE)
+                strongAreas = listOf(SkillArea.MULTIPLICATION, SkillArea.PLACE_VALUE),
+                clusterScores = clusterScores,
+                cpaPreferencePerCluster = cpaPreferencePerCluster
             )
             accuracy >= 0.5 -> PlacementAnalysis(
                 recommendedBand = StartingBand.EXTENDED,
@@ -355,7 +412,9 @@ class PlacementEngine {
                 startCpaPhase = CpaPhase.CONCRETE,
                 difficultyOffset = 1,
                 weakAreas = weakAreas,
-                strongAreas = strongAreas
+                strongAreas = strongAreas,
+                clusterScores = clusterScores,
+                cpaPreferencePerCluster = cpaPreferencePerCluster
             )
             else -> PlacementAnalysis(
                 recommendedBand = StartingBand.EARLY_ARITHMETIC,
@@ -363,7 +422,9 @@ class PlacementEngine {
                 startCpaPhase = CpaPhase.PICTORIAL,
                 difficultyOffset = 0,
                 weakAreas = weakAreas,
-                strongAreas = emptyList()
+                strongAreas = emptyList(),
+                clusterScores = clusterScores,
+                cpaPreferencePerCluster = cpaPreferencePerCluster
             )
         }
     }
@@ -414,6 +475,27 @@ class PlacementEngine {
         val difficultyOffset: Int,
         val weakAreas: List<SkillArea> = emptyList(),
         val strongAreas: List<SkillArea> = emptyList(),
-        val focusSkills: List<String> = startSkills  // Alias voor consistentie
+        val focusSkills: List<String> = startSkills,  // Alias voor consistentie
+        // PATCH 5: Cluster scores voor gedetailleerde analyse
+        val clusterScores: Map<SkillArea, ClusterScore> = emptyMap(),
+        val cpaPreferencePerCluster: Map<SkillArea, CpaPhase> = emptyMap()
     )
+    
+    /**
+     * PATCH 5: Cluster score met diagnostische info
+     */
+    data class ClusterScore(
+        val skillArea: SkillArea,
+        val correct: Int,
+        val total: Int,
+        val accuracy: Float,
+        val avgResponseTimeMs: Long,
+        val recommendation: ClusterRecommendation
+    )
+    
+    enum class ClusterRecommendation {
+        STRONG,      // 70%+ accuracy - start abstract
+        DEVELOPING,  // 40-70% accuracy - start pictorial
+        NEEDS_WORK   // <40% accuracy - start concrete
+    }
 }

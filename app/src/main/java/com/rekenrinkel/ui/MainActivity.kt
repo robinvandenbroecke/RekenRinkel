@@ -245,19 +245,14 @@ fun RekenRinkelApp() {
                         viewModel.navigation.collectLatest { event ->
                             when (event) {
                                 is LessonNavigationEvent.LessonComplete -> {
+                                    // ROBUST: Eerst data zetten, dan navigeren
+                                    // We gebruiken de huidige entry als carrier voor de data
+                                    navController.currentBackStackEntry?.savedStateHandle?.apply {
+                                        set("result", event.result)
+                                        set("badges", ArrayList(event.badges))
+                                        set("xpTotal", event.xpTotal)
+                                    }
                                     navController.navigate("result")
-                                    navController.currentBackStackEntry?.savedStateHandle?.set(
-                                        "result",
-                                        event.result
-                                    )
-                                    navController.currentBackStackEntry?.savedStateHandle?.set(
-                                        "badges",
-                                        ArrayList(event.badges)
-                                    )
-                                    navController.currentBackStackEntry?.savedStateHandle?.set(
-                                        "xpTotal",
-                                        event.xpTotal
-                                    )
                                 }
                                 is LessonNavigationEvent.BackToHome -> {
                                     navController.navigate("home") {
@@ -298,15 +293,28 @@ fun RekenRinkelApp() {
                             },
                             onSkip = { viewModel.skipExercise() },
                             onFeedbackComplete = { viewModel.nextExercise() },
-                            onExerciseShown = { viewModel.startExerciseTimer() }
+                            onExerciseShown = { viewModel.startExerciseTimer() },
+                            onContinueWorkedExample = { viewModel.continueWorkedExample() }
                         )
                     }
                 }
                 
                 composable("result") {
-                    val result = navController.currentBackStackEntry
-                        ?.savedStateHandle
-                        ?.get<SessionResult>("result")
+                    // ROBUST: Probeer eerst previousBackStackEntry (waar data gezet werd),
+                    // dan current als fallback
+                    val prevEntry = navController.previousBackStackEntry
+                    val currentEntry = navController.currentBackStackEntry
+                    
+                    val result = prevEntry?.savedStateHandle?.get<SessionResult>("result")
+                        ?: currentEntry?.savedStateHandle?.get<SessionResult>("result")
+                    
+                    val badges = prevEntry?.savedStateHandle?.get<ArrayList<com.rekenrinkel.domain.model.Badge>>("badges")
+                        ?: currentEntry?.savedStateHandle?.get<ArrayList<com.rekenrinkel.domain.model.Badge>>("badges")
+                        ?: arrayListOf()
+                    
+                    val xpTotal = prevEntry?.savedStateHandle?.get<Int>("xpTotal")
+                        ?: currentEntry?.savedStateHandle?.get<Int>("xpTotal")
+                        ?: 0
 
                     when {
                         result != null -> {
