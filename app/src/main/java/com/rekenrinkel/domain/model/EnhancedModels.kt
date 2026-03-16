@@ -246,6 +246,4 @@ data class DetailedExerciseResult(
     val timestamp: Long = System.currentTimeMillis()
 ) : Serializable
 
-// Backwards compatibility aliases
-typealias Profile = UserProfile
-typealias ExerciseResult = DetailedExerciseResult
+// Backwards compatibility aliases verwijderd - gebruik expliciet UserProfile en DetailedExerciseResult

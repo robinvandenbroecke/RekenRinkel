@@ -13,8 +13,16 @@ enum class Theme {
     SPACE
 }
 
-// Profile is nu gedefinieerd in EnhancedModels.kt als UserProfile
-// met uitgebreide rewards tracking en typealias Profile = UserProfile
+/**
+ * Gebruikersprofiel
+ */
+data class Profile(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String = "",
+    val age: Int = 6,
+    val theme: Theme = Theme.DINOSAURS,
+    val createdAt: Long = System.currentTimeMillis()
+) : Serializable
 
 /**
  * Mastery levels voor vaardigheden
@@ -114,8 +122,16 @@ enum class VisualType : Serializable {
     COMPARISON
 }
 
-// ExerciseResult is nu gedefinieerd in EnhancedModels.kt als DetailedExerciseResult
-// met uitgebreide velden en typealias ExerciseResult = DetailedExerciseResult
+/**
+ * Resultaat van een individuele oefening
+ */
+data class ExerciseResult(
+    val exerciseId: String,
+    val skillId: String,
+    val isCorrect: Boolean,
+    val responseTimeMs: Long,
+    val givenAnswer: String
+) : Serializable
 
 /**
  * Sessie resultaat

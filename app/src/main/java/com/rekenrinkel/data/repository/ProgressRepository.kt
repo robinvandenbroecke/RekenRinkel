@@ -3,6 +3,7 @@ package com.rekenrinkel.data.repository
 import com.rekenrinkel.data.local.dao.SkillProgressDao
 import com.rekenrinkel.data.local.entity.SkillProgressEntity
 import com.rekenrinkel.domain.model.SkillProgress
+import com.rekenrinkel.domain.engine.ProgressRepositoryInterface
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
@@ -11,9 +12,9 @@ import kotlinx.coroutines.flow.map
  * Repository voor skill progress met enhanced model mapping.
  * Database entity gebruikt nog oude veldnamen, model gebruikt nieuwe.
  */
-open class ProgressRepository(private val skillProgressDao: SkillProgressDao) {
+open class ProgressRepository(private val skillProgressDao: SkillProgressDao) : ProgressRepositoryInterface {
 
-    fun getProgress(skillId: String): Flow<SkillProgress?> {
+    open fun getProgress(skillId: String): Flow<SkillProgress?> {
         return skillProgressDao.getProgress(skillId).map { entity ->
             entity?.let {
                 SkillProgress(

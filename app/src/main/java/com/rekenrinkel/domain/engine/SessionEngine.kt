@@ -3,6 +3,7 @@ package com.rekenrinkel.domain.engine
 import com.rekenrinkel.domain.content.ContentRepository
 import com.rekenrinkel.domain.model.*
 import com.rekenrinkel.data.repository.ProgressRepository
+import com.rekenrinkel.domain.engine.ProgressRepositoryInterface
 import kotlinx.coroutines.flow.first
 
 /**
@@ -11,7 +12,7 @@ import kotlinx.coroutines.flow.first
  */
 class SessionEngine(
     private val exerciseEngine: ExerciseEngine,
-    private val progressRepository: ProgressRepository
+    private val progressRepository: ProgressRepositoryInterface
 ) {
     
     companion object {

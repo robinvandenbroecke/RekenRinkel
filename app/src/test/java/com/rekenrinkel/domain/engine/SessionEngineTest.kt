@@ -200,23 +200,25 @@ class SessionEngineTest {
 }
 
 /**
- * Fake repository for testing
+ * Fake repository for testing - implementeert interface, erft NIET van ProgressRepository
  */
-class FakeProgressRepository : com.rekenrinkel.data.repository.ProgressRepository(
-    com.rekenrinkel.data.local.dao.FakeSkillProgressDao()
-) {
+class FakeProgressRepository : com.rekenrinkel.domain.engine.ProgressRepositoryInterface {
     private val mockProgress = mutableMapOf<String, SkillProgress>()
 
     fun addMockProgress(skillId: String, masteryScore: Int) {
         mockProgress[skillId] = SkillProgress(
             skillId = skillId,
             masteryScore = masteryScore,
-            correctAnswers = masteryScore / 10,
-            wrongAnswers = 10 - masteryScore / 10
+            correctCount = masteryScore / 10,
+            incorrectCount = 10 - masteryScore / 10
         )
     }
 
     override fun getAllProgress(): kotlinx.coroutines.flow.Flow<List<SkillProgress>> {
         return kotlinx.coroutines.flow.flow { emit(mockProgress.values.toList()) }
+    }
+
+    override fun getProgress(skillId: String): kotlinx.coroutines.flow.Flow<SkillProgress?> {
+        return kotlinx.coroutines.flow.flow { emit(mockProgress[skillId]) }
     }
 }
