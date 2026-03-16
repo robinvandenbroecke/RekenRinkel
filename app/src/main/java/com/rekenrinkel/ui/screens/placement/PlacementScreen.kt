@@ -129,7 +129,7 @@ fun PlacementScreen(
             
             Spacer(modifier = Modifier.height(48.dp))
             
-            // Antwoord knoppen
+            // Antwoord knoppen - PATCH: FlowRow vervangen door Columns
             val answers = when {
                 currentItem.correctAnswer.toIntOrNull() != null -> {
                     // Numeriek antwoord
@@ -141,55 +141,43 @@ fun PlacementScreen(
                 }
             }.distinct().shuffled().take(6)
             
-            FlowRow(
+            // Gebruik 2 rows van 3 buttons ipv FlowRow
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                maxItemsInEachRow = 3
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                answers.forEach { answer ->
-                    Button(
-                        onClick = {
-                            val responseTime = System.currentTimeMillis() - startTime
-                            val isCorrect = answer == currentItem.correctAnswer
-                            results.add(isCorrect to responseTime)
-                            
-                            if (currentQuestionIndex < placementItems.size - 1) {
-                                currentQuestionIndex++
-                                startTime = System.currentTimeMillis()
-                            } else {
-                                isComplete = true
-                            }
-                        },
-                        modifier = Modifier
-                            .padding(4.dp)
-                            .size(64.dp)
+                answers.chunked(3).forEach { rowAnswers ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        Text(
-                            text = answer,
-                            style = MaterialTheme.typography.titleMedium
-                        )
+                        rowAnswers.forEach { answer ->
+                            Button(
+                                onClick = {
+                                    val responseTime = System.currentTimeMillis() - startTime
+                                    val isCorrect = answer == currentItem.correctAnswer
+                                    results.add(isCorrect to responseTime)
+                                    
+                                    if (currentQuestionIndex < placementItems.size - 1) {
+                                        currentQuestionIndex++
+                                        startTime = System.currentTimeMillis()
+                                    } else {
+                                        isComplete = true
+                                    }
+                                },
+                                modifier = Modifier
+                                    .padding(4.dp)
+                                    .size(64.dp)
+                            ) {
+                                Text(
+                                    text = answer,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
     }
-}
-
-// Helper composable voor FlowRow (vereist material3)
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-@Composable
-private fun FlowRow(
-    modifier: Modifier = Modifier,
-    horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
-    verticalArrangement: Arrangement.Vertical = Arrangement.Top,
-    maxItemsInEachRow: Int = Int.MAX_VALUE,
-    content: @Composable () -> Unit
-) {
-    androidx.compose.foundation.layout.FlowRow(
-        modifier = modifier,
-        horizontalArrangement = horizontalArrangement,
-        verticalArrangement = verticalArrangement,
-        maxItemsInEachRow = maxItemsInEachRow,
-        content = { content() }
-    )
 }
