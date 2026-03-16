@@ -9,6 +9,7 @@ import com.rekenrinkel.data.repository.ProfileRepository
 import com.rekenrinkel.data.repository.ProgressRepository
 import com.rekenrinkel.domain.engine.ExerciseEngine
 import com.rekenrinkel.domain.engine.ExerciseValidator
+import com.rekenrinkel.domain.engine.LessonEngine
 import com.rekenrinkel.domain.engine.SessionEngine
 
 /**
@@ -34,6 +35,7 @@ class MainViewModelFactory(
             )
             
             val exerciseEngine = ExerciseEngine()
+            val lessonEngine = LessonEngine(exerciseEngine, progressRepository)
             val sessionEngine = SessionEngine(
                 exerciseEngine,
                 progressRepository
@@ -43,6 +45,7 @@ class MainViewModelFactory(
                 profileRepository,
                 progressRepository,
                 exerciseEngine,
+                lessonEngine,
                 sessionEngine,
                 settingsDataStore
             ) as T

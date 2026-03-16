@@ -6,6 +6,7 @@ import com.rekenrinkel.data.datastore.SettingsDataStore
 import com.rekenrinkel.data.repository.ProfileRepository
 import com.rekenrinkel.data.repository.ProgressRepository
 import com.rekenrinkel.domain.engine.ExerciseEngine
+import com.rekenrinkel.domain.engine.LessonEngine
 import com.rekenrinkel.domain.engine.SessionEngine
 import com.rekenrinkel.domain.model.*
 import kotlinx.coroutines.flow.*
@@ -15,7 +16,8 @@ class MainViewModel(
     private val profileRepository: ProfileRepository,
     private val progressRepository: ProgressRepository,
     private val exerciseEngine: ExerciseEngine,
-    private val sessionEngine: SessionEngine,
+    private val lessonEngine: LessonEngine,
+    private val sessionEngine: SessionEngine,  // Helper voor legacy/noodgevallen
     private val settingsDataStore: SettingsDataStore
 ) : ViewModel() {
     
@@ -61,10 +63,32 @@ class MainViewModel(
         }
     }
     
+    /**
+     * PATCH 2: LessonEngine als primaire leermotor
+     * Bouwt didactische les met warm-up, focus, review, challenge
+     */
     fun startSession() {
         viewModelScope.launch {
+            val profile = uiState.value.profile
             val isPremium = uiState.value.isPremiumUnlocked
-            val exercises = sessionEngine.buildSession(isPremium)
+            
+            // Gebruik LessonEngine voor didactische lesopbouw
+            val lessonPlan = profile?.let {
+                lessonEngine.buildLesson(
+                    userProfile = com.rekenrinkel.domain.model.UserProfile(
+                        id = it.id,
+                        name = it.name,
+                        age = it.age,
+                        theme = it.theme,
+                        isPremium = isPremium
+                    ),
+                    isPremiumUnlocked = isPremium
+                )
+            }
+            
+            // Converteer LessonPlan naar exercises voor UI
+            val exercises = lessonPlan?.exercises ?: sessionEngine.buildSession(isPremium)
+            
             _navigation.emit(NavigationEvent.StartSession(exercises))
         }
     }
@@ -164,6 +188,31 @@ class MainViewModel(
             settingsDataStore.setProfileName(name)
             settingsDataStore.setTheme(theme)
             settingsDataStore.setOnboardingCompleted(true)
+            // Niet direct naar home - placement komt eerst
+        }
+    }
+    
+    /**
+     * PATCH 1: Voltooi placement en bepaal startniveau
+     */
+    fun completePlacement() {
+        viewModelScope.launch {
+            val profile = uiState.value.profile ?: return@launch
+            
+            // Simuleer placement analyse (in echte implementatie: gebruik PlacementEngine resultaten)
+            val updated = profile.copy(
+                placementCompleted = true,
+                startingBand = determineStartingBand(profile.age)
+            )
+            profileRepository.updateProfile(updated)
+        }
+    }
+    
+    private fun determineStartingBand(age: Int): com.rekenrinkel.domain.model.StartingBand {
+        return when (age) {
+            in 5..6 -> com.rekenrinkel.domain.model.StartingBand.FOUNDATION
+            in 7..8 -> com.rekenrinkel.domain.model.StartingBand.EARLY_ARITHMETIC
+            else -> com.rekenrinkel.domain.model.StartingBand.EXTENDED
         }
     }
 }

@@ -31,6 +31,7 @@ import com.rekenrinkel.ui.screens.premium.PremiumScreen
 import com.rekenrinkel.ui.screens.profile.ProfileScreen
 import com.rekenrinkel.ui.screens.session.SessionResultScreen
 import com.rekenrinkel.ui.screens.settings.SettingsScreen
+import com.rekenrinkel.ui.screens.placement.PlacementScreen
 import com.rekenrinkel.ui.theme.RekenRinkelTheme
 import com.rekenrinkel.ui.viewmodel.LessonNavigationEvent
 import com.rekenrinkel.ui.viewmodel.LessonViewModel
@@ -84,6 +85,16 @@ fun RekenRinkelApp() {
                     
                     val uiState by viewModel.uiState.collectAsState()
                     
+                    // PATCH 1: Placement verplicht check
+                    LaunchedEffect(uiState.profile) {
+                        if (uiState.profile != null && !uiState.profile.placementCompleted) {
+                            // Redirect naar placement als nog niet voltooid
+                            navController.navigate("placement") {
+                                popUpTo("home") { inclusive = true }
+                            }
+                        }
+                    }
+                    
                     // Handle navigation events
                     LaunchedEffect(Unit) {
                         viewModel.navigation.collectLatest { event ->
@@ -109,6 +120,32 @@ fun RekenRinkelApp() {
                         onOpenProfile = { viewModel.openProfile() },
                         onOpenSettings = { viewModel.openSettings() },
                         onOpenParentDashboard = { viewModel.openParentDashboard() }
+                    )
+                }
+                
+                // PATCH 1: Placement route toegevoegd
+                composable("placement") {
+                    val viewModel: MainViewModel = viewModel(
+                        factory = MainViewModelFactory(context)
+                    )
+                    val uiState by viewModel.uiState.collectAsState()
+                    
+                    // Laat placement zien en redirect naar home als voltooid
+                    LaunchedEffect(uiState.profile?.placementCompleted) {
+                        if (uiState.profile?.placementCompleted == true) {
+                            navController.navigate("home") {
+                                popUpTo("placement") { inclusive = true }
+                            }
+                        }
+                    }
+                    
+                    // Placeholder placement screen - gebruikt exercise engine
+                    PlacementScreen(
+                        profile = uiState.profile,
+                        onPlacementComplete = { viewModel.completePlacement() },
+                        onCancel = { 
+                            // Kan niet cancellen - placement is verplicht
+                        }
                     )
                 }
                 
