@@ -119,6 +119,7 @@ fun RekenRinkelApp() {
                     
                     HomeScreen(
                         profile = uiState.profile,
+                        progress = uiState.progress,
                         onStartSession = { viewModel.startSession() },
                         onOpenProfile = { viewModel.openProfile() },
                         onOpenSettings = { viewModel.openSettings() },

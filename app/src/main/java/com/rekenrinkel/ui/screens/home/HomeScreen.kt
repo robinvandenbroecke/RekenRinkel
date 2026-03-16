@@ -19,6 +19,7 @@ import com.rekenrinkel.ui.theme.AppColors
 @Composable
 fun HomeScreen(
     profile: Profile?,
+    progress: List<com.rekenrinkel.domain.model.SkillProgress> = emptyList(),
     onStartSession: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -55,20 +56,29 @@ fun HomeScreen(
             
             Spacer(modifier = Modifier.height(16.dp))
 
-            // PATCH 5: Leerdoelen sectie met echte data
-            val focusSkill = profile?.placementAnalysisResult?.startSkills?.firstOrNull() 
+            // PATCH 3 & 5: Leerdoelen sectie met echte skill data
+            val focusSkillId = profile?.placementAnalysisResult?.startSkills?.firstOrNull() 
                 ?: "foundation_subitize_5"
-            val cpaPhase = profile?.placementAnalysisResult?.startCpaPhase?.name?.lowercase() 
+            val focusSkillProgress = progress.find { it.skillId == focusSkillId }
+            
+            // Gebruik echte data indien beschikbaar, anders defaults
+            val actualMasteryScore = focusSkillProgress?.masteryScore ?: 0
+            val actualCpaPhase = focusSkillProgress?.currentCpaPhase?.name?.lowercase() 
+                ?: profile?.placementAnalysisResult?.startCpaPhase?.name?.lowercase() 
                 ?: "concrete"
-            val masteryProgress = profile?.rewards?.totalXp?.let { it % 100 }?.toFloat()?.div(100f) 
-                ?: 0.0f
-            val nextSkill = getNextSkill(focusSkill)
+            val masteryProgress = actualMasteryScore / 100f
+            val nextSkillId = getNextSkill(focusSkillId)
+            val nextSkillProgress = progress.find { it.skillId == nextSkillId }
+            val isNextUnlocked = nextSkillProgress?.isUnlocked == true
             
             LearningGoalsCard(
-                focusSkill = formatSkillName(focusSkill),
-                cpaPhase = cpaPhase,
+                focusSkill = formatSkillName(focusSkillId),
+                cpaPhase = actualCpaPhase,
                 masteryProgress = masteryProgress.coerceIn(0f, 1f),
-                nextSkill = formatSkillName(nextSkill)
+                masteryScore = actualMasteryScore,
+                nextSkill = formatSkillName(nextSkillId),
+                isNextUnlocked = isNextUnlocked,
+                isFocusMastered = focusSkillProgress?.isMastered() == true
             )
 
             Spacer(modifier = Modifier.weight(1f))
@@ -203,14 +213,17 @@ private fun ProfileCard(profile: Profile) {
 }
 
 /**
- * PATCH 5: Leerdoelen kaart - toont huidige focus en voortgang
+ * PATCH 3 & 5: Leerdoelen kaart - toont huidige focus en voortgang met echte data
  */
 @Composable
 private fun LearningGoalsCard(
     focusSkill: String,
     cpaPhase: String,
     masteryProgress: Float,
-    nextSkill: String
+    masteryScore: Int,
+    nextSkill: String,
+    isNextUnlocked: Boolean,
+    isFocusMastered: Boolean
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -236,33 +249,62 @@ private fun LearningGoalsCard(
                 style = MaterialTheme.typography.headlineSmall
             )
 
+            // CPA fase indicator
+            val cpaIcon = when (cpaPhase) {
+                "concrete" -> "🧱"
+                "pictorial" -> "🖼️"
+                "abstract" -> "🔢"
+                "mixed_transfer" -> "🔄"
+                else -> "📚"
+            }
             Text(
-                text = "Fase: $cpaPhase",
+                text = "$cpaIcon Fase: $cpaPhase",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Mastery progress
-            LinearProgressIndicator(
-                progress = { masteryProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-            )
+            // Mastery progress met sterren
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                LinearProgressIndicator(
+                    progress = { masteryProgress },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(8.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                // Sterren 0-3 gebaseerd op mastery
+                val stars = when {
+                    masteryScore >= 90 -> "⭐⭐⭐"
+                    masteryScore >= 70 -> "⭐⭐"
+                    masteryScore >= 50 -> "⭐"
+                    else -> ""
+                }
+                if (stars.isNotEmpty()) {
+                    Text(stars, style = MaterialTheme.typography.bodySmall)
+                }
+            }
 
             Text(
-                text = "${(masteryProgress * 100).toInt()}% naar mastery",
-                style = MaterialTheme.typography.labelSmall
+                text = if (isFocusMastered) "✅ Mastered!" else "$masteryScore% naar mastery",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isFocusMastered) MaterialTheme.colorScheme.primary 
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Volgende skill met lock status
+            val lockIcon = if (isNextUnlocked) "➡️" else "🔒"
             Text(
-                text = "➡️ Volgende: $nextSkill",
+                text = "$lockIcon Volgende: $nextSkill",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                color = if (isNextUnlocked) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
             )
         }
     }
