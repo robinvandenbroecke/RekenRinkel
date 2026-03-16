@@ -397,7 +397,7 @@ class LessonEngine(
         val progress = progressMap[focusSkill.id]
         val difficulty = progress?.currentDifficultyTier ?: 1
         
-        // PATCH 3: CPA-overgangen afdwingen
+        // PATCH 4: Echte end-to-end CPA flow voor foundation/optellen cluster
         val config = ContentRepository.getConfig(focusSkill.id)
         val skillCpaPhase = config?.cpaPhase ?: com.rekenrinkel.domain.content.CpaPhase.CONCRETE
         val currentCpaPhase = progress?.currentCpaPhase ?: com.rekenrinkel.domain.content.CpaPhase.CONCRETE
@@ -407,29 +407,76 @@ class LessonEngine(
         
         // Gebruik de strengere van skill-fase en toegestane fase
         val effectiveCpaPhase = minOf(skillCpaPhase, allowedCpaPhase)
+        
+        // Specifieke flow voor foundation/optellen cluster
+        val isFoundationArithmetic = focusSkill.id in setOf(
+            "foundation_number_bonds_5",
+            "foundation_number_bonds_10", 
+            "arithmetic_add_10_concrete",
+            "arithmetic_add_10_pictorial",
+            "arithmetic_add_10_abstract",
+            "arithmetic_sub_10_concrete",
+            "arithmetic_sub_10_pictorial",
+            "arithmetic_sub_10_abstract"
+        )
 
         // DIDACTISCHE STRUCTUUR: worked example -> guided -> independent
-        // Aangepast voor CPA-fase
-        return when (effectiveCpaPhase) {
-            com.rekenrinkel.domain.content.CpaPhase.CONCRETE -> {
-                // Alleen concrete oefeningen, veel scaffolding
+        // Specifiek per CPA-fase en cluster
+        return when {
+            // Speciale behandeling voor foundation/optellen cluster
+            isFoundationArithmetic && effectiveCpaPhase == com.rekenrinkel.domain.content.CpaPhase.CONCRETE -> {
+                // CONCRETE: 1 worked example + 3 guided
+                listOf(
+                    exerciseEngine.generateWorkedExample(focusSkill.id, difficulty),
+                    exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty),
+                    exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty),
+                    exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty)
+                )
+            }
+            isFoundationArithmetic && effectiveCpaPhase == com.rekenrinkel.domain.content.CpaPhase.PICTORIAL -> {
+                // PICTORIAL: 1 worked + 1 guided + 2 independent
+                listOf(
+                    exerciseEngine.generateWorkedExample(focusSkill.id, difficulty),
+                    exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty),
+                    exerciseEngine.generateExercise(focusSkill.id, difficulty),
+                    exerciseEngine.generateExercise(focusSkill.id, difficulty)
+                )
+            }
+            isFoundationArithmetic && effectiveCpaPhase == com.rekenrinkel.domain.content.CpaPhase.ABSTRACT -> {
+                // ABSTRACT: 1 guided + 3 independent (als er al attempts zijn)
+                if (progress != null && progress.totalAttempts() >= 5) {
+                    listOf(
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty),
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty),
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty),
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty)
+                    )
+                } else {
+                    listOf(
+                        exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty),
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty),
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty),
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty)
+                    )
+                }
+            }
+            // Default voor andere skills
+            effectiveCpaPhase == com.rekenrinkel.domain.content.CpaPhase.CONCRETE -> {
                 listOf(
                     exerciseEngine.generateWorkedExample(focusSkill.id, difficulty)
                 ) + (1 until count).map {
                     exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty)
                 }
             }
-            com.rekenrinkel.domain.content.CpaPhase.PICTORIAL -> {
-                // Picturale oefeningen, mix van guided en independent
+            effectiveCpaPhase == com.rekenrinkel.domain.content.CpaPhase.PICTORIAL -> {
                 listOf(
                     exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty)
                 ) + (1 until count).map {
                     exerciseEngine.generateExercise(focusSkill.id, difficulty)
                 }
             }
-            com.rekenrinkel.domain.content.CpaPhase.ABSTRACT,
-            com.rekenrinkel.domain.content.CpaPhase.MIXED_TRANSFER -> {
-                // Abstract, voornamelijk independent
+            else -> {
+                // ABSTRACT/MIXED
                 if (progress == null || progress.totalAttempts() < 3) {
                     listOf(
                         exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty)

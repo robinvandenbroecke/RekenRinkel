@@ -55,12 +55,20 @@ fun HomeScreen(
             
             Spacer(modifier = Modifier.height(16.dp))
 
-            // PATCH 5: Leerdoelen sectie
+            // PATCH 5: Leerdoelen sectie met echte data
+            val focusSkill = profile?.placementAnalysisResult?.startSkills?.firstOrNull() 
+                ?: "foundation_subitize_5"
+            val cpaPhase = profile?.placementAnalysisResult?.startCpaPhase?.name?.lowercase() 
+                ?: "concrete"
+            val masteryProgress = profile?.rewards?.totalXp?.let { it % 100 }?.toFloat()?.div(100f) 
+                ?: 0.0f
+            val nextSkill = getNextSkill(focusSkill)
+            
             LearningGoalsCard(
-                focusSkill = "splitsingen tot 10",  // TODO: uit repository halen
-                cpaPhase = "picturaal",
-                masteryProgress = 0.65f,
-                nextSkill = "brug over 10"
+                focusSkill = formatSkillName(focusSkill),
+                cpaPhase = cpaPhase,
+                masteryProgress = masteryProgress.coerceIn(0f, 1f),
+                nextSkill = formatSkillName(nextSkill)
             )
 
             Spacer(modifier = Modifier.weight(1f))
@@ -257,5 +265,51 @@ private fun LearningGoalsCard(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
         }
+    }
+}
+
+/**
+ * PATCH 5: Helper functie om skill ID naar leesbare naam te converteren
+ */
+private fun formatSkillName(skillId: String): String {
+    return when (skillId) {
+        "foundation_subitize_5" -> "Herkennen tot 5"
+        "foundation_counting" -> "Tellen"
+        "foundation_number_bonds_5" -> "Splitsen tot 5"
+        "foundation_number_bonds_10" -> "Splitsen tot 10"
+        "foundation_more_less" -> "Meer/minder"
+        "arithmetic_add_10_concrete" -> "Optellen tot 10 (concreet)"
+        "arithmetic_add_10_pictorial" -> "Optellen tot 10 (picturaal)"
+        "arithmetic_add_10_abstract" -> "Optellen tot 10 (abstract)"
+        "arithmetic_sub_10_concrete" -> "Aftrekken tot 10 (concreet)"
+        "arithmetic_sub_10_pictorial" -> "Aftrekken tot 10 (picturaal)"
+        "arithmetic_sub_10_abstract" -> "Aftrekken tot 10 (abstract)"
+        "arithmetic_bridge_add" -> "Brug over 10"
+        "patterns_doubles" -> "Dubbelen"
+        "patterns_count_2" -> "Tellen per 2"
+        "advanced_groups" -> "Groepjes"
+        "advanced_table_2" -> "Tafel van 2"
+        "advanced_table_5" -> "Tafel van 5"
+        else -> skillId.replace("_", " ").replaceFirstChar { it.uppercase() }
+    }
+}
+
+/**
+ * PATCH 5: Helper functie om volgende skill te bepalen
+ */
+private fun getNextSkill(currentSkill: String): String {
+    return when (currentSkill) {
+        "foundation_subitize_5" -> "foundation_counting"
+        "foundation_counting" -> "foundation_number_bonds_5"
+        "foundation_number_bonds_5" -> "foundation_number_bonds_10"
+        "foundation_number_bonds_10" -> "arithmetic_add_10_concrete"
+        "arithmetic_add_10_concrete" -> "arithmetic_add_10_pictorial"
+        "arithmetic_add_10_pictorial" -> "arithmetic_add_10_abstract"
+        "arithmetic_add_10_abstract" -> "arithmetic_sub_10_concrete"
+        "arithmetic_sub_10_concrete" -> "arithmetic_bridge_add"
+        "arithmetic_bridge_add" -> "patterns_count_2"
+        "patterns_count_2" -> "advanced_groups"
+        "advanced_groups" -> "advanced_table_2"
+        else -> "Volgende skill"
     }
 }
