@@ -17,6 +17,7 @@ import com.rekenrinkel.ui.components.StarDisplay
 @Composable
 fun SessionResultScreen(
     result: SessionResult,
+    skillProgress: List<com.rekenrinkel.domain.model.SkillProgress> = emptyList(),
     onHome: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
@@ -177,6 +178,82 @@ fun SessionResultScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
             
+            // PATCH 6: Skill mastery informatie
+            if (skillProgress.isNotEmpty()) {
+                val practicedSkillIds = result.exercises.map { it.skillId }.distinct()
+                val practicedSkills = skillProgress.filter { it.skillId in practicedSkillIds }
+                
+                if (practicedSkills.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Text(
+                                text = "📚 Skill voortgang",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            practicedSkills.take(3).forEach { skill ->
+                                val wasMastered = skill.isMastered()
+                                val masteryPercent = skill.masteryScore
+                                val stars = when {
+                                    masteryPercent >= 90 -> "⭐⭐⭐"
+                                    masteryPercent >= 70 -> "⭐⭐"
+                                    masteryPercent >= 50 -> "⭐"
+                                    else -> ""
+                                }
+                                
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = formatSkillName(skill.skillId),
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        LinearProgressIndicator(
+                                            progress = { masteryPercent / 100f },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(4.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (wasMastered) "✅ $stars" else "$masteryPercent% $stars",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                            
+                            // Toon "Les Master" badge als accuracy >= 80%
+                            if (accuracy >= 0.8f) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "🏆 Les Master! (80%+ accuracy)",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+            
             Spacer(modifier = Modifier.weight(1f))
             
             // Actions
@@ -239,5 +316,38 @@ private fun StatCard(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
         }
+    }
+}
+
+/**
+ * PATCH 6: Helper om skill ID naar leesbare naam te converteren
+ */
+private fun formatSkillName(skillId: String): String {
+    return when (skillId) {
+        "foundation_subitize_5" -> "Herkennen tot 5"
+        "foundation_counting" -> "Tellen"
+        "foundation_number_bonds_5" -> "Splitsen tot 5"
+        "foundation_number_bonds_10" -> "Splitsen tot 10"
+        "foundation_compare" -> "Vergelijken"
+        "foundation_more_less" -> "Meer/minder"
+        "foundation_patterns" -> "Patronen"
+        "foundation_sequence" -> "Getalreeksen"
+        "arithmetic_add" -> "Optellen"
+        "arithmetic_sub" -> "Aftrekken"
+        "arithmetic_add_20" -> "Optellen tot 20"
+        "arithmetic_sub_20" -> "Aftrekken tot 20"
+        "arithmetic_bridge" -> "Brug over 10"
+        "patterns_doubles" -> "Dubbelen"
+        "patterns_halves" -> "Helften"
+        "patterns_count_2" -> "Tellen per 2"
+        "patterns_count_5" -> "Tellen per 5"
+        "patterns_count_10" -> "Tellen per 10"
+        "multiplication_groups" -> "Groepjes"
+        "table_2" -> "Tafel van 2"
+        "table_5" -> "Tafel van 5"
+        "table_10" -> "Tafel van 10"
+        "place_value_tens" -> "Tientallen"
+        "comparison_symbol" -> "Vergelijken"
+        else -> skillId.replace("_", " ").replaceFirstChar { it.uppercase() }
     }
 }
