@@ -2,6 +2,7 @@ package com.rekenrinkel.data.repository
 
 import com.rekenrinkel.data.local.dao.SkillProgressDao
 import com.rekenrinkel.data.local.entity.SkillProgressEntity
+import com.rekenrinkel.domain.content.CpaPhase
 import com.rekenrinkel.domain.model.SkillProgress
 import com.rekenrinkel.domain.engine.ProgressRepositoryInterface
 import kotlinx.coroutines.flow.Flow
@@ -21,6 +22,7 @@ open class ProgressRepository(private val skillProgressDao: SkillProgressDao) : 
                     skillId = it.skillId,
                     masteryScore = it.masteryScore,
                     currentDifficultyTier = it.currentDifficulty,
+                    currentCpaPhase = it.currentCpaPhase.toCpaPhase(),
                     correctCount = it.correctAnswers,
                     incorrectCount = it.wrongAnswers,
                     averageResponseTimeMs = it.averageResponseTimeMs,
@@ -42,6 +44,7 @@ open class ProgressRepository(private val skillProgressDao: SkillProgressDao) : 
                     skillId = it.skillId,
                     masteryScore = it.masteryScore,
                     currentDifficultyTier = it.currentDifficulty,
+                    currentCpaPhase = it.currentCpaPhase.toCpaPhase(),
                     correctCount = it.correctAnswers,
                     incorrectCount = it.wrongAnswers,
                     averageResponseTimeMs = it.averageResponseTimeMs,
@@ -63,6 +66,7 @@ open class ProgressRepository(private val skillProgressDao: SkillProgressDao) : 
                 skillId = existing.skillId,
                 masteryScore = existing.masteryScore,
                 currentDifficultyTier = existing.currentDifficulty,
+                currentCpaPhase = existing.currentCpaPhase.toCpaPhase(),
                 correctCount = existing.correctAnswers,
                 incorrectCount = existing.wrongAnswers,
                 averageResponseTimeMs = existing.averageResponseTimeMs,
@@ -128,6 +132,7 @@ open class ProgressRepository(private val skillProgressDao: SkillProgressDao) : 
                 skillId = it.skillId,
                 masteryScore = it.masteryScore,
                 currentDifficultyTier = it.currentDifficulty,
+                currentCpaPhase = it.currentCpaPhase.toCpaPhase(),
                 correctCount = it.correctAnswers,
                 incorrectCount = it.wrongAnswers,
                 averageResponseTimeMs = it.averageResponseTimeMs,
@@ -147,6 +152,7 @@ open class ProgressRepository(private val skillProgressDao: SkillProgressDao) : 
                 skillId = it.skillId,
                 masteryScore = it.masteryScore,
                 currentDifficultyTier = it.currentDifficulty,
+                currentCpaPhase = it.currentCpaPhase.toCpaPhase(),
                 correctCount = it.correctAnswers,
                 incorrectCount = it.wrongAnswers,
                 averageResponseTimeMs = it.averageResponseTimeMs,
@@ -160,6 +166,26 @@ open class ProgressRepository(private val skillProgressDao: SkillProgressDao) : 
         }
     }
 
+    // PATCH 4: Update CPA fase voor een skill
+    suspend fun updateCpaPhase(skillId: String, newPhase: CpaPhase) {
+        val current = getOrCreateProgress(skillId)
+        val updated = current.copy(currentCpaPhase = newPhase)
+        skillProgressDao.updateProgress(updated.toEntity())
+    }
+
+    // PATCH 4: Bepaal volgende CPA fase gebaseerd op mastery
+    fun determineNextCpaPhase(currentPhase: CpaPhase, masteryScore: Int, attempts: Int): CpaPhase {
+        return when (currentPhase) {
+            CpaPhase.CONCRETE -> 
+                if (masteryScore >= 60 && attempts >= 5) CpaPhase.PICTORIAL else CpaPhase.CONCRETE
+            CpaPhase.PICTORIAL -> 
+                if (masteryScore >= 75 && attempts >= 8) CpaPhase.ABSTRACT else CpaPhase.PICTORIAL
+            CpaPhase.ABSTRACT -> 
+                if (masteryScore >= 85) CpaPhase.MIXED_TRANSFER else CpaPhase.ABSTRACT
+            CpaPhase.MIXED_TRANSFER -> CpaPhase.MIXED_TRANSFER
+        }
+    }
+
     private fun SkillProgress.toEntity() = SkillProgressEntity(
         skillId = skillId,
         masteryScore = masteryScore,
@@ -167,8 +193,15 @@ open class ProgressRepository(private val skillProgressDao: SkillProgressDao) : 
         wrongAnswers = incorrectCount,
         averageResponseTimeMs = averageResponseTimeMs,
         lastPracticed = lastPracticedAt,
-        currentDifficulty = currentDifficultyTier
+        currentDifficulty = currentDifficultyTier,
+        currentCpaPhase = currentCpaPhase.name
     )
+
+    private fun String.toCpaPhase(): CpaPhase = try {
+        CpaPhase.valueOf(this)
+    } catch (e: IllegalArgumentException) {
+        CpaPhase.CONCRETE
+    }
 
     suspend fun clearAll() {
         skillProgressDao.clearAll()

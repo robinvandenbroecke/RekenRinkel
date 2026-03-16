@@ -12,5 +12,6 @@ data class SkillProgressEntity(
     val wrongAnswers: Int,
     val averageResponseTimeMs: Long,
     val lastPracticed: Long?,
-    val currentDifficulty: Int
+    val currentDifficulty: Int,
+    val currentCpaPhase: String = "CONCRETE"  // PATCH 4: Persistente CPA status
 )
