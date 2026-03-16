@@ -86,10 +86,11 @@ fun RekenRinkelApp() {
                     
                     val uiState by viewModel.uiState.collectAsState()
                     val currentProfile = uiState.profile
+                    val placementCompleted = currentProfile?.placementCompleted ?: false
                     
                     // PATCH 1: Placement verplicht check
-                    LaunchedEffect(currentProfile) {
-                        if (currentProfile != null && !currentProfile.placementCompleted) {
+                    LaunchedEffect(placementCompleted) {
+                        if (!placementCompleted) {
                             // Redirect naar placement als nog niet voltooid
                             navController.navigate("placement") {
                                 popUpTo("home") { inclusive = true }
@@ -132,10 +133,11 @@ fun RekenRinkelApp() {
                     )
                     val uiState by viewModel.uiState.collectAsState()
                     val placementProfile = uiState.profile
+                    val isPlacementCompleted = placementProfile?.placementCompleted ?: false
                     
                     // Laat placement zien en redirect naar home als voltooid
-                    LaunchedEffect(placementProfile?.placementCompleted) {
-                        if (placementProfile?.placementCompleted == true) {
+                    LaunchedEffect(isPlacementCompleted) {
+                        if (isPlacementCompleted) {
                             navController.navigate("home") {
                                 popUpTo("placement") { inclusive = true }
                             }
