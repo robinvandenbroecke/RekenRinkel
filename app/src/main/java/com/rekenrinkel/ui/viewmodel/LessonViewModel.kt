@@ -83,181 +83,86 @@ class LessonViewModel(
         exerciseStartTime = System.currentTimeMillis()
     }
 
+    // ============ PATCH 1: UNIFORME OEFEN-AFRONDINGSFLOW ============
+
     /**
-     * Verwerk een antwoord met XP en mastery tracking
+     * PATCH 1: Centrale helper voor het afronden van een oefening.
+     * Alle paden (submit, worked, skip) eindigen hier.
      */
-    fun submitAnswer(answer: String) {
+    private suspend fun finishCurrentExercise(
+        result: DetailedExerciseResult,
+        skipMasteryUpdate: Boolean = false,
+        showFeedback: Boolean = true
+    ) {
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
 
-        // Guard: prevent double submit
-        if (state.showFeedback || state.isProcessing) return
-
-        _uiState.update { it.copy(isProcessing = true) }
-
-        val responseTimeMs = System.currentTimeMillis() - exerciseStartTime
-
-        viewModelScope.launch {
-            try {
-                // Valideer antwoord
-                val isCorrect = exerciseValidator.validate(currentExercise, answer)
-
-                // Haal huidige progress op (enhanced model)
+        try {
+            // 1. Update progress/mastery (indien niet geskipped)
+            if (!skipMasteryUpdate) {
                 val currentProgress = progressRepository.getOrCreateProgress(currentExercise.skillId)
-
-                // Verwerk resultaat met LessonEngine
-                val result = DetailedExerciseResult(
-                    exerciseId = currentExercise.id,
-                    skillId = currentExercise.skillId,
-                    isCorrect = isCorrect,
-                    responseTimeMs = responseTimeMs,
-                    givenAnswer = answer,
-                    correctAnswer = currentExercise.correctAnswer,
-                    difficultyTier = currentExercise.difficulty,
-                    representationUsed = currentExercise.visualData?.type?.name ?: "ABSTRACT",
-                    errorType = if (!isCorrect) determineErrorType(currentExercise, answer) else null
-                )
-
                 val outcome = lessonEngine.processExerciseResult(result, currentProgress)
-
-                // Update progress in database
                 progressRepository.updateProgress(outcome.updatedProgress)
 
-                // Update rewards (XP, streak, badges)
+                // 2. Update rewards (XP, streak, badges)
                 val currentRewards = profileRepository.getRewards()
                 val updatedRewards = currentRewards
                     .addXp(outcome.xpEarned)
                     .updateStreak()
 
-                // Check voor badges
                 val newBadges = lessonEngine.checkBadges(
                     outcome,
                     currentRewards,
-                    currentExercise.skillId // Gebruik skillId als placeholder voor name
+                    currentExercise.skillId
                 )
 
                 val finalRewards = newBadges.fold(updatedRewards) { rewards, badge ->
                     rewards.addBadge(badge)
                 }
-
                 profileRepository.updateRewards(finalRewards)
 
-                // Update UI state
+                // 3. Update UI state met resultaten
                 val newResults = state.results + result
                 _uiState.update {
                     it.copy(
                         results = newResults,
-                        showFeedback = true,
-                        lastAnswerCorrect = isCorrect,
+                        showFeedback = showFeedback,
+                        lastAnswerCorrect = result.isCorrect,
                         isProcessing = false,
                         xpEarnedThisLesson = it.xpEarnedThisLesson + outcome.xpEarned,
                         badgesEarnedThisLesson = it.badgesEarnedThisLesson + newBadges,
                         difficultyChanged = if (outcome.difficultyChanged) outcome.newDifficultyTier else null
                     )
                 }
-
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isProcessing = false, error = e.message) }
-            }
-        }
-    }
-
-    /**
-     * Ga verder bij WORKED_EXAMPLE - geen validatie, alleen logging
-     */
-    fun continueWorkedExample() {
-        val state = _uiState.value
-        val currentExercise = state.currentExercise ?: return
-
-        // Guard: alleen voor WORKED_EXAMPLE
-        if (currentExercise.type != com.rekenrinkel.domain.model.ExerciseType.WORKED_EXAMPLE) return
-
-        _uiState.update { it.copy(isProcessing = true) }
-
-        viewModelScope.launch {
-            try {
-                // Minimale logging zonder answer-validatie
-                val workedResult = DetailedExerciseResult(
-                    exerciseId = currentExercise.id,
-                    skillId = currentExercise.skillId,
-                    isCorrect = true, // WORKED_EXAMPLE telt altijd als "gezien"
-                    responseTimeMs = System.currentTimeMillis() - exerciseStartTime,
-                    givenAnswer = "[worked_example_viewed]",
-                    correctAnswer = currentExercise.correctAnswer,
-                    difficultyTier = currentExercise.difficulty,
-                    representationUsed = "WORKED_EXAMPLE"
-                )
-
-                // Sla op in results
-                val newResults = state.results + workedResult
+            } else {
+                // Skip: alleen resultaat opslaan, geen mastery/rewards update
+                val newResults = state.results + result
                 _uiState.update {
                     it.copy(
                         results = newResults,
-                        showFeedback = false, // Geen feedback overlay voor worked example
-                        lastAnswerCorrect = null,
+                        showFeedback = showFeedback,
+                        lastAnswerCorrect = result.isCorrect,
                         isProcessing = false
                     )
                 }
-
-                // Direct doorgaan naar volgende oefening
-                nextExercise()
-
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isProcessing = false, error = e.message) }
             }
+
+            // 4. Advance beslissing
+            if (!showFeedback) {
+                // Direct advance (voor worked example)
+                advanceToNextExercise()
+            }
+            // Anders: wacht op expliciete nextExercise() call via onFeedbackComplete
+
+        } catch (e: Exception) {
+            _uiState.update { it.copy(isProcessing = false, error = e.message) }
         }
     }
 
     /**
-     * Sla oefening over
+     * PATCH 1: Helper voor direct naar volgende oefening gaan
      */
-    fun skipExercise() {
-        val state = _uiState.value
-        val currentExercise = state.currentExercise ?: return
-
-        if (state.showFeedback || state.isProcessing) return
-
-        _uiState.update { it.copy(isProcessing = true) }
-
-        viewModelScope.launch {
-            try {
-                val skippedResult = DetailedExerciseResult(
-                    exerciseId = currentExercise.id,
-                    skillId = currentExercise.skillId,
-                    isCorrect = false,
-                    responseTimeMs = 30_000, // Skip penalty
-                    givenAnswer = "[skipped]",
-                    correctAnswer = currentExercise.correctAnswer,
-                    difficultyTier = currentExercise.difficulty,
-                    representationUsed = "SKIPPED"
-                )
-
-                // Sla skip op maar zonder XP
-                val currentProgress = progressRepository.getOrCreateProgress(currentExercise.skillId)
-
-                val outcome = lessonEngine.processExerciseResult(skippedResult, currentProgress)
-                progressRepository.updateProgress(outcome.updatedProgress)
-
-                val newResults = state.results + skippedResult
-                _uiState.update {
-                    it.copy(
-                        results = newResults,
-                        showFeedback = true,
-                        lastAnswerCorrect = false,
-                        isProcessing = false
-                    )
-                }
-
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isProcessing = false, error = e.message) }
-            }
-        }
-    }
-
-    /**
-     * Ga naar volgende oefening
-     */
-    fun nextExercise() {
+    private fun advanceToNextExercise() {
         val state = _uiState.value
         val nextIndex = state.currentIndex + 1
 
@@ -275,6 +180,118 @@ class LessonViewModel(
             }
             exerciseStartTime = System.currentTimeMillis()
         }
+    }
+
+    // ============ PUBLIEKE API ============
+
+    /**
+     * PATCH 1: Verwerk een normaal antwoord
+     * Gebruikt de uniforme finishCurrentExercise helper
+     */
+    fun submitAnswer(answer: String) {
+        val state = _uiState.value
+        val currentExercise = state.currentExercise ?: return
+
+        // Guard: prevent double submit
+        if (state.showFeedback || state.isProcessing) return
+
+        _uiState.update { it.copy(isProcessing = true) }
+
+        val responseTimeMs = System.currentTimeMillis() - exerciseStartTime
+
+        viewModelScope.launch {
+            val isCorrect = exerciseValidator.validate(currentExercise, answer)
+
+            val result = DetailedExerciseResult(
+                exerciseId = currentExercise.id,
+                skillId = currentExercise.skillId,
+                isCorrect = isCorrect,
+                responseTimeMs = responseTimeMs,
+                givenAnswer = answer,
+                correctAnswer = currentExercise.correctAnswer,
+                difficultyTier = currentExercise.difficulty,
+                representationUsed = currentExercise.visualData?.type?.name ?: "ABSTRACT",
+                errorType = if (!isCorrect) determineErrorType(currentExercise, answer) else null
+            )
+
+            // Gebruik uniforme flow
+            finishCurrentExercise(result, skipMasteryUpdate = false, showFeedback = true)
+        }
+    }
+
+    /**
+     * PATCH 2: WORKED_EXAMPLE - direct en expliciet
+     * Geen validatie, geen feedback-overlay, direct advance
+     */
+    fun continueWorkedExample() {
+        val state = _uiState.value
+        val currentExercise = state.currentExercise ?: return
+
+        // Guard: alleen voor WORKED_EXAMPLE
+        if (currentExercise.type != com.rekenrinkel.domain.model.ExerciseType.WORKED_EXAMPLE) {
+            // Als het per ongeluk een ander type is, behandel als normale oefening
+            submitAnswer("[worked_fallback]")
+            return
+        }
+
+        // Guard: prevent double submit
+        if (state.isProcessing) return
+
+        _uiState.update { it.copy(isProcessing = true) }
+
+        viewModelScope.launch {
+            val result = DetailedExerciseResult(
+                exerciseId = currentExercise.id,
+                skillId = currentExercise.skillId,
+                isCorrect = true, // WORKED_EXAMPLE telt altijd als "gezien"
+                responseTimeMs = System.currentTimeMillis() - exerciseStartTime,
+                givenAnswer = "[worked_example_viewed]",
+                correctAnswer = currentExercise.correctAnswer,
+                difficultyTier = currentExercise.difficulty,
+                representationUsed = "WORKED_EXAMPLE"
+            )
+
+            // Gebruik uniforme flow met direct advance
+            finishCurrentExercise(result, skipMasteryUpdate = true, showFeedback = false)
+            // showFeedback = false triggert automatisch advanceToNextExercise()
+        }
+    }
+
+    /**
+     * PATCH 1: Sla oefening over
+     * Gebruikt de uniforme finishCurrentExercise helper
+     */
+    fun skipExercise() {
+        val state = _uiState.value
+        val currentExercise = state.currentExercise ?: return
+
+        if (state.showFeedback || state.isProcessing) return
+
+        _uiState.update { it.copy(isProcessing = true) }
+
+        viewModelScope.launch {
+            val result = DetailedExerciseResult(
+                exerciseId = currentExercise.id,
+                skillId = currentExercise.skillId,
+                isCorrect = false,
+                responseTimeMs = 30_000, // Skip penalty
+                givenAnswer = "[skipped]",
+                correctAnswer = currentExercise.correctAnswer,
+                difficultyTier = currentExercise.difficulty,
+                representationUsed = "SKIPPED"
+            )
+
+            // Gebruik uniforme flow
+            finishCurrentExercise(result, skipMasteryUpdate = true, showFeedback = true)
+        }
+    }
+
+    /**
+     * PATCH 4: Eenduidige advance - aangeroepen na feedback
+     * Gebruikt dezelfde advanceToNextExercise als worked example
+     */
+    fun nextExercise() {
+        advanceToNextExercise()
     }
 
     /**
