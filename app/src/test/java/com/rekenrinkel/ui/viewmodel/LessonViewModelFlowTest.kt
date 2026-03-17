@@ -172,6 +172,37 @@ class LessonViewModelFlowTest {
         assertEquals(LessonStepState.SHOWING, viewModel.uiState.value.stepState)
     }
 
+    // PATCH 9: Specifieke test voor skip semantiek
+    @Test
+    fun `skipExercise - should log exactly one result and not duplicate`() = runTest {
+        // Arrange
+        val exercises = listOf(
+            createExercise("1"),
+            createExercise("2")
+        )
+        setupLessonWithExercises(exercises)
+
+        // Start lesson
+        viewModel.startLesson()
+        advanceTimeBy(500)
+
+        // Act - skip first exercise
+        viewModel.skipExercise()
+        advanceTimeBy(100)
+
+        // Assert - exactly one result logged
+        assertEquals(1, viewModel.uiState.value.results.size)
+        assertEquals("[skipped]", viewModel.uiState.value.results.first().givenAnswer)
+        assertEquals(false, viewModel.uiState.value.results.first().isCorrect)
+
+        // Laat completion afmaken
+        advanceTimeBy(1000)
+
+        // Assert - at second exercise, no duplicate results
+        assertEquals(1, viewModel.uiState.value.currentIndex)
+        assertEquals(1, viewModel.uiState.value.results.size)
+    }
+
     // ============ TEST 5: Dubbele submit guard ============
     @Test
     fun `double submit - should ignore second submit`() = runTest {

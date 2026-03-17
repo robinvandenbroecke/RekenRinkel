@@ -373,6 +373,12 @@ class LessonViewModel(
         android.util.Log.e("LessonViewModel", "[FAILURE] Stage: ${state.completionStage}, exercise: ${state.completionStageExerciseId}, index: ${state.currentIndex}")
 
         // PATCH 2 & 6: Maak expliciete failure context met rijke completion state
+        // PATCH 6: De failure flags worden geïnferreerd uit failureStage en completionStage
+        val progressFailed = stage == FailureStage.PROGRESS_UPDATE || 
+            (stage == FailureStage.UNKNOWN && state.completionStage == CompletionStage.RESULT_LOGGED)
+        val rewardsFailed = stage == FailureStage.REWARD_UPDATE || 
+            (stage == FailureStage.UNKNOWN && state.completionStage == CompletionStage.PROGRESS_UPDATED)
+        
         val failureContext = currentExercise?.let {
             FailureContext(
                 errorMessage = errorMessage,
@@ -384,7 +390,10 @@ class LessonViewModel(
                 completionStageExerciseId = state.completionStageExerciseId,
                 resultLogged = state.completionStage >= CompletionStage.RESULT_LOGGED,
                 progressUpdated = state.completionStage >= CompletionStage.PROGRESS_UPDATED,
-                rewardsApplied = state.completionStage >= CompletionStage.REWARDS_APPLIED
+                rewardsApplied = state.completionStage >= CompletionStage.REWARDS_APPLIED,
+                // PATCH 6: Expliciete failure flags
+                progressFailed = progressFailed,
+                rewardsFailed = rewardsFailed
             )
         }
 
@@ -776,21 +785,29 @@ class LessonViewModel(
                 RecoveryAction.ADVANCE_TO_NEXT
             }
             CompletionStage.PROGRESS_UPDATED -> {
-                // PATCH 4: Progress is geupdate maar rewards mogelijk niet
-                // Dit is een gedegradeerde state - log dit expliciet
-                android.util.Log.d("LessonViewModel", "[RECOVERY] Stage=PROGRESS_UPDATED → gedegradeerde completion, rewards missen mogelijk")
-                when (exerciseType) {
-                    ExerciseType.WORKED_EXAMPLE -> RecoveryAction.ADVANCE_TO_NEXT
-                    else -> RecoveryAction.CONTINUE_REMAINING_STEPS
+                // PATCH 7: Progress is geupdate maar rewards mogelijk niet
+                // Dit is een gedegradeerde state - bepaal actie obv exercise type
+                android.util.Log.d("LessonViewModel", "[RECOVERY] Stage=PROGRESS_UPDATED → progress done, rewards pending")
+                // PATCH 7: Worked example heeft geen rewards nodig
+                if (exerciseType == ExerciseType.WORKED_EXAMPLE) {
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] WORKED_EXAMPLE at PROGRESS_UPDATED → direct ADVANCE_TO_NEXT")
+                    RecoveryAction.ADVANCE_TO_NEXT
+                } else {
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] NORMAL at PROGRESS_UPDATED → CONTINUE_REMAINING_STEPS for rewards")
+                    RecoveryAction.CONTINUE_REMAINING_STEPS
                 }
             }
             CompletionStage.RESULT_LOGGED -> {
-                // PATCH 4: Resultaat is gelogd maar progress/rewards niet
-                // Dit is een gedegradeerde state - log dit expliciet
-                android.util.Log.d("LessonViewModel", "[RECOVERY] Stage=RESULT_LOGGED → gedegradeerde completion, progress/rewards missen")
-                when (exerciseType) {
-                    ExerciseType.WORKED_EXAMPLE -> RecoveryAction.ADVANCE_TO_NEXT
-                    else -> RecoveryAction.CONTINUE_REMAINING_STEPS
+                // PATCH 7: Resultaat is gelogd maar progress/rewards niet
+                // Dit is een gedegradeerde state - bepaal actie obv exercise type
+                android.util.Log.d("LessonViewModel", "[RECOVERY] Stage=RESULT_LOGGED → result logged, progress/rewards pending")
+                // PATCH 7: Worked example heeft geen progress/rewards nodig
+                if (exerciseType == ExerciseType.WORKED_EXAMPLE) {
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] WORKED_EXAMPLE at RESULT_LOGGED → direct ADVANCE_TO_NEXT")
+                    RecoveryAction.ADVANCE_TO_NEXT
+                } else {
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] NORMAL at RESULT_LOGGED → CONTINUE_REMAINING_STEPS")
+                    RecoveryAction.CONTINUE_REMAINING_STEPS
                 }
             }
             CompletionStage.NOT_STARTED -> {
@@ -1052,6 +1069,7 @@ data class FailureContext(
     val resultLogged: Boolean = false,
     val progressUpdated: Boolean = false,
     val rewardsApplied: Boolean = false,
+    // PATCH 6: Expliciete failure flags voor degraded completion
     val progressFailed: Boolean = false,
     val rewardsFailed: Boolean = false
 )
