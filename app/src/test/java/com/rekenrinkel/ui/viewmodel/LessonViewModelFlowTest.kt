@@ -4,8 +4,7 @@ import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.rekenrinkel.data.datastore.SettingsDataStore
 import com.rekenrinkel.data.repository.ProfileRepository
 import com.rekenrinkel.data.repository.ProgressRepository
-import com.rekenrinkel.domain.engine.ExerciseEngine
-import com.rekenrinkel.domain.engine.ExerciseValidator
+import com.rekenrinkel.domain.engine.*
 import com.rekenrinkel.domain.model.*
 import io.mockk.*
 import kotlinx.coroutines.*
@@ -15,8 +14,8 @@ import org.junit.*
 import org.junit.Assert.*
 
 /**
- * PATCH 9: Tests voor robuuste lesflow
- * Deze tests dekken de vastloper-klasse op de eerste oefening
+ * PATCH 1-9: Tests voor robuuste lesflow
+ * Geactualiseerd naar huidige model- en enginecontract
  */
 @ExperimentalCoroutinesApi
 class LessonViewModelFlowTest {
@@ -370,10 +369,11 @@ class LessonViewModelFlowTest {
         coVerify(atLeast = 1) { progressRepository.updateProgress(any()) }
     }
 
+    // PATCH 1: Gebruik correcte Rewards constructor (totalXp, niet xp)
     @Test
     fun `error after rewards - recovery should not give double XP`() = runTest {
         // Arrange
-        val initialRewards = Rewards(xp = 0)
+        val initialRewards = Rewards(totalXp = 0)
         coEvery { profileRepository.getRewards() } returns initialRewards
         // PATCH 2: validate is gewone functie
         every { exerciseValidator.validate(any(), any()) } returns true
@@ -385,8 +385,8 @@ class LessonViewModelFlowTest {
         viewModel.submitAnswer("5")
         advanceTimeBy(1500)
 
-        // Assert - should have earned XP once
-        coVerify(atMost = 1) { profileRepository.updateRewards(match { it.xp > 0 }) }
+        // Assert - should have earned XP once (check via totalXp > 0)
+        coVerify(atMost = 1) { profileRepository.updateRewards(match { it.totalXp > 0 }) }
     }
 
     @Test
@@ -489,35 +489,7 @@ class LessonViewModelFlowTest {
         assertNull(viewModel.uiState.value.completionStageExerciseId)
     }
 
-    // ============ Helpers ============
-    private fun setupLessonWithExercises(exercises: List<Exercise>) {
-        val lessonPlan = LessonPlan(
-            exercises = exercises,
-            warmUpCount = 0,
-            focusCount = exercises.size,
-            reviewCount = 0,
-            challengeCount = 0,
-            targetSkills = emptyList()
-        )
-        // PATCH 2: generateExercises is gewone functie in ExerciseEngine
-        every { exerciseEngine.generateExercises(any(), any(), any(), any()) } returns exercises
-    }
-
-    private fun createExercise(
-        id: String,
-        type: ExerciseType = ExerciseType.TYPED_NUMERIC
-    ): Exercise {
-        return Exercise(
-            id = id,
-            skillId = "test_skill",
-            type = type,
-            question = "Test vraag",
-            correctAnswer = "5",
-            difficulty = 1
-        )
-    }
-
-    // ============ PATCH 6: Stale-state regressie test ============
+    // ============ PATCH 4: Stale-state regressie test ============
     @Test
     fun `completion stages use actual state not stale snapshot`() = runTest {
         // Arrange
@@ -577,5 +549,31 @@ class LessonViewModelFlowTest {
         // Assert - nog steeds maar één resultaat
         assertEquals(1, viewModel.uiState.value.results.size)
         assertEquals(1, viewModel.uiState.value.currentIndex)
+    }
+
+    // ============ Helpers ============
+    // PATCH 1: Actualiseer setupLessonWithExercises naar huidige LessonPlan structuur
+    private fun setupLessonWithExercises(exercises: List<Exercise>) {
+        // We mocken de LessonEngine.buildLesson direct via de exerciseEngine mock
+        // Omdat LessonEngine intern exerciseEngine gebruikt voor generateExercise calls
+        exercises.forEachIndexed { index, exercise ->
+            every { exerciseEngine.generateExercise(any(), any()) } returns exercise
+            every { exerciseEngine.generateWorkedExample(any(), any()) } returns exercise
+            every { exerciseEngine.generateGuidedExercise(any(), any()) } returns exercise
+        }
+    }
+
+    private fun createExercise(
+        id: String,
+        type: ExerciseType = ExerciseType.TYPED_NUMERIC
+    ): Exercise {
+        return Exercise(
+            id = id,
+            skillId = "test_skill",
+            type = type,
+            question = "Test vraag",
+            correctAnswer = "5",
+            difficulty = 1
+        )
     }
 }

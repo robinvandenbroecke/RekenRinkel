@@ -36,14 +36,16 @@ class LessonViewModel(
     private var exerciseStartTime: Long = 0
 
     // PATCH 2 & 5: Harde completion guard - bijhouden welke oefening momenteel verwerkt wordt
+    // Dit is een transient guard, geen state. UI state (_uiState) is de bron van waarheid.
     private var currentlyCompletingExerciseId: String? = null
     
     // PATCH 5: Set van definitief afgehandelde oefeningen
+    // Dit is extra bescherming tegen dubbele verwerking, maar UI state is leidend.
     private val handledExerciseIds = mutableSetOf<String>()
     
-    // PATCH 1: Expliciete completion stage - gekoppeld aan huidige oefening
-    private var currentCompletionStage = CompletionStage.NOT_STARTED
-    private var currentStageExerciseId: String? = null  // Voor validatie dat stage bij juiste oefening hoort
+    // NOTE: currentCompletionStage en currentStageExerciseId verwijderd.
+    // Gebruik altijd _uiState.value.completionStage en _uiState.value.completionStageExerciseId
+    // Deze private vars waren een bron van stale state en semantische verwarring.
 
     /**
      * Start een nieuwe les
@@ -163,8 +165,8 @@ class LessonViewModel(
             return
         }
         currentlyCompletingExerciseId = currentExercise.id
-        currentCompletionStage = CompletionStage.NOT_STARTED
-        currentStageExerciseId = currentExercise.id
+        // NOTE: currentCompletionStage en currentStageExerciseId niet meer als private vars
+        // UI state (_uiState.value.completionStage etc.) is de enige bron van waarheid
 
         // PATCH 4 & 7: Versterkte debug logging - gebruik actuele state
         val (initialStage, initialStageExerciseId) = currentCompletionState()
@@ -193,7 +195,7 @@ class LessonViewModel(
                         completionStageExerciseId = currentExercise.id
                     )
                 }
-                currentCompletionStage = CompletionStage.RESULT_LOGGED
+                // UI state is leidend - private var niet meer bijwerken
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 1 DONE: stage=RESULT_LOGGED")
             } else {
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 1 SKIP: result already logged")
@@ -215,7 +217,7 @@ class LessonViewModel(
                     _uiState.update {
                         it.copy(completionStage = CompletionStage.PROGRESS_UPDATED)
                     }
-                    currentCompletionStage = CompletionStage.PROGRESS_UPDATED
+                    // UI state is leidend - private var niet meer bijwerken
                     android.util.Log.d("LessonViewModel", "[COMPLETION] Step 2 DONE: stage=PROGRESS_UPDATED")
                 } catch (e: Exception) {
                     // PATCH 4 & 7: Progress failure expliciet markeren
@@ -258,7 +260,7 @@ class LessonViewModel(
                     _uiState.update {
                         it.copy(completionStage = CompletionStage.REWARDS_APPLIED)
                     }
-                    currentCompletionStage = CompletionStage.REWARDS_APPLIED
+                    // UI state is leidend - private var niet meer bijwerken
                     android.util.Log.d("LessonViewModel", "[COMPLETION] Step 3 DONE: stage=REWARDS_APPLIED")
                 } catch (e: Exception) {
                     // PATCH 4 & 7: Rewards failure expliciet markeren
@@ -298,7 +300,7 @@ class LessonViewModel(
                         completionStage = CompletionStage.READY_TO_ADVANCE
                     )
                 }
-                currentCompletionStage = CompletionStage.READY_TO_ADVANCE
+                // UI state is leidend - private var niet meer bijwerken
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 4 DONE: stage=READY_TO_ADVANCE, xpEarned=$xpEarned")
             } else {
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 4 SKIP: already ready to advance")
@@ -395,8 +397,7 @@ class LessonViewModel(
 
         // PATCH 2: Reset completion guard bij advance
         currentlyCompletingExerciseId = null
-        currentCompletionStage = CompletionStage.NOT_STARTED
-        currentStageExerciseId = null
+        // NOTE: currentCompletionStage en currentStageExerciseId niet meer als private vars
 
         // PATCH 8: Debug logging
         android.util.Log.d("LessonViewModel", "Advancing from index ${state.currentIndex} to $nextIndex")
@@ -551,11 +552,10 @@ class LessonViewModel(
         val state = _uiState.value
         val failureContext = state.failureContext
 
-        // PATCH 8: Debug logging
+        // PATCH 8: Debug logging - alleen UI state gebruiken
         android.util.Log.d("LessonViewModel", "continueAfterError called")
         android.util.Log.d("LessonViewModel", "Failure stage: ${failureContext?.stage?.name ?: "null"}")
-        android.util.Log.d("LessonViewModel", "UI completion stage: ${state.completionStage} (exercise: ${state.completionStageExerciseId})")
-        android.util.Log.d("LessonViewModel", "Private completion stage: $currentCompletionStage (exercise: $currentStageExerciseId)")
+        android.util.Log.d("LessonViewModel", "Completion stage: ${state.completionStage} (exercise: ${state.completionStageExerciseId})")
         android.util.Log.d("LessonViewModel", "Exercise type: ${failureContext?.exerciseType}")
 
         // PATCH 3 & 6: Gebruik UI state als bron van waarheid voor recovery
@@ -590,8 +590,7 @@ class LessonViewModel(
                         )
                     }
                     currentlyCompletingExerciseId = null
-                    currentCompletionStage = CompletionStage.NOT_STARTED
-                    currentStageExerciseId = null
+                    // NOTE: UI state is leidend
                 }
             }
             
@@ -623,8 +622,7 @@ class LessonViewModel(
                         )
                     }
                     currentlyCompletingExerciseId = null
-                    currentCompletionStage = CompletionStage.NOT_STARTED
-                    currentStageExerciseId = null
+                    // NOTE: UI state is leidend
                     advanceToNextExercise()
                 }
             }
@@ -645,8 +643,7 @@ class LessonViewModel(
                         )
                     }
                     currentlyCompletingExerciseId = null
-                    currentCompletionStage = CompletionStage.NOT_STARTED
-                    currentStageExerciseId = null
+                    // NOTE: UI state is leidend
                     advanceToNextExercise()
                 }
             }
@@ -666,12 +663,11 @@ class LessonViewModel(
                         )
                     }
                     currentlyCompletingExerciseId = null
-                    currentCompletionStage = CompletionStage.NOT_STARTED
-                    currentStageExerciseId = null
+                    // NOTE: UI state is leidend
                     advanceToNextExercise()
                 }
             }
-            
+
             RecoveryAction.COMPLETE_LESSON -> {
                 // PATCH 7: Les voltooien (als alles DONE is)
                 android.util.Log.d("LessonViewModel", "[RECOVERY] COMPLETE_LESSON - completing lesson")
