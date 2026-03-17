@@ -7,28 +7,32 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 
 ## Wat werkt
 
-### Robuuste lessonflow met expliciete error handling
-- **Expliciete ERROR state**: interruptiestatus bij fouten, niet terug naar SHOWING
-- **Failure recovery**: context-aware recovery zonder dubbele afhandeling
-- **Completion guard**: elke oefening maximaal één keer verwerkt
+### Robuuste lessonflow met expliciete completion stages
+- **Expliciete CompletionStage**: NOT_STARTED → RESULT_LOGGED → PROGRESS_UPDATED → REWARDS_APPLIED → READY_TO_ADVANCE → DONE
+- **Stage-based recovery**: recovery actie afhankelijk van hoe ver afhandeling gekomen is
+- **Idempotente side effects**: dubbele calls worden veilig genegeerd per stage
+- **DONE guard**: een oefening kan maar één keer volledig afgerond worden
 - **Failure stages**: RESULT_LOGGING, PROGRESS_UPDATE, REWARD_UPDATE, STATE_UPDATE, ADVANCE
-- **Debug logging**: volledige traceerbaarheid in logcat
+- **Debug logging**: volledige traceerbaarheid in logcat met [RECOVERY] prefix
 
 ### Oefentype-specifieke afhandeling
-- **WORKED_EXAMPLE**: direct door, veilige failure path
+- **WORKED_EXAMPLE**: direct door zonder validatie, veilige failure path
 - **GUIDED_PRACTICE**: validatie + feedback, veilige recovery
-- **Normale antwoorden**: standaard response path
+- **Normale antwoorden**: standaard response path met feedback
 - **Skip**: direct en veilig, blokkeert nooit
 
 ### Regressie-checks
-- ✅ Eerste oefening kan altijd afronden
+- ✅ Eerste oefening kan altijd afronden (ook na fout)
 - ✅ Worked example gaat direct door
 - ✅ Guided practice valideert en gaat door
 - ✅ Skip blokkeert niet
-- ✅ Geen dubbele submit
-- ✅ Geen dubbele XP
+- ✅ Geen dubbele submit (DONE guard)
+- ✅ Geen dubbele XP (REWARDS_APPLIED check)
+- ✅ Geen dubbele progress update (PROGRESS_UPDATED check)
+- ✅ Geen dubbele result logging (RESULT_LOGGED check)
 - ✅ Geen wit scherm na les
 - ✅ Result screen blijft werken
+- ✅ Stage-based recovery werkt
 
 ## Wat in ontwikkeling is
 
@@ -49,6 +53,10 @@ CI: https://github.com/robinvandenbroecke/RekenRinkel/actions
 
 - 100% offline, Room database
 - Geen tracking, geen ads
+
+## Status
+
+Privétestfase, nog niet productierijp.
 
 ## Licentie
 
