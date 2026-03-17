@@ -13,7 +13,9 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 - **Idempotente side effects**: dubbele calls worden veilig genegeerd per stage
 - **DONE guard**: een oefening kan maar één keer volledig afgerond worden
 - **Failure stages**: RESULT_LOGGING, PROGRESS_UPDATE, REWARD_UPDATE, STATE_UPDATE, ADVANCE
-- **Debug logging**: volledige traceerbaarheid in logcat met [RECOVERY] prefix
+- **Debug logging**: volledige traceerbaarheid in logcat met [COMPLETION], [FAILURE], [RECOVERY] prefix
+- **Rijke failure context**: completion stage en flags voor betere recovery beslissingen
+- **Expliciete progress/reward failure handling**: failures worden gelogd, niet stilgeslikt
 
 ### Oefentype-specifieke afhandeling
 - **WORKED_EXAMPLE**: direct door zonder validatie, veilige failure path
