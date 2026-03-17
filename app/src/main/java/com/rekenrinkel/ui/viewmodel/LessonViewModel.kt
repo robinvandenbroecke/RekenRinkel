@@ -363,6 +363,12 @@ class LessonViewModel(
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
 
+        // PATCH 5: Guard - als al DONE, negeren
+        if (state.completionStage == CompletionStage.DONE) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} already DONE")
+            return
+        }
+
         // PATCH 6: Guard met expliciete state
         if (state.stepState != LessonStepState.SHOWING) return
 
@@ -397,6 +403,12 @@ class LessonViewModel(
     fun continueWorkedExample() {
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
+
+        // PATCH 5: Guard - als al DONE, negeren
+        if (state.completionStage == CompletionStage.DONE) {
+            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${currentExercise.id} already DONE")
+            return
+        }
 
         // Guard: alleen voor WORKED_EXAMPLE
         if (currentExercise.type != com.rekenrinkel.domain.model.ExerciseType.WORKED_EXAMPLE) {
@@ -434,6 +446,12 @@ class LessonViewModel(
     fun skipExercise() {
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
+
+        // PATCH 5: Guard - als al DONE, negeren
+        if (state.completionStage == CompletionStage.DONE) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${currentExercise.id} already DONE")
+            return
+        }
 
         // PATCH 6: Guard met expliciete state
         if (state.stepState != LessonStepState.SHOWING) return
@@ -486,9 +504,58 @@ class LessonViewModel(
         val recoveryAction = determineRecoveryAction(failureContext, recoveryStage)
         android.util.Log.d("LessonViewModel", "Recovery action: $recoveryAction")
 
+        // PATCH 8: Log recovery execution
+        android.util.Log.d("LessonViewModel", "[RECOVERY] Executing action: $recoveryAction")
+        
         when (recoveryAction) {
-            RecoveryAction.CONTINUE_TO_NEXT -> {
-                // Veilige continue naar volgende oefening
+            RecoveryAction.RETRY_CURRENT -> {
+                // PATCH 7: Probeer huidige opnieuw (alleen als NOT_STARTED)
+                android.util.Log.d("LessonViewModel", "[RECOVERY] RETRY_CURRENT - resetting to SHOWING")
+                viewModelScope.launch {
+                    _uiState.update {
+                        it.copy(
+                            stepState = LessonStepState.SHOWING,
+                            error = null,
+                            failureContext = null,
+                            completionStage = CompletionStage.NOT_STARTED,
+                            completionStageExerciseId = null
+                        )
+                    }
+                    currentlyCompletingExerciseId = null
+                    currentCompletionStage = CompletionStage.NOT_STARTED
+                    currentStageExerciseId = null
+                }
+            }
+            
+            RecoveryAction.CONTINUE_REMAINING_STEPS -> {
+                // PATCH 7: Voltooi huidige oefening (result al gelogd, doe rest)
+                // Roep finishCurrentExercise opnieuw aan - het is idempotent
+                android.util.Log.d("LessonViewModel", "[RECOVERY] CONTINUE_REMAINING_STEPS - re-attempting completion")
+                viewModelScope.launch {
+                    val currentExercise = state.currentExercise
+                    if (currentExercise != null) {
+                        // Maak een dummy result als we er geen hebben
+                        val result = DetailedExerciseResult(
+                            exerciseId = currentExercise.id,
+                            skillId = currentExercise.skillId,
+                            isCorrect = false,
+                            responseTimeMs = 0,
+                            givenAnswer = "[recovery_continue]",
+                            correctAnswer = currentExercise.correctAnswer,
+                            difficultyTier = currentExercise.difficulty,
+                            representationUsed = "RECOVERY"
+                        )
+                        finishCurrentExercise(result, mode = CompletionMode.DIRECT_CONTINUE)
+                    } else {
+                        // Geen current exercise, probeer advance
+                        advanceToNextExercise()
+                    }
+                }
+            }
+            
+            RecoveryAction.ADVANCE_TO_NEXT -> {
+                // PATCH 7: Ga naar volgende (geen side effects meer)
+                android.util.Log.d("LessonViewModel", "[RECOVERY] ADVANCE_TO_NEXT - safe advance")
                 viewModelScope.launch {
                     _uiState.update {
                         it.copy(
@@ -505,8 +572,10 @@ class LessonViewModel(
                     advanceToNextExercise()
                 }
             }
+            
             RecoveryAction.SKIP_TO_NEXT -> {
                 // Markeer huidige als handled en skip
+                android.util.Log.d("LessonViewModel", "[RECOVERY] SKIP_TO_NEXT - marking as handled and advancing")
                 failureContext?.let { handledExerciseIds.add(it.exerciseId) }
                 viewModelScope.launch {
                     _uiState.update {
@@ -524,29 +593,20 @@ class LessonViewModel(
                     advanceToNextExercise()
                 }
             }
-            RecoveryAction.RETRY_CURRENT -> {
-                // Probeer huidige opnieuw (alleen als veilig)
-                viewModelScope.launch {
-                    _uiState.update {
-                        it.copy(
-                            stepState = LessonStepState.SHOWING,
-                            error = null,
-                            failureContext = null,
-                            completionStage = CompletionStage.NOT_STARTED,
-                            completionStageExerciseId = null
-                        )
-                    }
-                    currentlyCompletingExerciseId = null
-                    currentCompletionStage = CompletionStage.NOT_STARTED
-                    currentStageExerciseId = null
-                }
+            
+            RecoveryAction.COMPLETE_LESSON -> {
+                // PATCH 7: Les voltooien (als alles DONE is)
+                android.util.Log.d("LessonViewModel", "[RECOVERY] COMPLETE_LESSON - completing lesson")
+                completeLesson()
             }
-            RecoveryAction.RETURN_TO_HOME -> {
+            
+            RecoveryAction.RETURN_HOME -> {
                 // Meest veilige fallback
+                android.util.Log.d("LessonViewModel", "[RECOVERY] RETURN_HOME - navigating back")
                 _uiState.update {
                     it.copy(
                         stepState = LessonStepState.SHOWING,
-                        error = "Kan niet verder, ga terug naar home",
+                        error = null,
                         failureContext = null
                     )
                 }
@@ -555,18 +615,20 @@ class LessonViewModel(
                 }
             }
         }
+        
+        android.util.Log.d("LessonViewModel", "[RECOVERY] Action execution completed")
     }
 
     /**
-     * PATCH 3 & 6: Bepaal veilige recovery actie op basis van completionStage (bron van waarheid)
+     * PATCH 3, 6 & 7: Bepaal veilige recovery actie op basis van completionStage (bron van waarheid)
      * 
      * Recovery logica per completionStage:
-     * - NOT_STARTED: Oefening nog niet begonnen → veilig om opnieuw te proberen of te skippen
-     * - RESULT_LOGGED: Resultaat al gelogd → niet opnieuw loggen, progress verder afwerken of skippen
+     * - NOT_STARTED: Oefening nog niet begonnen → RETRY_CURRENT of SKIP_TO_NEXT
+     * - RESULT_LOGGED: Resultaat al gelogd → niet opnieuw loggen, CONTINUE_REMAINING_STEPS
      * - PROGRESS_UPDATED: Progress al geupdate → rewards/advance verder afwerken
-     * - REWARDS_APPLIED: Rewards al toegepast → direct advance
-     * - READY_TO_ADVANCE: Al klaar om door te gaan → direct advanceToNextExercise()
-     * - DONE: Al afgerond → niets meer doen
+     * - REWARDS_APPLIED: Rewards al toegepast → direct ADVANCE_TO_NEXT
+     * - READY_TO_ADVANCE: Al klaar om door te gaan → direct ADVANCE_TO_NEXT
+     * - DONE: Al afgerond → niets meer doen (CHECK_LESSON_COMPLETE)
      */
     private fun determineRecoveryAction(
         failureContext: FailureContext?,
@@ -575,33 +637,46 @@ class LessonViewModel(
         val stage = failureContext?.stage ?: FailureStage.UNKNOWN
         val exerciseType = failureContext?.exerciseType
 
-        // PATCH 3: Stage-gebaseerde recovery als primaire logica
-        return when (completionStage) {
+        // PATCH 8: Log recovery decision context
+        android.util.Log.d("LessonViewModel", "[RECOVERY] Deciding action for stage=$completionStage, failureStage=$stage, type=$exerciseType")
+
+        // PATCH 7: Stage-gebaseerde recovery als primaire logica - semantisch veilig
+        val action = when (completionStage) {
             CompletionStage.DONE -> {
-                // Oefening is al volledig afgerond, alleen advance doen
-                RecoveryAction.CONTINUE_TO_NEXT
+                // PATCH 5: Oefening is al volledig afgerond
+                // Als we hier zijn terwijl DONE, is er iets mis met de advance
+                // Veiligste is om te proberen advance te voltooien
+                android.util.Log.d("LessonViewModel", "[RECOVERY] Stage=DONE → CHECK_LESSON_COMPLETE")
+                RecoveryAction.ADVANCE_TO_NEXT
             }
             CompletionStage.READY_TO_ADVANCE -> {
-                // UI staat klaar, alleen advance uitvoeren
-                RecoveryAction.CONTINUE_TO_NEXT
+                // UI staat klaar, alleen advance uitvoeren - geen side effects meer
+                android.util.Log.d("LessonViewModel", "[RECOVERY] Stage=READY_TO_ADVANCE → ADVANCE_TO_NEXT (no side effects)")
+                RecoveryAction.ADVANCE_TO_NEXT
             }
             CompletionStage.REWARDS_APPLIED -> {
-                // Rewards zijn al toegepast, direct advance is veilig
-                RecoveryAction.CONTINUE_TO_NEXT
+                // Rewards zijn al toegepast, XP/stars al gegeven
+                // Alleen advance doen, geen dubbele rewards
+                android.util.Log.d("LessonViewModel", "[RECOVERY] Stage=REWARDS_APPLIED → ADVANCE_TO_NEXT (rewards already applied)")
+                RecoveryAction.ADVANCE_TO_NEXT
             }
             CompletionStage.PROGRESS_UPDATED -> {
                 // Progress is geupdate maar rewards mogelijk niet
-                // Worked example: geen rewards nodig
+                // Worked example: geen rewards nodig, direct advance
                 // Normale oefening: rewards zijn nice-to-have, advance is veilig
-                RecoveryAction.CONTINUE_TO_NEXT
+                android.util.Log.d("LessonViewModel", "[RECOVERY] Stage=PROGRESS_UPDATED → CONTINUE_REMAINING_STEPS (apply rewards if needed)")
+                when (exerciseType) {
+                    ExerciseType.WORKED_EXAMPLE -> RecoveryAction.ADVANCE_TO_NEXT
+                    else -> RecoveryAction.CONTINUE_REMAINING_STEPS
+                }
             }
             CompletionStage.RESULT_LOGGED -> {
                 // Resultaat is gelogd, progress moet nog
-                // Als dit een retry zou zijn, zouden we result dubbel loggen
-                // Dus beter om door te gaan naar volgende (progress wordt niet dubbel geupdate door repository)
+                // RETRY zou result dubbel loggen → niet toestaan
+                android.util.Log.d("LessonViewModel", "[RECOVERY] Stage=RESULT_LOGGED → CONTINUE_REMAINING_STEPS (skip result logging)")
                 when (exerciseType) {
-                    ExerciseType.WORKED_EXAMPLE -> RecoveryAction.CONTINUE_TO_NEXT
-                    else -> RecoveryAction.CONTINUE_TO_NEXT  // Progress update is idempotent via repository
+                    ExerciseType.WORKED_EXAMPLE -> RecoveryAction.ADVANCE_TO_NEXT
+                    else -> RecoveryAction.CONTINUE_REMAINING_STEPS  // Progress update is idempotent
                 }
             }
             CompletionStage.NOT_STARTED -> {
@@ -609,30 +684,44 @@ class LessonViewModel(
                 when (exerciseType) {
                     ExerciseType.WORKED_EXAMPLE -> {
                         // Worked example: geen retry nodig, altijd door
-                        RecoveryAction.CONTINUE_TO_NEXT
+                        android.util.Log.d("LessonViewModel", "[RECOVERY] Stage=NOT_STARTED, type=WORKED → ADVANCE_TO_NEXT")
+                        RecoveryAction.ADVANCE_TO_NEXT
                     }
                     else -> {
                         // Bij NOT_STARTED en een error: waarschijnlijk ging iets mis voor we begonnen
-                        // Veiligste is om te skippen naar volgende
                         when (stage) {
-                            FailureStage.RESULT_LOGGING -> RecoveryAction.SKIP_TO_NEXT
-                            FailureStage.UNKNOWN -> RecoveryAction.SKIP_TO_NEXT
-                            else -> RecoveryAction.CONTINUE_TO_NEXT
+                            FailureStage.RESULT_LOGGING -> {
+                                android.util.Log.d("LessonViewModel", "[RECOVERY] Stage=NOT_STARTED, failure=RESULT_LOGGING → SKIP_TO_NEXT")
+                                RecoveryAction.SKIP_TO_NEXT
+                            }
+                            FailureStage.UNKNOWN -> {
+                                android.util.Log.d("LessonViewModel", "[RECOVERY] Stage=NOT_STARTED, failure=UNKNOWN → RETRY_CURRENT")
+                                RecoveryAction.RETRY_CURRENT
+                            }
+                            else -> {
+                                android.util.Log.d("LessonViewModel", "[RECOVERY] Stage=NOT_STARTED, failure=$stage → CONTINUE_REMAINING_STEPS")
+                                RecoveryAction.CONTINUE_REMAINING_STEPS
+                            }
                         }
                     }
                 }
             }
         }
+        
+        android.util.Log.d("LessonViewModel", "[RECOVERY] Final action: $action")
+        return action
     }
 
     /**
-     * PATCH 6: Mogelijke recovery acties
+     * PATCH 6 & 7: Mogelijke recovery acties - semantisch veilig
      */
     enum class RecoveryAction {
-        CONTINUE_TO_NEXT,   // Ga veilig door naar volgende oefening
-        SKIP_TO_NEXT,       // Skip huidige en ga door
-        RETRY_CURRENT,      // Probeer huidige opnieuw (alleen als veilig)
-        RETURN_TO_HOME      // Terug naar home (meest veilige fallback)
+        RETRY_CURRENT,           // PATCH 7: Probeer huidige opnieuw (alleen als NOT_STARTED)
+        CONTINUE_REMAINING_STEPS, // PATCH 7: Voltooi huidige (result al gelogd, doe rest)
+        ADVANCE_TO_NEXT,         // PATCH 7: Ga naar volgende (geen side effects meer)
+        SKIP_TO_NEXT,            // Skip huidige en ga door (als retry niet veilig is)
+        COMPLETE_LESSON,         // PATCH 7: Les voltooien (als alles DONE is)
+        RETURN_HOME              // Terug naar home (meest veilige fallback)
     }
 
     /**

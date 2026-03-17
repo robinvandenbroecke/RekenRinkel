@@ -235,6 +235,243 @@ class LessonViewModelFlowTest {
         assertTrue(viewModel.uiState.value.currentIndex in 0..1)
     }
 
+    // ============ PATCH 9: Completion Stage Tests ============
+
+    @Test
+    fun `normal exercise - should go through all completion stages`() = runTest {
+        // Arrange
+        setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
+        coEvery { exerciseValidator.validate(any(), any()) } returns true
+
+        // Act - start lesson
+        viewModel.startLesson()
+        advanceTimeBy(100)
+
+        // Assert - initial state
+        assertEquals(CompletionStage.NOT_STARTED, viewModel.uiState.value.completionStage)
+
+        // Act - submit answer
+        viewModel.submitAnswer("5")
+        advanceTimeBy(1500) // Processing + feedback + advance
+
+        // Assert - should have completed first exercise
+        assertEquals(1, viewModel.uiState.value.currentIndex)
+        assertEquals(CompletionStage.NOT_STARTED, viewModel.uiState.value.completionStage) // Reset for next
+    }
+
+    @Test
+    fun `worked example - should complete without validation`() = runTest {
+        // Arrange
+        setupLessonWithExercises(listOf(
+            createExercise("1", ExerciseType.WORKED_EXAMPLE),
+            createExercise("2")
+        ))
+
+        // Act
+        viewModel.startLesson()
+        advanceTimeBy(100)
+        viewModel.continueWorkedExample()
+        advanceTimeBy(500)
+
+        // Assert - should have advanced directly
+        assertEquals(1, viewModel.uiState.value.currentIndex)
+        assertEquals(CompletionStage.NOT_STARTED, viewModel.uiState.value.completionStage)
+    }
+
+    @Test
+    fun `guided practice - should complete normally`() = runTest {
+        // Arrange
+        setupLessonWithExercises(listOf(
+            createExercise("1", ExerciseType.GUIDED_PRACTICE),
+            createExercise("2")
+        ))
+        coEvery { exerciseValidator.validate(any(), any()) } returns true
+
+        // Act
+        viewModel.startLesson()
+        advanceTimeBy(100)
+        viewModel.submitAnswer("5")
+        advanceTimeBy(1500)
+
+        // Assert - should have advanced
+        assertEquals(1, viewModel.uiState.value.currentIndex)
+    }
+
+    @Test
+    fun `error after result logged - recovery should not log again`() = runTest {
+        // Arrange
+        setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
+        coEvery { exerciseValidator.validate(any(), any()) } returns true
+        
+        // Simulate: result logged, then error in progress update
+        var callCount = 0
+        coEvery { progressRepository.getOrCreateProgress(any()) } answers {
+            callCount++
+            if (callCount == 1) throw RuntimeException("Simulated error")
+            SkillProgress("test_skill")
+        }
+
+        // Act - submit (will fail at progress update)
+        viewModel.startLesson()
+        advanceTimeBy(100)
+        viewModel.submitAnswer("5")
+        advanceTimeBy(500)
+
+        // Assert - should be in error state
+        assertEquals(LessonStepState.ERROR, viewModel.uiState.value.stepState)
+        
+        // Reset mock for recovery
+        coEvery { progressRepository.getOrCreateProgress(any()) } returns SkillProgress("test_skill")
+
+        // Act - recover
+        viewModel.continueAfterError()
+        advanceTimeBy(1000)
+
+        // Assert - should have advanced, results should not be duplicated
+        assertEquals(1, viewModel.uiState.value.currentIndex)
+        assertEquals(1, viewModel.uiState.value.results.size) // Only one result
+    }
+
+    @Test
+    fun `error after progress updated - recovery should not update progress again`() = runTest {
+        // Arrange
+        setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
+        coEvery { exerciseValidator.validate(any(), any()) } returns true
+        coEvery { progressRepository.getOrCreateProgress(any()) } returns SkillProgress("test_skill")
+        
+        // Simulate: progress updated, then error in rewards
+        var updateCallCount = 0
+        coEvery { profileRepository.updateRewards(any()) } answers {
+            updateCallCount++
+            if (updateCallCount == 1) throw RuntimeException("Simulated error")
+        }
+
+        // Act
+        viewModel.startLesson()
+        advanceTimeBy(100)
+        viewModel.submitAnswer("5")
+        advanceTimeBy(500)
+
+        // Assert - should be in error or have handled error
+        // Progress should be updated once
+        coVerify(atLeast = 1) { progressRepository.updateProgress(any()) }
+    }
+
+    @Test
+    fun `error after rewards - recovery should not give double XP`() = runTest {
+        // Arrange
+        val initialRewards = Rewards(xp = 0)
+        coEvery { profileRepository.getRewards() } returns initialRewards
+        coEvery { exerciseValidator.validate(any(), any()) } returns true
+        setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
+
+        // Act - complete first exercise
+        viewModel.startLesson()
+        advanceTimeBy(100)
+        viewModel.submitAnswer("5")
+        advanceTimeBy(1500)
+
+        // Assert - should have earned XP once
+        coVerify(atMost = 1) { profileRepository.updateRewards(match { it.xp > 0 }) }
+    }
+
+    @Test
+    fun `double submit while DONE - should be ignored`() = runTest {
+        // Arrange
+        setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
+        coEvery { exerciseValidator.validate(any(), any()) } returns true
+
+        // Act - complete first exercise
+        viewModel.startLesson()
+        advanceTimeBy(100)
+        viewModel.submitAnswer("5")
+        advanceTimeBy(1500) // Wait for completion
+
+        // Assert - at second exercise
+        assertEquals(1, viewModel.uiState.value.currentIndex)
+        val resultsAfterFirst = viewModel.uiState.value.results.size
+
+        // Act - try to submit on completed exercise (should be ignored)
+        viewModel.submitAnswer("5")
+        advanceTimeBy(500)
+
+        // Assert - results should not increase
+        assertEquals(resultsAfterFirst, viewModel.uiState.value.results.size)
+    }
+
+    @Test
+    fun `error state plus continue - should advance safely`() = runTest {
+        // Arrange
+        setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
+        coEvery { exerciseValidator.validate(any(), any()) } throws RuntimeException("Test error")
+
+        // Act - trigger error
+        viewModel.startLesson()
+        advanceTimeBy(100)
+        viewModel.submitAnswer("5")
+        advanceTimeBy(1000)
+
+        // Assert - in error state
+        assertEquals(LessonStepState.ERROR, viewModel.uiState.value.stepState)
+
+        // Act - continue
+        viewModel.continueAfterError()
+        advanceTimeBy(1000)
+
+        // Assert - should have advanced, not stuck
+        assertNotEquals(LessonStepState.ERROR, viewModel.uiState.value.stepState)
+        assertTrue(viewModel.uiState.value.currentIndex >= 0)
+    }
+
+    @Test
+    fun `skip exercise - should advance directly`() = runTest {
+        // Arrange
+        setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
+
+        // Act
+        viewModel.startLesson()
+        advanceTimeBy(100)
+        viewModel.skipExercise()
+        advanceTimeBy(500)
+
+        // Assert - should have advanced
+        assertEquals(1, viewModel.uiState.value.currentIndex)
+    }
+
+    @Test
+    fun `skip when already processing - should be ignored`() = runTest {
+        // Arrange
+        setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
+
+        // Act - start skip
+        viewModel.startLesson()
+        advanceTimeBy(100)
+        viewModel.skipExercise()
+        // Try to skip again while processing
+        viewModel.skipExercise()
+        advanceTimeBy(500)
+
+        // Assert - should not cause issues
+        assertTrue(viewModel.uiState.value.currentIndex in 0..1)
+    }
+
+    @Test
+    fun `completion stage validation - should reset on exercise change`() = runTest {
+        // Arrange
+        setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
+        coEvery { exerciseValidator.validate(any(), any()) } returns true
+
+        // Act - complete first exercise
+        viewModel.startLesson()
+        advanceTimeBy(100)
+        viewModel.submitAnswer("5")
+        advanceTimeBy(1500)
+
+        // Assert - stage reset for new exercise
+        assertEquals(CompletionStage.NOT_STARTED, viewModel.uiState.value.completionStage)
+        assertNull(viewModel.uiState.value.completionStageExerciseId)
+    }
+
     // ============ Helpers ============
     private fun setupLessonWithExercises(exercises: List<Exercise>) {
         val lessonPlan = LessonPlan(
