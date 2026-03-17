@@ -516,4 +516,66 @@ class LessonViewModelFlowTest {
             difficulty = 1
         )
     }
+
+    // ============ PATCH 6: Stale-state regressie test ============
+    @Test
+    fun `completion stages use actual state not stale snapshot`() = runTest {
+        // Arrange
+        setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
+        every { exerciseValidator.validate(any(), any()) } returns true
+
+        // Act - start completion process
+        viewModel.startLesson()
+        advanceTimeBy(100)
+        
+        // Submit answer - dit zou RESULT_LOGGED moeten zetten
+        viewModel.submitAnswer("5")
+        advanceTimeBy(50) // Klein beetje verwerkingstijd
+        
+        // Assert - stage moet RESULT_LOGGED zijn (niet NOT_STARTED)
+        // Deze check verifieert dat we niet op een oude snapshot zitten
+        val stageAfterSubmit = viewModel.uiState.value.completionStage
+        assertTrue(
+            "Stage should be at least RESULT_LOGGED after submit, but was $stageAfterSubmit",
+            stageAfterSubmit >= CompletionStage.RESULT_LOGGED
+        )
+        
+        // Wacht tot completion klaar is
+        advanceTimeBy(1500)
+        
+        // Assert - oefening moet volledig afgerond zijn
+        assertEquals(1, viewModel.uiState.value.currentIndex)
+        assertEquals(1, viewModel.uiState.value.results.size)
+        // Stage moet gereset zijn voor volgende oefening
+        assertEquals(CompletionStage.NOT_STARTED, viewModel.uiState.value.completionStage)
+    }
+
+    @Test
+    fun `no double side effects when stage already advanced`() = runTest {
+        // Arrange - simuleer een scenario waar we al RESULT_LOGGED hebben bereikt
+        setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
+        every { exerciseValidator.validate(any(), any()) } returns true
+
+        // Act
+        viewModel.startLesson()
+        advanceTimeBy(100)
+        
+        // Eerste submit
+        viewModel.submitAnswer("5")
+        advanceTimeBy(50)
+        
+        // Probeer nog een submit (moet geblokkeerd worden)
+        viewModel.submitAnswer("5")
+        advanceTimeBy(50)
+        
+        // Assert - maar één resultaat
+        assertEquals(1, viewModel.uiState.value.results.size)
+        
+        // Laat completion afmaken
+        advanceTimeBy(1500)
+        
+        // Assert - nog steeds maar één resultaat
+        assertEquals(1, viewModel.uiState.value.results.size)
+        assertEquals(1, viewModel.uiState.value.currentIndex)
+    }
 }

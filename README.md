@@ -16,6 +16,7 @@ Educatieve wiskunde-app voor kinderen van 5-11 jaar.
 - **Debug logging**: volledige traceerbaarheid in logcat met [COMPLETION], [FAILURE], [RECOVERY] prefix
 - **Rijke failure context**: completion stage en flags voor betere recovery beslissingen
 - **Expliciete progress/reward failure handling**: failures worden gelogd, niet stilgeslikt
+- **Geen stale state**: completion-stages gebruiken altijd actuele state via helper functies
 
 ### Oefentype-specifieke afhandeling
 - **WORKED_EXAMPLE**: direct door zonder validatie, veilige failure path
