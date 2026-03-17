@@ -310,33 +310,30 @@ class LessonViewModel(
         stage: FailureStage = FailureStage.UNKNOWN,
         exercise: Exercise? = null
     ) {
-        val state = _uiState.value
-        val currentExercise = exercise ?: state.currentExercise
+        val currentExercise = exercise ?: currentExerciseOrNull()
+        val completion = currentCompletionState()
+        val currentIndex = _uiState.value.currentIndex
 
-        // PATCH 7 & 8: Debug logging
         android.util.Log.e("LessonViewModel", "[FAILURE] Exercise ${currentExercise?.id ?: "unknown"} failed at ${stage.name}: $errorMessage")
-        android.util.Log.e("LessonViewModel", "[FAILURE] Stage: ${state.completionStage}, exercise: ${state.completionStageExerciseId}, index: ${state.currentIndex}")
+        android.util.Log.e("LessonViewModel", "[FAILURE] Stage: ${completion.stage}, exercise: ${completion.exerciseId}, index: $currentIndex")
 
-        // PATCH 2 & 6: Maak expliciete failure context met rijke completion state
-        // PATCH 6: De failure flags worden geïnferreerd uit failureStage en completionStage
-        val progressFailed = stage == FailureStage.PROGRESS_UPDATE || 
-            (stage == FailureStage.UNKNOWN && state.completionStage == CompletionStage.RESULT_LOGGED)
-        val rewardsFailed = stage == FailureStage.REWARD_UPDATE || 
-            (stage == FailureStage.UNKNOWN && state.completionStage == CompletionStage.PROGRESS_UPDATED)
-        
+        val progressFailed = stage == FailureStage.PROGRESS_UPDATE ||
+            (stage == FailureStage.UNKNOWN && completion.stage == CompletionStage.RESULT_LOGGED)
+        val rewardsFailed = stage == FailureStage.REWARD_UPDATE ||
+            (stage == FailureStage.UNKNOWN && completion.stage == CompletionStage.PROGRESS_UPDATED)
+
         val failureContext = currentExercise?.let {
             FailureContext(
                 errorMessage = errorMessage,
                 exerciseId = it.id,
                 exerciseType = it.type,
-                currentIndex = state.currentIndex,
+                currentIndex = currentIndex,
                 stage = stage,
-                completionStage = state.completionStage,
-                completionStageExerciseId = state.completionStageExerciseId,
-                resultLogged = state.completionStage >= CompletionStage.RESULT_LOGGED,
-                progressUpdated = state.completionStage >= CompletionStage.PROGRESS_UPDATED,
-                rewardsApplied = state.completionStage >= CompletionStage.REWARDS_APPLIED,
-                // PATCH 6: Expliciete failure flags
+                completionStage = completion.stage,
+                completionStageExerciseId = completion.exerciseId,
+                resultLogged = completion.stage >= CompletionStage.RESULT_LOGGED,
+                progressUpdated = completion.stage >= CompletionStage.PROGRESS_UPDATED,
+                rewardsApplied = completion.stage >= CompletionStage.REWARDS_APPLIED,
                 progressFailed = progressFailed,
                 rewardsFailed = rewardsFailed
             )
@@ -359,10 +356,9 @@ class LessonViewModel(
      * PATCH 1 & 8: Helper voor direct naar volgende oefening gaan
      */
     private fun advanceToNextExercise(completedExerciseId: String? = null) {
-        val state = _uiState.value
-        val nextIndex = state.currentIndex + 1
-        val currentExercise = state.currentExercise
-        val exerciseIdToHandle = completedExerciseId ?: currentExercise?.id
+        val currentState = _uiState.value
+        val nextIndex = currentState.currentIndex + 1
+        val exerciseIdToHandle = completedExerciseId ?: currentExerciseOrNull()?.id
 
         exerciseIdToHandle?.let { exerciseId ->
             handledExerciseIds.add(exerciseId)
@@ -370,15 +366,11 @@ class LessonViewModel(
         }
 
         _uiState.update { it.copy(stepState = LessonStepState.ADVANCING) }
-
-        // PATCH 2: Reset completion guard bij advance
         currentlyCompletingExerciseId = null
-        // NOTE: currentCompletionStage en currentStageExerciseId niet meer als private vars
 
-        // PATCH 8: Debug logging
-        android.util.Log.d("LessonViewModel", "Advancing from index ${state.currentIndex} to $nextIndex")
+        android.util.Log.d("LessonViewModel", "Advancing from index ${currentState.currentIndex} to $nextIndex")
 
-        if (nextIndex >= state.exercises.size) {
+        if (nextIndex >= currentState.exercises.size) {
             android.util.Log.d("LessonViewModel", "Completing lesson")
             completeLesson()
         } else {
@@ -390,7 +382,9 @@ class LessonViewModel(
                     difficultyChanged = null,
                     currentPhase = determinePhase(nextIndex, it),
                     completionStage = CompletionStage.NOT_STARTED,
-                    completionStageExerciseId = null
+                    completionStageExerciseId = null,
+                    error = null,
+                    failureContext = null
                 )
             }
             exerciseStartTime = System.currentTimeMillis()
@@ -405,15 +399,15 @@ class LessonViewModel(
      * Gebruikt de uniforme finishCurrentExercise helper
      */
     fun submitAnswer(answer: String) {
-        val state = _uiState.value
-        val currentExercise = state.currentExercise ?: return
+        val currentExercise = currentExerciseOrNull() ?: return
+        val stepState = _uiState.value.stepState
 
         if (isCompletionDoneForCurrentExercise(currentExercise.id)) {
             android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} already DONE")
             return
         }
 
-        if (state.stepState != LessonStepState.SHOWING) return
+        if (stepState != LessonStepState.SHOWING) return
 
         _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
@@ -447,23 +441,20 @@ class LessonViewModel(
      * Geen validatie, geen feedback-overlay, direct advance
      */
     fun continueWorkedExample() {
-        val state = _uiState.value
-        val currentExercise = state.currentExercise ?: return
+        val currentExercise = currentExerciseOrNull() ?: return
+        val stepState = _uiState.value.stepState
 
         if (isCompletionDoneForCurrentExercise(currentExercise.id)) {
             android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${currentExercise.id} already DONE")
             return
         }
 
-        // Guard: alleen voor WORKED_EXAMPLE
         if (currentExercise.type != com.rekenrinkel.domain.model.ExerciseType.WORKED_EXAMPLE) {
-            // Als het per ongeluk een ander type is, behandel als normale oefening
             submitAnswer("[worked_fallback]")
             return
         }
 
-        // PATCH 6: Guard met expliciete state
-        if (state.stepState != LessonStepState.SHOWING) return
+        if (stepState != LessonStepState.SHOWING) return
 
         _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
@@ -489,16 +480,15 @@ class LessonViewModel(
      * Geen feedback, direct door naar volgende oefening
      */
     fun skipExercise() {
-        val state = _uiState.value
-        val currentExercise = state.currentExercise ?: return
+        val currentExercise = currentExerciseOrNull() ?: return
+        val stepState = _uiState.value.stepState
 
         if (isCompletionDoneForCurrentExercise(currentExercise.id)) {
             android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${currentExercise.id} already DONE")
             return
         }
 
-        // PATCH 6: Guard met expliciete state
-        if (state.stepState != LessonStepState.SHOWING) return
+        if (stepState != LessonStepState.SHOWING) return
 
         _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
@@ -524,8 +514,7 @@ class LessonViewModel(
      * Gebruikt failure context om veilige recovery te bepalen
      */
     fun continueAfterError() {
-        val state = _uiState.value
-        val failureContext = state.failureContext
+        val failureContext = _uiState.value.failureContext
         val completion = currentCompletionState()
 
         android.util.Log.d("LessonViewModel", "continueAfterError called")
