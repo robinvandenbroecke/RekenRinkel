@@ -44,9 +44,12 @@ class LessonViewModelFlowTest {
         exerciseValidator = mockk(relaxed = true)
 
         // Setup default mocks
-        coEvery { settingsDataStore.premiumUnlocked } returns kotlinx.coroutines.flow.flowOf(false)
-        coEvery { profileRepository.getProfile() } returns kotlinx.coroutines.flow.flowOf(null)
+        // PATCH 2: Gebruik every (niet coEvery) voor niet-suspend functies die Flow teruggeven
+        every { settingsDataStore.premiumUnlocked } returns kotlinx.coroutines.flow.flowOf(false)
+        every { profileRepository.getProfile() } returns kotlinx.coroutines.flow.flowOf(null)
+        // PATCH 2: getRewards() is suspend functie, gebruik coEvery
         coEvery { profileRepository.getRewards() } returns Rewards()
+        // PATCH 2: getOrCreateProgress is suspend, dus coEvery is correct
         coEvery { progressRepository.getOrCreateProgress(any()) } returns SkillProgress("test_skill")
 
         viewModel = LessonViewModel(
@@ -68,7 +71,8 @@ class LessonViewModelFlowTest {
     fun `submitAnswer - should show feedback then auto-advance`() = runTest {
         // Arrange
         setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
-        coEvery { exerciseValidator.validate(any(), any()) } returns true
+        // PATCH 2: validate is gewone functie (geen suspend), gebruik every
+        every { exerciseValidator.validate(any(), any()) } returns true
 
         // Act - submit answer
         viewModel.submitAnswer("5")
@@ -111,7 +115,8 @@ class LessonViewModelFlowTest {
             createExercise("1", ExerciseType.GUIDED_PRACTICE),
             createExercise("2")
         ))
-        coEvery { exerciseValidator.validate(any(), any()) } returns true
+        // PATCH 2: validate is gewone functie
+        every { exerciseValidator.validate(any(), any()) } returns true
 
         // Act
         viewModel.submitAnswer("5")
@@ -147,7 +152,8 @@ class LessonViewModelFlowTest {
     fun `double submit - should ignore second submit`() = runTest {
         // Arrange
         setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
-        coEvery { exerciseValidator.validate(any(), any()) } returns true
+        // PATCH 2: validate is gewone functie
+        every { exerciseValidator.validate(any(), any()) } returns true
 
         // Act - submit twice rapidly
         viewModel.submitAnswer("5")
@@ -163,7 +169,8 @@ class LessonViewModelFlowTest {
     fun `exception during finish - should show error and not hang`() = runTest {
         // Arrange
         setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
-        coEvery { exerciseValidator.validate(any(), any()) } throws RuntimeException("Test error")
+        // PATCH 2: validate is gewone functie
+        every { exerciseValidator.validate(any(), any()) } throws RuntimeException("Test error")
 
         // Act
         viewModel.submitAnswer("5")
@@ -180,7 +187,8 @@ class LessonViewModelFlowTest {
     fun `failure in result logging - should allow skip to next`() = runTest {
         // Arrange
         setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
-        coEvery { exerciseValidator.validate(any(), any()) } returns true
+        // PATCH 2: validate is gewone functie
+        every { exerciseValidator.validate(any(), any()) } returns true
         coEvery { progressRepository.getOrCreateProgress(any()) } throws RuntimeException("DB error")
 
         // Act
@@ -219,7 +227,8 @@ class LessonViewModelFlowTest {
     fun `double continueAfterError - should not cause issues`() = runTest {
         // Arrange
         setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
-        coEvery { exerciseValidator.validate(any(), any()) } throws RuntimeException("Test error")
+        // PATCH 2: validate is gewone functie
+        every { exerciseValidator.validate(any(), any()) } throws RuntimeException("Test error")
 
         // Act - trigger error
         viewModel.submitAnswer("5")
@@ -241,7 +250,8 @@ class LessonViewModelFlowTest {
     fun `normal exercise - should go through all completion stages`() = runTest {
         // Arrange
         setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
-        coEvery { exerciseValidator.validate(any(), any()) } returns true
+        // PATCH 2: validate is gewone functie
+        every { exerciseValidator.validate(any(), any()) } returns true
 
         // Act - start lesson
         viewModel.startLesson()
@@ -285,7 +295,8 @@ class LessonViewModelFlowTest {
             createExercise("1", ExerciseType.GUIDED_PRACTICE),
             createExercise("2")
         ))
-        coEvery { exerciseValidator.validate(any(), any()) } returns true
+        // PATCH 2: validate is gewone functie
+        every { exerciseValidator.validate(any(), any()) } returns true
 
         // Act
         viewModel.startLesson()
@@ -301,7 +312,8 @@ class LessonViewModelFlowTest {
     fun `error after result logged - recovery should not log again`() = runTest {
         // Arrange
         setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
-        coEvery { exerciseValidator.validate(any(), any()) } returns true
+        // PATCH 2: validate is gewone functie
+        every { exerciseValidator.validate(any(), any()) } returns true
         
         // Simulate: result logged, then error in progress update
         var callCount = 0
@@ -336,7 +348,8 @@ class LessonViewModelFlowTest {
     fun `error after progress updated - recovery should not update progress again`() = runTest {
         // Arrange
         setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
-        coEvery { exerciseValidator.validate(any(), any()) } returns true
+        // PATCH 2: validate is gewone functie
+        every { exerciseValidator.validate(any(), any()) } returns true
         coEvery { progressRepository.getOrCreateProgress(any()) } returns SkillProgress("test_skill")
         
         // Simulate: progress updated, then error in rewards
@@ -362,7 +375,8 @@ class LessonViewModelFlowTest {
         // Arrange
         val initialRewards = Rewards(xp = 0)
         coEvery { profileRepository.getRewards() } returns initialRewards
-        coEvery { exerciseValidator.validate(any(), any()) } returns true
+        // PATCH 2: validate is gewone functie
+        every { exerciseValidator.validate(any(), any()) } returns true
         setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
 
         // Act - complete first exercise
@@ -379,7 +393,8 @@ class LessonViewModelFlowTest {
     fun `double submit while DONE - should be ignored`() = runTest {
         // Arrange
         setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
-        coEvery { exerciseValidator.validate(any(), any()) } returns true
+        // PATCH 2: validate is gewone functie
+        every { exerciseValidator.validate(any(), any()) } returns true
 
         // Act - complete first exercise
         viewModel.startLesson()
@@ -403,7 +418,8 @@ class LessonViewModelFlowTest {
     fun `error state plus continue - should advance safely`() = runTest {
         // Arrange
         setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
-        coEvery { exerciseValidator.validate(any(), any()) } throws RuntimeException("Test error")
+        // PATCH 2: validate is gewone functie
+        every { exerciseValidator.validate(any(), any()) } throws RuntimeException("Test error")
 
         // Act - trigger error
         viewModel.startLesson()
@@ -459,7 +475,8 @@ class LessonViewModelFlowTest {
     fun `completion stage validation - should reset on exercise change`() = runTest {
         // Arrange
         setupLessonWithExercises(listOf(createExercise("1"), createExercise("2")))
-        coEvery { exerciseValidator.validate(any(), any()) } returns true
+        // PATCH 2: validate is gewone functie
+        every { exerciseValidator.validate(any(), any()) } returns true
 
         // Act - complete first exercise
         viewModel.startLesson()
@@ -482,7 +499,8 @@ class LessonViewModelFlowTest {
             challengeCount = 0,
             targetSkills = emptyList()
         )
-        coEvery { exerciseEngine.generateExercises(any(), any(), any(), any()) } returns exercises
+        // PATCH 2: generateExercises is gewone functie in ExerciseEngine
+        every { exerciseEngine.generateExercises(any(), any(), any(), any()) } returns exercises
     }
 
     private fun createExercise(
