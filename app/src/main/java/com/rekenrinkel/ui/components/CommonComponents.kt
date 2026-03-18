@@ -210,6 +210,40 @@ fun VisualDots(
     }
 }
 
+/**
+ * PATCH 3: VisualBlocks component voor blokjes representatie
+ * Eenvoudige vierkantjes met hoog contrast voor kinderoefeningen
+ */
+@Composable
+fun VisualBlocks(
+    count: Int,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary
+) {
+    val rows = (count + 4) / 5
+    
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        repeat(rows) { row ->
+            Row {
+                val start = row * 5
+                val end = minOf(start + 5, count)
+                repeat(end - start) {
+                    Box(
+                        modifier = Modifier
+                            .padding(4.dp)
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(color)
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun VisualGroups(
     groups: List<Int>,
