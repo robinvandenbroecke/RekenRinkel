@@ -27,7 +27,6 @@ import com.rekenrinkel.ui.screens.exercise.ExerciseScreen
 import com.rekenrinkel.ui.screens.home.HomeScreen
 import com.rekenrinkel.ui.screens.onboarding.OnboardingScreen
 import com.rekenrinkel.ui.screens.parent.ParentDashboardScreen
-import com.rekenrinkel.ui.screens.premium.PremiumScreen
 import com.rekenrinkel.ui.screens.profile.ProfileScreen
 import com.rekenrinkel.ui.screens.session.SessionResultScreen
 import com.rekenrinkel.ui.screens.settings.SettingsScreen
@@ -100,7 +99,6 @@ fun RekenRinkelApp() {
                                 is MainNavEvent.OpenProfile -> navController.navigate("profile")
                                 is MainNavEvent.OpenSettings -> navController.navigate("settings")
                                 is MainNavEvent.OpenParentDashboard -> navController.navigate("parent")
-                                is MainNavEvent.OpenPremium -> navController.navigate("premium")
                             }
                         }
                     }
@@ -170,7 +168,6 @@ fun RekenRinkelApp() {
                         onEinkModeToggle = { viewModel.toggleEinkMode(it) },
                         onResetProgress = { viewModel.resetProgress() },
                         onResetProfile = { viewModel.resetProfile() },
-                        onOpenPremium = { navController.navigate("premium") },
                         onBack = { navController.popBackStack() }
                     )
                 }
@@ -185,12 +182,6 @@ fun RekenRinkelApp() {
                         progressList = uiState.progress,
                         isPremiumUnlocked = uiState.isPremiumUnlocked,
                         currentStreak = uiState.profile?.currentStreak ?: 0,
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-                
-                composable("premium") {
-                    PremiumScreen(
                         onBack = { navController.popBackStack() }
                     )
                 }

@@ -111,12 +111,6 @@ class MainViewModel(
         }
     }
     
-    fun openPremium() {
-        viewModelScope.launch {
-            _navigation.emit(NavigationEvent.OpenPremium)
-        }
-    }
-    
     fun updateProfileName(name: String) {
         viewModelScope.launch {
             val current = uiState.value.profile ?: return@launch
@@ -299,6 +293,5 @@ sealed class NavigationEvent {
     data object OpenProfile : NavigationEvent()
     data object OpenSettings : NavigationEvent()
     data object OpenParentDashboard : NavigationEvent()
-    data object OpenPremium : NavigationEvent()
     data class StartSession(val exercises: List<Exercise>) : NavigationEvent()
 }

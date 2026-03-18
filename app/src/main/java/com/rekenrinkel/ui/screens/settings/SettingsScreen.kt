@@ -23,7 +23,6 @@ fun SettingsScreen(
     onEinkModeToggle: (Boolean) -> Unit,
     onResetProgress: () -> Unit,
     onResetProfile: () -> Unit,
-    onOpenPremium: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -77,10 +76,10 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Premium toggle (for testing)
+            // V1: alleen eenvoudige test-toggle voor extra vaardigheden
             SettingCard(
-                title = "⭐ Premium (test)",
-                subtitle = if (isPremiumUnlocked) "Ontgrendeld" else "Gesloten",
+                title = "⭐ Extra vaardigheden (test)",
+                subtitle = if (isPremiumUnlocked) "Aan" else "Uit",
                 onClick = { onPremiumToggle(!isPremiumUnlocked) }
             ) {
                 Switch(
@@ -176,39 +175,6 @@ fun SettingsScreen(
                             )
                         }
                     }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Premium option
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                onClick = onOpenPremium
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "⭐ RekenRinkel Premium",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = "Bekijk premium functies",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                        )
-                    }
-                    Text(
-                        text = "›",
-                        style = MaterialTheme.typography.titleLarge
-                    )
                 }
             }
 
