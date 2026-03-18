@@ -32,6 +32,13 @@ class LessonViewModelFlowTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
 
+        // PATCH 5: Mock android.util.Log om "Method not mocked" errors te voorkomen
+        mockkStatic(android.util.Log::class)
+        every { android.util.Log.w(any(), any<String>()) } returns 0
+        every { android.util.Log.e(any(), any<String>()) } returns 0
+        every { android.util.Log.d(any(), any<String>()) } returns 0
+        every { android.util.Log.i(any(), any<String>()) } returns 0
+
         progressRepository = mockk(relaxed = true)
         profileRepository = mockk(relaxed = true)
         settingsDataStore = mockk(relaxed = true)
@@ -60,6 +67,7 @@ class LessonViewModelFlowTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        unmockkStatic(android.util.Log::class)
     }
 
     @Test
