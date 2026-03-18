@@ -273,11 +273,50 @@ class LessonViewModelFlowTest {
         assertEquals(1, viewModel.uiState.value.currentIndex)
     }
 
+    /**
+     * PATCH 1: Correcte mock-opzet met returnsMany in plaats van overschrijvende any() matchers.
+     * 
+     * De vorige implementatie gebruikte een loop met identieke any(), any() matchers,
+     * waardoor elke iteratie de vorige overschreef en uiteindelijk alleen het laatste
+     * exercise-object werd geretourneerd.
+     * 
+     * Deze implementatie gebruikt returnsMany om een deterministische reeks oefeningen
+     * te leveren die overeenkomt met hoe LessonEngine de methods aanroept.
+     */
     private fun setupLessonWithExercises(exercises: List<Exercise>) {
-        exercises.forEach { exercise ->
-            every { exerciseEngine.generateExercise(any(), any()) } returns exercise
-            every { exerciseEngine.generateWorkedExample(any(), any()) } returns exercise
-            every { exerciseEngine.generateGuidedExercise(any(), any()) } returns exercise
+        // Verdeel exercises over de verschillende methodes die LessonEngine aanroept
+        // Op basis van LessonEngine.buildLesson() structuur:
+        // - Warm-up: generateExercise
+        // - Focus block: mix van generateWorkedExample, generateGuidedExercise, generateExercise
+        // - Review block: generateExercise
+        // - Challenge block: generateExercise
+        
+        val workedExamples = exercises.filterIndexed { index, _ -> index % 4 == 0 }
+        val guidedExercises = exercises.filterIndexed { index, _ -> index % 4 == 1 }
+        val regularExercises = exercises.filterIndexed { index, _ -> index % 4 == 2 || index % 4 == 3 }
+        
+        if (workedExamples.isNotEmpty()) {
+            every { exerciseEngine.generateWorkedExample(any(), any()) } returnsMany workedExamples
+        }
+        if (guidedExercises.isNotEmpty()) {
+            every { exerciseEngine.generateGuidedExercise(any(), any()) } returnsMany guidedExercises
+        }
+        if (regularExercises.isNotEmpty()) {
+            every { exerciseEngine.generateExercise(any(), any()) } returnsMany regularExercises
+        }
+        
+        // Fallback: als een lijst leeg is, return het eerste exercise voor die methode
+        // Dit zorgt dat de mock altijd iets returnt, zelfs als de verdeling niet perfect is
+        exercises.firstOrNull()?.let { firstExercise ->
+            if (workedExamples.isEmpty()) {
+                every { exerciseEngine.generateWorkedExample(any(), any()) } returns firstExercise
+            }
+            if (guidedExercises.isEmpty()) {
+                every { exerciseEngine.generateGuidedExercise(any(), any()) } returns firstExercise
+            }
+            if (regularExercises.isEmpty()) {
+                every { exerciseEngine.generateExercise(any(), any()) } returns firstExercise
+            }
         }
     }
 

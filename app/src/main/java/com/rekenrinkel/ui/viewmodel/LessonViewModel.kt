@@ -87,6 +87,10 @@ class LessonViewModel(
         _uiState.update { it.copy(completionStage = stage, completionStageExerciseId = exerciseId) }
     }
 
+    /**
+     * PATCH 4: Alle state reads gebruiken nu _uiState.value direct, geen stale snapshots.
+     * Dit voorkomt dat oude state wordt gebruikt in beslissingen terwijl de flow bezig is.
+     */
     private suspend fun finishCurrentExercise(
         result: DetailedExerciseResult,
         mode: CompletionMode,
@@ -111,9 +115,9 @@ class LessonViewModel(
         val shouldUpdateMastery = mode == CompletionMode.FEEDBACK_THEN_ADVANCE
 
         try {
-            // Step 1: Log result
-            val state1 = _uiState.value
-            if (state1.completionStageExerciseId != exerciseId || state1.completionStage < CompletionStage.RESULT_LOGGED) {
+            // Step 1: Log result - check fresh state each time
+            if (_uiState.value.completionStageExerciseId != exerciseId || 
+                _uiState.value.completionStage < CompletionStage.RESULT_LOGGED) {
                 _uiState.update {
                     it.copy(
                         results = it.results + result,
@@ -126,8 +130,8 @@ class LessonViewModel(
             // Step 2: Update progress (only for normal answers)
             var outcome: ExerciseOutcome? = null
             if (shouldUpdateMastery) {
-                val state2 = _uiState.value
-                if (state2.completionStage == CompletionStage.RESULT_LOGGED) {
+                // Fresh state check before progress update
+                if (_uiState.value.completionStage == CompletionStage.RESULT_LOGGED) {
                     try {
                         val currentProgress = progressRepository.getOrCreateProgress(result.skillId)
                         outcome = lessonEngine.processExerciseResult(result, currentProgress)
@@ -141,8 +145,8 @@ class LessonViewModel(
 
             // Step 3: Apply rewards (only for normal answers)
             if (shouldUpdateMastery) {
-                val state3 = _uiState.value
-                if (state3.completionStage == CompletionStage.PROGRESS_UPDATED) {
+                // Fresh state check before rewards
+                if (_uiState.value.completionStage == CompletionStage.PROGRESS_UPDATED) {
                     try {
                         val finalOutcome = outcome ?: run {
                             val currentProgress = progressRepository.getOrCreateProgress(result.skillId)
@@ -161,12 +165,11 @@ class LessonViewModel(
                 }
             }
 
-            // Step 4: Prepare advance
-            val state4 = _uiState.value
+            // Step 4: Prepare advance - fresh state check
             val canAdvance = when {
                 mode == CompletionMode.SKIP_ADVANCE || mode == CompletionMode.DIRECT_CONTINUE ->
-                    state4.completionStage == CompletionStage.RESULT_LOGGED
-                else -> state4.completionStage == CompletionStage.REWARDS_APPLIED
+                    _uiState.value.completionStage == CompletionStage.RESULT_LOGGED
+                else -> _uiState.value.completionStage == CompletionStage.REWARDS_APPLIED
             }
             if (canAdvance) {
                 val xpEarned = if (shouldUpdateMastery) outcome?.xpEarned ?: 0 else 0
@@ -186,9 +189,9 @@ class LessonViewModel(
                 }
             }
 
-            // Step 5: Advance
-            val state5 = _uiState.value
-            if (state5.completionStage == CompletionStage.READY_TO_ADVANCE && state5.completionStageExerciseId == exerciseId) {
+            // Step 5: Advance - fresh state check
+            if (_uiState.value.completionStage == CompletionStage.READY_TO_ADVANCE && 
+                _uiState.value.completionStageExerciseId == exerciseId) {
                 if (needsFeedback) {
                     delay(feedbackDelayMs)
                 }
