@@ -283,49 +283,47 @@ class LessonViewModelFlowTest {
     }
 
     /**
-     * PATCH 1: Correcte mock-opzet met returnsMany in plaats van overschrijvende any() matchers.
+     * PATCH 3: Correcte mock-opzet met queues per generatorfunctie.
      * 
-     * De vorige implementatie gebruikte een loop met identieke any(), any() matchers,
-     * waardoor elke iteratie de vorige overschreef en uiteindelijk alleen het laatste
-     * exercise-object werd geretourneerd.
+     * Lesstructuur (WARM_UP=1, FOCUS=4, REVIEW=2, CHALLENGE=1 = 8 total):
+     * - Warm-up: altijd generateExercise()
+     * - Focus block: afhankelijk van CPA fase, mix van worked/guided/regular
+     * - Review: altijd generateExercise()
+     * - Challenge: altijd generateExercise()
      * 
-     * Deze implementatie gebruikt returnsMany om een deterministische reeks oefeningen
-     * te leveren die overeenkomt met hoe LessonEngine de methods aanroept.
+     * Deze helper gebruikt aparte queues zodat elke methode uit zijn eigen queue poppt
+     * in de volgorde waarin LessonEngine ze echt aanroept.
      */
     private fun setupLessonWithExercises(exercises: List<Exercise>) {
-        // Verdeel exercises over de verschillende methodes die LessonEngine aanroept
-        // Op basis van LessonEngine.buildLesson() structuur:
-        // - Warm-up: generateExercise
-        // - Focus block: mix van generateWorkedExample, generateGuidedExercise, generateExercise
-        // - Review block: generateExercise
-        // - Challenge block: generateExercise
+        // Maak mutable queues voor elke generator functie
+        val workedQueue = exercises.filter { it.type == ExerciseType.WORKED_EXAMPLE }.toMutableList()
+        val guidedQueue = exercises.filter { it.type == ExerciseType.GUIDED_PRACTICE }.toMutableList()
+        val regularQueue = exercises.filter { 
+            it.type != ExerciseType.WORKED_EXAMPLE && it.type != ExerciseType.GUIDED_PRACTICE 
+        }.toMutableList()
         
-        val workedExamples = exercises.filterIndexed { index, _ -> index % 4 == 0 }
-        val guidedExercises = exercises.filterIndexed { index, _ -> index % 4 == 1 }
-        val regularExercises = exercises.filterIndexed { index, _ -> index % 4 == 2 || index % 4 == 3 }
+        // Fallback queue met alle exercises voor als een specifieke queue leeg is
+        val fallbackQueue = exercises.toMutableList()
         
-        if (workedExamples.isNotEmpty()) {
-            every { exerciseEngine.generateWorkedExample(any(), any()) } returnsMany workedExamples
-        }
-        if (guidedExercises.isNotEmpty()) {
-            every { exerciseEngine.generateGuidedExercise(any(), any()) } returnsMany guidedExercises
-        }
-        if (regularExercises.isNotEmpty()) {
-            every { exerciseEngine.generateExercise(any(), any()) } returnsMany regularExercises
+        // generateWorkedExample: pop uit workedQueue, of fallback
+        every { exerciseEngine.generateWorkedExample(any(), any()) } answers {
+            workedQueue.removeFirstOrNull() 
+                ?: fallbackQueue.removeFirstOrNull()
+                ?: createExercise("worked_fallback", ExerciseType.WORKED_EXAMPLE)
         }
         
-        // Fallback: als een lijst leeg is, return het eerste exercise voor die methode
-        // Dit zorgt dat de mock altijd iets returnt, zelfs als de verdeling niet perfect is
-        exercises.firstOrNull()?.let { firstExercise ->
-            if (workedExamples.isEmpty()) {
-                every { exerciseEngine.generateWorkedExample(any(), any()) } returns firstExercise
-            }
-            if (guidedExercises.isEmpty()) {
-                every { exerciseEngine.generateGuidedExercise(any(), any()) } returns firstExercise
-            }
-            if (regularExercises.isEmpty()) {
-                every { exerciseEngine.generateExercise(any(), any()) } returns firstExercise
-            }
+        // generateGuidedExercise: pop uit guidedQueue, of fallback  
+        every { exerciseEngine.generateGuidedExercise(any(), any()) } answers {
+            guidedQueue.removeFirstOrNull()
+                ?: fallbackQueue.removeFirstOrNull()
+                ?: createExercise("guided_fallback", ExerciseType.GUIDED_PRACTICE)
+        }
+        
+        // generateExercise: pop uit regularQueue, of fallback
+        every { exerciseEngine.generateExercise(any(), any()) } answers {
+            regularQueue.removeFirstOrNull()
+                ?: fallbackQueue.removeFirstOrNull()
+                ?: createExercise("regular_fallback", ExerciseType.TYPED_NUMERIC)
         }
     }
 

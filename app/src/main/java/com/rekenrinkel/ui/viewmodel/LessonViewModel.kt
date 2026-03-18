@@ -228,6 +228,8 @@ class LessonViewModel(
     /**
      * ROBUUSTE LESSONFLOW: Stage-based completion met expliciete state machine
      * 
+     * PATCH 1: Geen stale state snapshots - elke stap leest actuele _uiState.value
+     * 
      * Completion stages: NOT_STARTED → RESULT_LOGGED → PROGRESS_UPDATED → REWARDS_APPLIED → READY_TO_ADVANCE → DONE
      * Failure stages: RESULT_LOGGING, PROGRESS_UPDATE, REWARD_UPDATE, ADVANCE, UNKNOWN
      */
@@ -236,7 +238,6 @@ class LessonViewModel(
         mode: CompletionMode
     ) {
         val exerciseId = result.exerciseId
-        val state = _uiState.value
 
         // Guard: al voltooid
         if (isExerciseCompleted(exerciseId)) {
@@ -253,8 +254,9 @@ class LessonViewModel(
 
         try {
             // STAGE 1: Log resultaat (altijd)
-            if (state.completionStageExerciseId != exerciseId ||
-                state.completionStage < CompletionStage.RESULT_LOGGED) {
+            // Gebruik actuele state voor de check, niet een snapshot
+            if (_uiState.value.completionStageExerciseId != exerciseId ||
+                _uiState.value.completionStage < CompletionStage.RESULT_LOGGED) {
                 _uiState.update {
                     it.copy(
                         results = it.results + result,
@@ -268,7 +270,8 @@ class LessonViewModel(
             // STAGE 2 & 3: Update progress en rewards (alleen voor FEEDBACK_THEN_ADVANCE mode)
             if (mode == CompletionMode.FEEDBACK_THEN_ADVANCE) {
                 // STAGE 2: Progress update
-                if (state.completionStage < CompletionStage.PROGRESS_UPDATED) {
+                // Altijd actuele state lezen voor de check
+                if (_uiState.value.completionStage < CompletionStage.PROGRESS_UPDATED) {
                     try {
                         val currentProgress = progressRepository.getOrCreateProgress(result.skillId)
                         val outcome = lessonEngine.processExerciseResult(result, currentProgress)
@@ -286,6 +289,7 @@ class LessonViewModel(
                 }
 
                 // STAGE 3: Rewards update
+                // Altijd actuele state lezen voor de check
                 if (_uiState.value.completionStage < CompletionStage.REWARDS_APPLIED) {
                     try {
                         val currentRewards = profileRepository.getRewards()
@@ -310,6 +314,7 @@ class LessonViewModel(
             }
 
             // STAGE 4: Ready to advance
+            // Altijd actuele state lezen voor de check
             if (_uiState.value.completionStage < CompletionStage.READY_TO_ADVANCE) {
                 _uiState.update { it.copy(completionStage = CompletionStage.READY_TO_ADVANCE) }
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Stage READY_TO_ADVANCE for $exerciseId")
