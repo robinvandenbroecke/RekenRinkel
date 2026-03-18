@@ -255,8 +255,8 @@ class LessonViewModel(
         try {
             // STAGE 1: Log resultaat (altijd)
             // Gebruik actuele state voor de check, niet een snapshot
-            if (_uiState.value.completionStageExerciseId != exerciseId ||
-                _uiState.value.completionStage < CompletionStage.RESULT_LOGGED) {
+            if (currentUiState().completionStageExerciseId != exerciseId ||
+                currentCompletionState() < CompletionStage.RESULT_LOGGED) {
                 _uiState.update {
                     it.copy(
                         results = it.results + result,
@@ -271,7 +271,7 @@ class LessonViewModel(
             if (mode == CompletionMode.FEEDBACK_THEN_ADVANCE) {
                 // STAGE 2: Progress update
                 // Altijd actuele state lezen voor de check
-                if (_uiState.value.completionStage < CompletionStage.PROGRESS_UPDATED) {
+                if (currentCompletionState() < CompletionStage.PROGRESS_UPDATED) {
                     try {
                         val currentProgress = progressRepository.getOrCreateProgress(result.skillId)
                         val outcome = lessonEngine.processExerciseResult(result, currentProgress)
@@ -290,7 +290,7 @@ class LessonViewModel(
 
                 // STAGE 3: Rewards update
                 // Altijd actuele state lezen voor de check
-                if (_uiState.value.completionStage < CompletionStage.REWARDS_APPLIED) {
+                if (currentCompletionState() < CompletionStage.REWARDS_APPLIED) {
                     try {
                         val currentRewards = profileRepository.getRewards()
                         val xpEarned = calculateXpFromResult(result)
@@ -315,7 +315,7 @@ class LessonViewModel(
 
             // STAGE 4: Ready to advance
             // Altijd actuele state lezen voor de check
-            if (_uiState.value.completionStage < CompletionStage.READY_TO_ADVANCE) {
+            if (currentCompletionState() < CompletionStage.READY_TO_ADVANCE) {
                 _uiState.update { it.copy(completionStage = CompletionStage.READY_TO_ADVANCE) }
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Stage READY_TO_ADVANCE for $exerciseId")
             }
@@ -366,15 +366,13 @@ class LessonViewModel(
      * Advance naar volgende oefening of finish les
      */
     private suspend fun advanceToNextExercise() {
-        val state = _uiState.value
-        val nextIndex = state.currentIndex + 1
-        
-        if (nextIndex >= state.exercises.size) {
-            // Les klaar
+        val nextIndex = currentIndex() + 1
+        val exercises = currentUiState().exercises
+
+        if (nextIndex >= exercises.size) {
             finishLesson()
         } else {
-            // Volgende oefening
-            val nextExercise = state.exercises[nextIndex]
+            val nextExercise = exercises[nextIndex]
             _uiState.update {
                 it.copy(
                     currentIndex = nextIndex,
@@ -392,11 +390,11 @@ class LessonViewModel(
      * Finish les en navigeer naar result screen
      */
     private suspend fun finishLesson() {
-        val state = _uiState.value
-        
-        // Maak session result
+        val results = currentUiState().results
+        val xpEarned = currentUiState().xpEarnedThisLesson
+
         val sessionResult = SessionResult(
-            exercises = state.results.map { r ->
+            exercises = results.map { r ->
                 ExerciseResult(
                     exerciseId = r.exerciseId,
                     skillId = r.skillId,
@@ -405,15 +403,14 @@ class LessonViewModel(
                     givenAnswer = r.givenAnswer
                 )
             },
-            xpEarned = state.xpEarnedThisLesson
+            xpEarned = xpEarned
         )
-        
-        _uiState.update { it.copy(isActive = false) }
-        
-        // Emit navigation event
+
+        _uiState.update { it.copy(isActive = false, stepState = LessonStepState.COMPLETED) }
+
         _navigation.emit(LessonNavigationEvent.LessonComplete(
             result = sessionResult,
-            xpTotal = state.xpEarnedThisLesson,
+            xpTotal = xpEarned,
             badges = emptyList() // V1: simplified rewards
         ))
     }
@@ -443,9 +440,17 @@ class LessonViewModel(
         return completedExerciseIds.contains(exerciseId)
     }
 
-    private fun currentExerciseId(): String? {
-        return _uiState.value.currentExercise?.id
-    }
+    private fun currentUiState(): LessonUiState = _uiState.value
+
+    private fun currentExerciseOrNull(): Exercise? = currentUiState().currentExercise
+
+    private fun currentCompletionState(): CompletionStage = currentUiState().completionStage
+
+    private fun currentIndex(): Int = currentUiState().currentIndex
+
+    private fun currentLastAnswerCorrect(): Boolean? = currentUiState().lastAnswerCorrect
+
+    private fun currentExerciseId(): String? = currentExerciseOrNull()?.id
 
     override fun onCleared() {
         super.onCleared()

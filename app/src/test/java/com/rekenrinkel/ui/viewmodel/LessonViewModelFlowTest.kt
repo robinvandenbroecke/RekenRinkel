@@ -47,9 +47,7 @@ class LessonViewModelFlowTest {
         exerciseValidator = mockk(relaxed = true)
 
         every { settingsDataStore.premiumUnlocked } returns flowOf(false)
-        every { profileRepository.getProfile() } returns flowOf(
-            Profile(name = "Test", age = 8, theme = Theme.DINOSAURS)
-        )
+        mockProfile(age = 8)
         coEvery { profileRepository.getRewards() } returns Rewards()
         coEvery { progressRepository.getOrCreateProgress(any()) } returns SkillProgress("test_skill")
         coEvery { progressRepository.getAllProgress() } returns flowOf(emptyList())
@@ -73,8 +71,18 @@ class LessonViewModelFlowTest {
 
     @Test
     fun `submitAnswer - should show feedback then auto-advance`() = runTest {
-        val exercises = listOf(createExercise("1"), createExercise("2"))
-        setupLessonWithExercises(exercises)
+        setupLessonWithExercises(
+            regularExercises = listOf(
+                createExercise("warmup"),
+                createExercise("focus_independent_1"),
+                createExercise("focus_independent_2"),
+                createExercise("review_1"),
+                createExercise("review_2"),
+                createExercise("challenge")
+            ),
+            workedExamples = listOf(createExercise("focus_worked", ExerciseType.WORKED_EXAMPLE)),
+            guidedExercises = listOf(createExercise("focus_guided", ExerciseType.GUIDED_PRACTICE))
+        )
         every { exerciseValidator.validate(any(), any()) } returns true
 
         viewModel.startLesson()
@@ -93,33 +101,64 @@ class LessonViewModelFlowTest {
 
     @Test
     fun `continueWorkedExample - should advance directly without feedback`() = runTest {
-        val exercises = listOf(
-            createExercise("1", ExerciseType.WORKED_EXAMPLE),
-            createExercise("2")
+        mockProfile(age = 6)
+        setupLessonWithExercises(
+            regularExercises = listOf(
+                createExercise("warmup"),
+                createExercise("review_1"),
+                createExercise("review_2"),
+                createExercise("challenge")
+            ),
+            workedExamples = listOf(createExercise("focus_worked", ExerciseType.WORKED_EXAMPLE)),
+            guidedExercises = listOf(
+                createExercise("focus_guided_1", ExerciseType.GUIDED_PRACTICE),
+                createExercise("focus_guided_2", ExerciseType.GUIDED_PRACTICE),
+                createExercise("focus_guided_3", ExerciseType.GUIDED_PRACTICE)
+            )
         )
-        setupLessonWithExercises(exercises)
 
         viewModel.startLesson()
         advanceTimeBy(500)
 
+        viewModel.skipExercise()
+        advanceTimeBy(100)
+        assertEquals(1, viewModel.uiState.value.currentIndex)
+        assertEquals(ExerciseType.WORKED_EXAMPLE, viewModel.uiState.value.currentExercise?.type)
+
         viewModel.continueWorkedExample()
         advanceTimeBy(100)
 
-        assertEquals(1, viewModel.uiState.value.currentIndex)
+        assertEquals(2, viewModel.uiState.value.currentIndex)
         assertEquals(LessonStepState.SHOWING, viewModel.uiState.value.stepState)
     }
 
     @Test
     fun `guidedPractice - should validate and advance with feedback`() = runTest {
-        val exercises = listOf(
-            createExercise("1", ExerciseType.GUIDED_PRACTICE),
-            createExercise("2")
+        mockProfile(age = 6)
+        setupLessonWithExercises(
+            regularExercises = listOf(
+                createExercise("warmup"),
+                createExercise("review_1"),
+                createExercise("review_2"),
+                createExercise("challenge")
+            ),
+            workedExamples = listOf(createExercise("focus_worked", ExerciseType.WORKED_EXAMPLE)),
+            guidedExercises = listOf(
+                createExercise("focus_guided_1", ExerciseType.GUIDED_PRACTICE),
+                createExercise("focus_guided_2", ExerciseType.GUIDED_PRACTICE),
+                createExercise("focus_guided_3", ExerciseType.GUIDED_PRACTICE)
+            )
         )
-        setupLessonWithExercises(exercises)
         every { exerciseValidator.validate(any(), any()) } returns true
 
         viewModel.startLesson()
         advanceTimeBy(500)
+
+        viewModel.skipExercise()
+        advanceTimeBy(100)
+        viewModel.continueWorkedExample()
+        advanceTimeBy(100)
+        assertEquals(ExerciseType.GUIDED_PRACTICE, viewModel.uiState.value.currentExercise?.type)
 
         viewModel.submitAnswer("5")
         advanceTimeBy(100)
@@ -128,7 +167,7 @@ class LessonViewModelFlowTest {
 
         advanceTimeBy(1000)
 
-        assertEquals(1, viewModel.uiState.value.currentIndex)
+        assertEquals(3, viewModel.uiState.value.currentIndex)
     }
 
     @Test
@@ -283,48 +322,69 @@ class LessonViewModelFlowTest {
     }
 
     /**
-     * PATCH 3: Correcte mock-opzet met queues per generatorfunctie.
+     * Bouw een expliciete lesson-sequence die de LessonEngine-aanroepvolgorde weerspiegelt.
      * 
-     * Lesstructuur (WARM_UP=1, FOCUS=4, REVIEW=2, CHALLENGE=1 = 8 total):
-     * - Warm-up: altijd generateExercise()
-     * - Focus block: afhankelijk van CPA fase, mix van worked/guided/regular
-     * - Review: altijd generateExercise()
-     * - Challenge: altijd generateExercise()
-     * 
-     * Deze helper gebruikt aparte queues zodat elke methode uit zijn eigen queue poppt
-     * in de volgorde waarin LessonEngine ze echt aanroept.
+     * We mocken de generatoren per methode zonder algemene fallback-queue.
+     * Onverwachte extra calls falen de test direct.
      */
-    private fun setupLessonWithExercises(exercises: List<Exercise>) {
-        // Maak mutable queues voor elke generator functie
-        val workedQueue = exercises.filter { it.type == ExerciseType.WORKED_EXAMPLE }.toMutableList()
-        val guidedQueue = exercises.filter { it.type == ExerciseType.GUIDED_PRACTICE }.toMutableList()
-        val regularQueue = exercises.filter { 
-            it.type != ExerciseType.WORKED_EXAMPLE && it.type != ExerciseType.GUIDED_PRACTICE 
-        }.toMutableList()
-        
-        // Fallback queue met alle exercises voor als een specifieke queue leeg is
-        val fallbackQueue = exercises.toMutableList()
-        
-        // generateWorkedExample: pop uit workedQueue, of fallback
-        every { exerciseEngine.generateWorkedExample(any(), any()) } answers {
-            workedQueue.removeFirstOrNull() 
-                ?: fallbackQueue.removeFirstOrNull()
-                ?: createExercise("worked_fallback", ExerciseType.WORKED_EXAMPLE)
+    private fun setupLessonWithExercises(
+        regularExercises: List<Exercise>,
+        workedExamples: List<Exercise> = emptyList(),
+        guidedExercises: List<Exercise> = emptyList()
+    ) {
+        val workedQueue = workedExamples.toMutableList().apply {
+            while (size < 4) add(createExercise("worked_pad_$size", ExerciseType.WORKED_EXAMPLE))
         }
-        
-        // generateGuidedExercise: pop uit guidedQueue, of fallback  
+        val guidedQueue = guidedExercises.toMutableList().apply {
+            while (size < 6) add(createExercise("guided_pad_$size", ExerciseType.GUIDED_PRACTICE))
+        }
+        val regularQueue = regularExercises.toMutableList().apply {
+            while (size < 12) add(createExercise("regular_pad_$size"))
+        }
+
+        every { exerciseEngine.generateWorkedExample(any(), any()) } answers {
+            workedQueue.removeFirstOrNull()
+                ?: error("Unexpected generateWorkedExample call - sequence exhausted")
+        }
+
         every { exerciseEngine.generateGuidedExercise(any(), any()) } answers {
             guidedQueue.removeFirstOrNull()
-                ?: fallbackQueue.removeFirstOrNull()
-                ?: createExercise("guided_fallback", ExerciseType.GUIDED_PRACTICE)
+                ?: error("Unexpected generateGuidedExercise call - sequence exhausted")
         }
-        
-        // generateExercise: pop uit regularQueue, of fallback
+
         every { exerciseEngine.generateExercise(any(), any()) } answers {
             regularQueue.removeFirstOrNull()
-                ?: fallbackQueue.removeFirstOrNull()
-                ?: createExercise("regular_fallback", ExerciseType.TYPED_NUMERIC)
+                ?: error("Unexpected generateExercise call - sequence exhausted")
         }
+    }
+
+    /**
+     * Default scenario voor profiel age=8: warm-up regular, daarna een guided focus item,
+     * daarna onafhankelijke regular focus items, review en challenge.
+     */
+    private fun setupLessonWithExercises(exercises: List<Exercise>) {
+        require(exercises.isNotEmpty())
+        val warmup = exercises.first()
+        val nextRegular = exercises.getOrElse(1) { createExercise("focus_regular_1") }
+        setupLessonWithExercises(
+            regularExercises = listOf(
+                warmup,
+                nextRegular,
+                createExercise("focus_regular_2"),
+                createExercise("focus_regular_3"),
+                createExercise("review_1"),
+                createExercise("review_2"),
+                createExercise("challenge")
+            ),
+            workedExamples = emptyList(),
+            guidedExercises = listOf(createExercise("focus_guided", ExerciseType.GUIDED_PRACTICE))
+        )
+    }
+
+    private fun mockProfile(age: Int) {
+        every { profileRepository.getProfile() } returns flowOf(
+            Profile(name = "Test", age = age, theme = Theme.DINOSAURS)
+        )
     }
 
     private fun createExercise(
