@@ -186,10 +186,10 @@ class LessonViewModel(
                 representationUsed = "SKIP"
             )
             
-            // Skip gebruikt DIRECT_CONTINUE - geen feedback, geen XP update
+            // Skip gebruikt eigen completion-mode: geen validator, geen feedback, directe veilige advance
             finishCurrentExercise(
                 result = result,
-                mode = CompletionMode.DIRECT_CONTINUE
+                mode = CompletionMode.SKIP_ADVANCE
             )
         }
     }
@@ -320,31 +320,41 @@ class LessonViewModel(
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Stage READY_TO_ADVANCE for $exerciseId")
             }
 
-            // STAGE 5: Toon feedback of ga direct door
+            // STAGE 5: huidig item definitief DONE zetten vóór advance
+            completedExerciseIds.add(exerciseId)
+            _uiState.update {
+                it.copy(
+                    completionStage = CompletionStage.DONE,
+                    completionStageExerciseId = exerciseId,
+                    lastAnswerCorrect = result.isCorrect
+                )
+            }
+            android.util.Log.d("LessonViewModel", "[COMPLETION] Stage DONE for $exerciseId")
+
+            // STAGE 6: pas na DONE naar volgende state/lesson
             when (mode) {
                 CompletionMode.FEEDBACK_THEN_ADVANCE -> {
                     _uiState.update {
-                        it.copy(
-                            stepState = LessonStepState.FEEDBACK,
-                            lastAnswerCorrect = result.isCorrect
-                        )
+                        it.copy(stepState = LessonStepState.FEEDBACK)
                     }
-                    // Delay dan advance
                     delay(1000)
-                    _uiState.update { it.copy(stepState = LessonStepState.ADVANCING) }
-                    advanceToNextExercise()
+                    _uiState.update { current ->
+                        if (current.completionStageExerciseId == exerciseId && current.completionStage == CompletionStage.DONE) {
+                            current.copy(stepState = LessonStepState.ADVANCING)
+                        } else current
+                    }
+                    advanceToNextExercise(exerciseId)
                 }
-                CompletionMode.DIRECT_CONTINUE -> {
-                    _uiState.update { it.copy(stepState = LessonStepState.ADVANCING) }
-                    advanceToNextExercise()
+                CompletionMode.DIRECT_CONTINUE,
+                CompletionMode.SKIP_ADVANCE -> {
+                    _uiState.update { current ->
+                        if (current.completionStageExerciseId == exerciseId && current.completionStage == CompletionStage.DONE) {
+                            current.copy(stepState = LessonStepState.ADVANCING)
+                        } else current
+                    }
+                    advanceToNextExercise(exerciseId)
                 }
             }
-
-            // Mark as completed
-            completedExerciseIds.add(exerciseId)
-            _uiState.update { it.copy(completionStage = CompletionStage.DONE) }
-            android.util.Log.d("LessonViewModel", "[COMPLETION] Stage DONE for $exerciseId")
-
         } catch (e: Exception) {
             android.util.Log.e("LessonViewModel", "[FAILURE] Unexpected error in finishCurrentExercise", e)
             handleFailure("Er ging iets mis", FailureStage.UNKNOWN, exerciseId)
@@ -365,9 +375,15 @@ class LessonViewModel(
     /**
      * Advance naar volgende oefening of finish les
      */
-    private suspend fun advanceToNextExercise() {
-        val nextIndex = currentIndex() + 1
-        val exercises = currentUiState().exercises
+    private suspend fun advanceToNextExercise(completedExerciseId: String) {
+        val currentState = currentUiState()
+        if (currentState.completionStageExerciseId != completedExerciseId || currentState.completionStage != CompletionStage.DONE) {
+            android.util.Log.w("LessonViewModel", "[ADVANCE] blocked - item not definitively DONE: $completedExerciseId")
+            return
+        }
+
+        val nextIndex = currentState.currentIndex + 1
+        val exercises = currentState.exercises
 
         if (nextIndex >= exercises.size) {
             finishLesson()
@@ -432,7 +448,29 @@ class LessonViewModel(
      */
     fun continueAfterError() {
         viewModelScope.launch {
-            advanceToNextExercise()
+            advanceAfterError()
+        }
+    }
+
+    private suspend fun advanceAfterError() {
+        val nextIndex = currentIndex() + 1
+        val exercises = currentUiState().exercises
+
+        if (nextIndex >= exercises.size) {
+            finishLesson()
+        } else {
+            val nextExercise = exercises[nextIndex]
+            _uiState.update {
+                it.copy(
+                    currentIndex = nextIndex,
+                    currentExercise = nextExercise,
+                    stepState = LessonStepState.SHOWING,
+                    completionStage = CompletionStage.NOT_STARTED,
+                    completionStageExerciseId = null,
+                    error = null,
+                    exerciseStartTime = System.currentTimeMillis()
+                )
+            }
         }
     }
 
@@ -502,7 +540,8 @@ enum class CompletionStage {
 
 enum class CompletionMode {
     FEEDBACK_THEN_ADVANCE,
-    DIRECT_CONTINUE
+    DIRECT_CONTINUE,
+    SKIP_ADVANCE
 }
 
 enum class FailureStage {
