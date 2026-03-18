@@ -1,45 +1,26 @@
-# RekenRinkel V1 Freeze
+# RekenRinkel V1
 
-Lokale Android testapp voor rekenoefeningen, gericht op privétest.
+Lokale Android testapp voor rekenoefeningen. Privétestfase.
 
-## Wat dit is
+## Architectuur
 
-Een stabiele V1-versie voor test op eigen apparaten (OnePlus 12, Boox Note Air 4C). Geen productierelease, geen commerciële verspreiding.
-
-## Huidige scope (V1)
-
-- **Leeftijdsstart**: 5-6, 6-8, 8-11 jaar
-- **Lesflow**: 8 oefeningen per sessie
-- **Oefentypes**: VISUAL_QUANTITY, VISUAL_GROUPS, TYPED_NUMERIC, MISSING_NUMBER
-- **Adaptive difficulty**: prestatiegestuurd
-- **Lokale opslag**: Room database
-- **Rewards**: XP en streak (vereenvoudigd)
-
-## Niet in V1
-
-- Cloud sync
-- Accounts
-- Play Store
-- Monetisatie
-- Analytics
-- Brede curriculumuitbreiding
-
-## Bouwen
-
-```bash
-./gradlew :app:assembleDebug
-```
-
-APK verschijnt in `app/build/outputs/apk/debug/`
+Robuuste stage-based lessonflow:
+- Expliciete LessonStepState machine
+- CompletionStage pipeline: NOT_STARTED → RESULT_LOGGED → PROGRESS_UPDATED → REWARDS_APPLIED → READY_TO_ADVANCE → DONE
+- Stage-based error recovery
 
 ## Testen
 
 ```bash
-./gradlew :app:testDebugUnitTest
+./gradlew testDebugUnitTest  # 106 tests
 ```
 
-18 tests, alle groen.
+## Bouwen
+
+```bash
+./gradlew :app:assembleDebug  # APK in app/build/outputs/apk/debug/
+```
 
 ## Status
 
-V1 freeze - stabiel voor privétest. V2/publicatie later.
+Privétest. V2/publicatie later.
