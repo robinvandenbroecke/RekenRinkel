@@ -36,6 +36,7 @@ class LessonViewModelFlowTest {
         mockkStatic(android.util.Log::class)
         every { android.util.Log.w(any(), any<String>()) } returns 0
         every { android.util.Log.e(any(), any<String>()) } returns 0
+        every { android.util.Log.e(any(), any<String>(), any()) } returns 0  // 3-arg versie met Throwable
         every { android.util.Log.d(any(), any<String>()) } returns 0
         every { android.util.Log.i(any(), any<String>()) } returns 0
 
