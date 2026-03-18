@@ -57,6 +57,27 @@ class ExerciseEngineTest {
             assertEquals(groups?.sum(), groups?.let { it[0] + it[1] })
         }
     }
+
+    @Test
+    fun `number bonds 5 stays within 5 across repeated generations`() {
+        repeat(40) {
+            val exercise = engine.generateExercise("foundation_number_bonds_5", 2)
+            if (exercise.type == ExerciseType.VISUAL_GROUPS) {
+                val groups = exercise.visualData?.groups
+                assertNotNull("Expected two groups", groups)
+                val safeGroups = groups!!
+                assertEquals(2, safeGroups.size)
+                assertTrue("Each part should stay within 0..5: $safeGroups", safeGroups.all { it in 0..5 })
+                assertTrue("Total should stay within 5: ${safeGroups.sum()}", safeGroups.sum() <= 5)
+            } else {
+                val numbers = Regex("""(\d+)""").findAll(exercise.question).map { it.value.toInt() }.toList()
+                if (numbers.isNotEmpty()) {
+                    assertTrue("Question values should stay within 5: $numbers", (numbers.maxOrNull() ?: 0) <= 5)
+                }
+                assertTrue("Answer should stay within 5: ${exercise.correctAnswer}", exercise.correctAnswer.toInt() <= 5)
+            }
+        }
+    }
     
     // ============================================
     // ARITHMETIC TESTS

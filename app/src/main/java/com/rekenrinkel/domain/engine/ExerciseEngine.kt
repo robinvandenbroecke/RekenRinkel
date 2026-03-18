@@ -3,6 +3,7 @@ package com.rekenrinkel.domain.engine
 import com.rekenrinkel.domain.content.ContentRepository
 import com.rekenrinkel.domain.content.DidacticRule
 import com.rekenrinkel.domain.content.ErrorType
+import com.rekenrinkel.domain.content.SkillContentConfig
 import com.rekenrinkel.domain.model.*
 import kotlin.math.max
 import kotlin.math.min
@@ -102,40 +103,51 @@ class ExerciseEngine {
         // Clamp difficulty binnen de toegestane grenzen
         val clampedDifficulty = difficulty.coerceIn(config.minDifficulty, config.maxDifficulty)
         
+        return generateExerciseForSkill(skillId, config, clampedDifficulty).let { exercise ->
+            // PATCH 8: Voorkom directe duplicaten zonder tweede, afwijkende routeringstabel
+            var attempts = 0
+            var result = exercise
+            while (isRecentDuplicate(skillId, result.question) && attempts < 3) {
+                result = generateExerciseForSkill(skillId, config, clampedDifficulty)
+                attempts++
+            }
+            markAsRecent(skillId, result.question)
+            result
+        }
+    }
+
+    private fun generateExerciseForSkill(
+        skillId: String,
+        config: SkillContentConfig,
+        clampedDifficulty: Int
+    ): Exercise {
         return when (skillId) {
             // FOUNDATION
-            "foundation_subitize_5" -> generateNumberImages(config, clampedDifficulty)
-            "foundation_number_images_5" -> generateNumberImages(config, clampedDifficulty)
-            "foundation_counting" -> generateNumberImages(config, clampedDifficulty)
+            "foundation_subitize_5", "foundation_number_images_5", "foundation_counting" ->
+                generateNumberImages(config, clampedDifficulty)
             "foundation_number_bonds_5" -> generateSplits(config, clampedDifficulty, 5)
-            "foundation_number_bonds_10" -> generateSplits(config, clampedDifficulty, 10)
-            "foundation_number_bonds_20" -> generateSplits(config, clampedDifficulty, 20)
-            "foundation_splits_10" -> generateSplits(config, clampedDifficulty, 10)
-            "foundation_splits_20" -> generateSplits(config, clampedDifficulty, 20)
-            
-            // ARITHMETIC - Aggregatie skills (gebruiken abstracte logica)
-            "arithmetic_add_10" -> generateAddition(config, clampedDifficulty, maxSum = 10, useBridge = false)
-            "arithmetic_sub_10" -> generateSubtraction(config, clampedDifficulty, max = 10, useBridge = false)
+            "foundation_number_bonds_10", "foundation_splits_10" ->
+                generateSplits(config, clampedDifficulty, 10)
+            "foundation_number_bonds_20", "foundation_splits_20" ->
+                generateSplits(config, clampedDifficulty, 20)
+
+            // ARITHMETIC - Aggregatie skills en CPA-varianten
+            "arithmetic_add_10", "arithmetic_add_10_concrete", "arithmetic_add_10_pictorial", "arithmetic_add_10_abstract" ->
+                generateAddition(config, clampedDifficulty, maxSum = 10, useBridge = false)
+            "arithmetic_sub_10", "arithmetic_sub_10_concrete", "arithmetic_sub_10_pictorial", "arithmetic_sub_10_abstract" ->
+                generateSubtraction(config, clampedDifficulty, max = 10, useBridge = false)
             "arithmetic_add_20" -> generateAddition(config, clampedDifficulty, maxSum = 20, useBridge = false)
             "arithmetic_sub_20" -> generateSubtraction(config, clampedDifficulty, max = 20, useBridge = false)
             "arithmetic_bridge_add" -> generateAddition(config, clampedDifficulty, maxSum = 18, useBridge = true)
             "arithmetic_bridge_sub" -> generateSubtraction(config, clampedDifficulty, max = 18, useBridge = true)
-            
-            // ARITHMETIC - CPA varianten (gebruiken zelfde logica als aggregatie)
-            "arithmetic_add_10_concrete" -> generateAddition(config, clampedDifficulty, maxSum = 10, useBridge = false)
-            "arithmetic_add_10_pictorial" -> generateAddition(config, clampedDifficulty, maxSum = 10, useBridge = false)
-            "arithmetic_add_10_abstract" -> generateAddition(config, clampedDifficulty, maxSum = 10, useBridge = false)
-            "arithmetic_sub_10_concrete" -> generateSubtraction(config, clampedDifficulty, max = 10, useBridge = false)
-            "arithmetic_sub_10_pictorial" -> generateSubtraction(config, clampedDifficulty, max = 10, useBridge = false)
-            "arithmetic_sub_10_abstract" -> generateSubtraction(config, clampedDifficulty, max = 10, useBridge = false)
-            
+
             // PATTERNS
             "patterns_doubles" -> generateDoubles(config, clampedDifficulty)
             "patterns_halves" -> generateHalves(config, clampedDifficulty)
             "patterns_count_2" -> generateSkipCounting(config, clampedDifficulty, step = 2)
             "patterns_count_5" -> generateSkipCounting(config, clampedDifficulty, step = 5)
             "patterns_count_10" -> generateSkipCounting(config, clampedDifficulty, step = 10)
-            
+
             // ADVANCED
             "advanced_compare_100" -> generateComparison(config, clampedDifficulty)
             "advanced_place_value" -> generatePlaceValue(config, clampedDifficulty)
@@ -143,43 +155,8 @@ class ExerciseEngine {
             "advanced_table_2" -> generateTable(config, clampedDifficulty, multiplier = 2)
             "advanced_table_5" -> generateTable(config, clampedDifficulty, multiplier = 5)
             "advanced_table_10" -> generateTable(config, clampedDifficulty, multiplier = 10)
-            
+
             else -> generateFallbackExercise(skillId, clampedDifficulty)
-        }.let { exercise ->
-            // PATCH 8: Voorkom directe duplicaten
-            var attempts = 0
-            var result = exercise
-            while (isRecentDuplicate(skillId, result.question) && attempts < 3) {
-                // Genereer opnieuw als het een duplicaat is (max 3 pogingen)
-                result = when (skillId) {
-                    "foundation_subitize_5", "foundation_number_images_5", "foundation_counting" -> generateNumberImages(config!!, clampedDifficulty)
-                    "foundation_number_bonds_5", "foundation_splits_10" -> generateSplits(config!!, clampedDifficulty, 10)
-                    "foundation_number_bonds_10" -> generateSplits(config!!, clampedDifficulty, 10)
-                    "foundation_number_bonds_20", "foundation_splits_20" -> generateSplits(config!!, clampedDifficulty, 20)
-                    // Aggregatie skills en CPA varianten gebruiken zelfde logica
-                    "arithmetic_add_10", "arithmetic_add_10_concrete", "arithmetic_add_10_pictorial", "arithmetic_add_10_abstract" -> generateAddition(config!!, clampedDifficulty, maxSum = 10, useBridge = false)
-                    "arithmetic_sub_10", "arithmetic_sub_10_concrete", "arithmetic_sub_10_pictorial", "arithmetic_sub_10_abstract" -> generateSubtraction(config!!, clampedDifficulty, max = 10, useBridge = false)
-                    "arithmetic_add_20" -> generateAddition(config!!, clampedDifficulty, maxSum = 20, useBridge = false)
-                    "arithmetic_sub_20" -> generateSubtraction(config!!, clampedDifficulty, max = 20, useBridge = false)
-                    "arithmetic_bridge_add" -> generateAddition(config!!, clampedDifficulty, maxSum = 18, useBridge = true)
-                    "arithmetic_bridge_sub" -> generateSubtraction(config!!, clampedDifficulty, max = 18, useBridge = true)
-                    "patterns_doubles" -> generateDoubles(config!!, clampedDifficulty)
-                    "patterns_halves" -> generateHalves(config!!, clampedDifficulty)
-                    "patterns_count_2" -> generateSkipCounting(config!!, clampedDifficulty, step = 2)
-                    "patterns_count_5" -> generateSkipCounting(config!!, clampedDifficulty, step = 5)
-                    "patterns_count_10" -> generateSkipCounting(config!!, clampedDifficulty, step = 10)
-                    "advanced_compare_100" -> generateComparison(config!!, clampedDifficulty)
-                    "advanced_place_value" -> generatePlaceValue(config!!, clampedDifficulty)
-                    "advanced_groups" -> generateGroups(config!!, clampedDifficulty)
-                    "advanced_table_2" -> generateTable(config!!, clampedDifficulty, multiplier = 2)
-                    "advanced_table_5" -> generateTable(config!!, clampedDifficulty, multiplier = 5)
-                    "advanced_table_10" -> generateTable(config!!, clampedDifficulty, multiplier = 10)
-                    else -> generateFallbackExercise(skillId, clampedDifficulty)
-                }
-                attempts++
-            }
-            markAsRecent(skillId, result.question)
-            result
         }
     }
     
