@@ -226,31 +226,35 @@ class LessonViewModel(
     }
 
     /**
-     * V1 FREEZE: Strakke finishCurrentExercise - geen stale state, geen dubbele side effects
+     * ROBUUSTE LESSONFLOW: Stage-based completion met expliciete state machine
+     * 
+     * Completion stages: NOT_STARTED → RESULT_LOGGED → PROGRESS_UPDATED → REWARDS_APPLIED → READY_TO_ADVANCE → DONE
+     * Failure stages: RESULT_LOGGING, PROGRESS_UPDATE, REWARD_UPDATE, ADVANCE, UNKNOWN
      */
     private suspend fun finishCurrentExercise(
         result: DetailedExerciseResult,
         mode: CompletionMode
     ) {
         val exerciseId = result.exerciseId
+        val state = _uiState.value
 
         // Guard: al voltooid
         if (isExerciseCompleted(exerciseId)) {
-            android.util.Log.w("LessonViewModel", "finishCurrentExercise blocked - already done")
+            android.util.Log.w("LessonViewModel", "[COMPLETION] Exercise $exerciseId already completed")
             return
         }
 
         // Guard: al aan het verwerken
         if (currentlyCompletingExerciseId == exerciseId) {
-            android.util.Log.w("LessonViewModel", "finishCurrentExercise blocked - already processing")
+            android.util.Log.w("LessonViewModel", "[COMPLETION] Exercise $exerciseId already processing")
             return
         }
         currentlyCompletingExerciseId = exerciseId
 
         try {
-            // Stap 1: Log resultaat
-            if (_uiState.value.completionStageExerciseId != exerciseId ||
-                _uiState.value.completionStage < CompletionStage.RESULT_LOGGED) {
+            // STAGE 1: Log resultaat (altijd)
+            if (state.completionStageExerciseId != exerciseId ||
+                state.completionStage < CompletionStage.RESULT_LOGGED) {
                 _uiState.update {
                     it.copy(
                         results = it.results + result,
@@ -258,41 +262,60 @@ class LessonViewModel(
                         completionStageExerciseId = exerciseId
                     )
                 }
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Stage RESULT_LOGGED for $exerciseId")
             }
 
-            // Stap 2: Update progress (alleen voor normale antwoorden, niet skip/worked)
+            // STAGE 2 & 3: Update progress en rewards (alleen voor FEEDBACK_THEN_ADVANCE mode)
             if (mode == CompletionMode.FEEDBACK_THEN_ADVANCE) {
-                try {
-                    val currentProgress = progressRepository.getOrCreateProgress(result.skillId)
-                    val outcome = lessonEngine.processExerciseResult(result, currentProgress)
-                    progressRepository.updateProgress(outcome.updatedProgress)
-                    
-                    // Update rewards
-                    val currentRewards = profileRepository.getRewards()
-                    val updatedRewards = currentRewards.addXp(outcome.xpEarned).updateStreak()
-                    profileRepository.updateRewards(updatedRewards)
-                    
-                    _uiState.update {
-                        it.copy(
-                            xpEarnedThisLesson = it.xpEarnedThisLesson + outcome.xpEarned,
-                            lastAnswerCorrect = result.isCorrect
-                        )
+                // STAGE 2: Progress update
+                if (state.completionStage < CompletionStage.PROGRESS_UPDATED) {
+                    try {
+                        val currentProgress = progressRepository.getOrCreateProgress(result.skillId)
+                        val outcome = lessonEngine.processExerciseResult(result, currentProgress)
+                        progressRepository.updateProgress(outcome.updatedProgress)
+                        
+                        _uiState.update {
+                            it.copy(completionStage = CompletionStage.PROGRESS_UPDATED)
+                        }
+                        android.util.Log.d("LessonViewModel", "[COMPLETION] Stage PROGRESS_UPDATED for $exerciseId")
+                    } catch (e: Exception) {
+                        android.util.Log.e("LessonViewModel", "[FAILURE] Progress update failed", e)
+                        handleFailure("Voortgang kon niet worden opgeslagen", FailureStage.PROGRESS_UPDATE, exerciseId)
+                        return
                     }
-                } catch (e: Exception) {
-                    android.util.Log.e("LessonViewModel", "Error updating progress", e)
-                    // Ga naar ERROR state - gebruiker kan zelf verder klikken
-                    _uiState.update {
-                        it.copy(
-                            stepState = LessonStepState.ERROR,
-                            error = "Voortgang kon niet worden opgeslagen"
-                        )
+                }
+
+                // STAGE 3: Rewards update
+                if (_uiState.value.completionStage < CompletionStage.REWARDS_APPLIED) {
+                    try {
+                        val currentRewards = profileRepository.getRewards()
+                        val xpEarned = calculateXpFromResult(result)
+                        val updatedRewards = currentRewards.addXp(xpEarned).updateStreak()
+                        profileRepository.updateRewards(updatedRewards)
+                        
+                        _uiState.update {
+                            it.copy(
+                                completionStage = CompletionStage.REWARDS_APPLIED,
+                                xpEarnedThisLesson = it.xpEarnedThisLesson + xpEarned,
+                                lastAnswerCorrect = result.isCorrect
+                            )
+                        }
+                        android.util.Log.d("LessonViewModel", "[COMPLETION] Stage REWARDS_APPLIED for $exerciseId")
+                    } catch (e: Exception) {
+                        android.util.Log.e("LessonViewModel", "[FAILURE] Rewards update failed", e)
+                        handleFailure("Rewards konden niet worden opgeslagen", FailureStage.REWARD_UPDATE, exerciseId)
+                        return
                     }
-                    currentlyCompletingExerciseId = null
-                    return
                 }
             }
 
-            // Stap 3: Toon feedback of ga direct door
+            // STAGE 4: Ready to advance
+            if (_uiState.value.completionStage < CompletionStage.READY_TO_ADVANCE) {
+                _uiState.update { it.copy(completionStage = CompletionStage.READY_TO_ADVANCE) }
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Stage READY_TO_ADVANCE for $exerciseId")
+            }
+
+            // STAGE 5: Toon feedback of ga direct door
             when (mode) {
                 CompletionMode.FEEDBACK_THEN_ADVANCE -> {
                     _uiState.update {
@@ -303,19 +326,35 @@ class LessonViewModel(
                     }
                     // Delay dan advance
                     delay(1000)
+                    _uiState.update { it.copy(stepState = LessonStepState.ADVANCING) }
                     advanceToNextExercise()
                 }
                 CompletionMode.DIRECT_CONTINUE -> {
+                    _uiState.update { it.copy(stepState = LessonStepState.ADVANCING) }
                     advanceToNextExercise()
                 }
             }
 
+            // Mark as completed
+            completedExerciseIds.add(exerciseId)
+            _uiState.update { it.copy(completionStage = CompletionStage.DONE) }
+            android.util.Log.d("LessonViewModel", "[COMPLETION] Stage DONE for $exerciseId")
+
         } catch (e: Exception) {
-            android.util.Log.e("LessonViewModel", "Error in finishCurrentExercise", e)
+            android.util.Log.e("LessonViewModel", "[FAILURE] Unexpected error in finishCurrentExercise", e)
             handleFailure("Er ging iets mis", FailureStage.UNKNOWN, exerciseId)
         } finally {
             currentlyCompletingExerciseId = null
         }
+    }
+
+    /**
+     * Bereken XP uit een exercise result
+     */
+    private fun calculateXpFromResult(result: DetailedExerciseResult): Int {
+        val baseXp = if (result.isCorrect) 10 else 0
+        val speedBonus = if (result.isCorrect && result.responseTimeMs < 3000) 5 else 0
+        return baseXp + speedBonus
     }
 
     /**
@@ -437,12 +476,18 @@ enum class LessonStepState {
     SHOWING,
     PROCESSING,
     FEEDBACK,
-    ERROR
+    ADVANCING,
+    ERROR,
+    COMPLETED
 }
 
 enum class CompletionStage {
     NOT_STARTED,
-    RESULT_LOGGED
+    RESULT_LOGGED,
+    PROGRESS_UPDATED,
+    REWARDS_APPLIED,
+    READY_TO_ADVANCE,
+    DONE
 }
 
 enum class CompletionMode {
@@ -452,8 +497,10 @@ enum class CompletionMode {
 
 enum class FailureStage {
     VALIDATION,
+    RESULT_LOGGING,
     PROGRESS_UPDATE,
     REWARD_UPDATE,
+    ADVANCE,
     UNKNOWN
 }
 
