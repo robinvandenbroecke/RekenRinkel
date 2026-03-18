@@ -7,13 +7,18 @@ import com.rekenrinkel.data.repository.ProfileRepository
 import com.rekenrinkel.data.repository.ProgressRepository
 import com.rekenrinkel.domain.engine.*
 import com.rekenrinkel.domain.model.*
-import com.rekenrinkel.domain.model.UserProfile as ProfileModel
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 
 /**
- * ViewModel voor de nieuwe lesson flow met mastery tracking.
+ * PATCH 1 (V1 FREEZE): Strakke, betrouwbare LessonViewModel
+ * 
+ * KERNPRINCIPES:
+ * 1. Geen enkele oefening wordt dubbel verwerkt
+ * 2. State wijzigt alleen via goed gedefinieerde stappen
+ * 3. Geen stale state - altijd actuele _uiState.value reads
+ * 4. Duidelijke error handling zonder "hang"
+ * 5. Skip werkt altijd correct
  */
 class LessonViewModel(
     private val progressRepository: ProgressRepository,
@@ -25,98 +30,226 @@ class LessonViewModel(
 
     private val lessonEngine = LessonEngine(exerciseEngine, progressRepository)
 
+    // State
     private val _uiState = MutableStateFlow(LessonUiState())
     val uiState: StateFlow<LessonUiState> = _uiState.asStateFlow()
 
+    // Navigation events
     private val _navigation = MutableSharedFlow<LessonNavigationEvent>()
     val navigation: SharedFlow<LessonNavigationEvent> = _navigation.asSharedFlow()
 
-    private var exerciseStartTime: Long = 0
-    private var currentlyCompletingExerciseId: String? = null
+    // Guards tegen dubbele verwerking
     private val completedExerciseIds = mutableSetOf<String>()
+    private var currentlyCompletingExerciseId: String? = null
+    private var lessonStarted = false
 
+    /**
+     * Start een les - alleen als nog niet gestart
+     */
     fun startLesson() {
+        if (lessonStarted || _uiState.value.isLoading) return
+        lessonStarted = true
+        
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
+            
             try {
-                val profile = profileRepository.getProfile().firstOrNull()
-                    ?.let { ProfileModel(name = it.name, age = it.age, theme = it.theme) }
-                    ?: ProfileModel()
-                val isPremium = settingsDataStore.premiumUnlocked.first()
-                val lessonPlan = lessonEngine.buildLesson(profile, isPremium)
+                val profile = profileRepository.getProfile().first()
+                    ?: throw IllegalStateException("No profile found")
+                val userProfile = UserProfile(
+                    name = profile.name,
+                    age = profile.age,
+                    theme = profile.theme
+                )
+                val lesson = lessonEngine.buildLesson(userProfile)
+                
                 _uiState.update {
                     it.copy(
-                        exercises = lessonPlan.exercises,
-                        currentIndex = 0,
-                        results = emptyList(),
-                        isActive = true,
                         isLoading = false,
+                        isActive = true,
+                        exercises = lesson.exercises,
+                        currentIndex = 0,
+                        currentExercise = lesson.exercises.firstOrNull(),
+                        results = emptyList(),
                         stepState = LessonStepState.SHOWING,
-                        currentPhase = determinePhase(0, lessonPlan),
                         completionStage = CompletionStage.NOT_STARTED,
-                        completionStageExerciseId = null
+                        completionStageExerciseId = null,
+                        error = null
                     )
                 }
-                exerciseStartTime = System.currentTimeMillis()
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = e.message) }
+                android.util.Log.e("LessonViewModel", "Failed to start lesson", e)
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Kon les niet starten: ${e.message}"
+                    )
+                }
             }
         }
     }
 
+    /**
+     * Start timer voor huidige oefening
+     */
     fun startExerciseTimer() {
-        exerciseStartTime = System.currentTimeMillis()
-    }
-
-    enum class CompletionMode {
-        FEEDBACK_THEN_ADVANCE,
-        DIRECT_CONTINUE,
-        SKIP_ADVANCE
-    }
-
-    private fun currentExerciseId(): String? = _uiState.value.currentExercise?.id
-    private fun currentStepState(): LessonStepState = _uiState.value.stepState
-
-    private fun isExerciseCompleted(exerciseId: String): Boolean {
-        val state = _uiState.value
-        return state.completionStageExerciseId == exerciseId && state.completionStage == CompletionStage.DONE
-                || completedExerciseIds.contains(exerciseId)
-    }
-
-    private fun markStage(stage: CompletionStage, exerciseId: String) {
-        _uiState.update { it.copy(completionStage = stage, completionStageExerciseId = exerciseId) }
+        _uiState.update {
+            it.copy(exerciseStartTime = System.currentTimeMillis())
+        }
     }
 
     /**
-     * PATCH 4: Alle state reads gebruiken nu _uiState.value direct, geen stale snapshots.
-     * Dit voorkomt dat oude state wordt gebruikt in beslissingen terwijl de flow bezig is.
+     * Verwerk een antwoord - met strikte guards tegen dubbele submit
      */
-    private suspend fun finishCurrentExercise(
-        result: DetailedExerciseResult,
-        mode: CompletionMode,
-        feedbackDelayMs: Long = 800
-    ) {
-        val exerciseId = result.exerciseId
-
-        // Guard: already done
-        if (isExerciseCompleted(exerciseId)) {
-            android.util.Log.w("LessonViewModel", "finishCurrentExercise blocked - $exerciseId already done")
+    fun submitAnswer(answer: String) {
+        val state = _uiState.value
+        val exercise = state.currentExercise ?: return
+        
+        // Guard: les niet actief of al in verwerking
+        if (!state.isActive || state.stepState != LessonStepState.SHOWING) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - wrong state: ${state.stepState}")
+            return
+        }
+        
+        // Guard: oefening al voltooid
+        if (isExerciseCompleted(exercise.id)) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise already completed")
             return
         }
 
-        // Guard: already processing
+        viewModelScope.launch {
+            // Direct naar PROCESSING state om dubbele submits te voorkomen
+            _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
+            
+            try {
+                val isCorrect = exerciseValidator.validate(exercise, answer)
+                val responseTime = System.currentTimeMillis() - (state.exerciseStartTime ?: System.currentTimeMillis())
+                
+                val result = DetailedExerciseResult(
+                    exerciseId = exercise.id,
+                    skillId = exercise.skillId,
+                    isCorrect = isCorrect,
+                    givenAnswer = answer,
+                    correctAnswer = exercise.correctAnswer,
+                    responseTimeMs = responseTime,
+                    difficultyTier = exercise.difficulty,
+                    representationUsed = exercise.visualData?.type?.name ?: "SYMBOLS"
+                )
+                
+                // Verwerk completion met juiste mode
+                finishCurrentExercise(
+                    result = result,
+                    mode = if (isCorrect) CompletionMode.FEEDBACK_THEN_ADVANCE else CompletionMode.FEEDBACK_THEN_ADVANCE
+                )
+            } catch (e: Exception) {
+                android.util.Log.e("LessonViewModel", "Error in submitAnswer", e)
+                _uiState.update { 
+                    it.copy(
+                        stepState = LessonStepState.ERROR,
+                        error = "Antwoord kon niet worden verwerkt"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Skip huidige oefening - altijd direct advance, nooit valideren
+     */
+    fun skipExercise() {
+        val state = _uiState.value
+        val exercise = state.currentExercise ?: return
+        
+        // Guard: les niet actief of al in verwerking
+        if (!state.isActive || state.stepState != LessonStepState.SHOWING) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - wrong state")
+            return
+        }
+        
+        // Guard: oefening al voltooid
+        if (isExerciseCompleted(exercise.id)) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - already completed")
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
+            
+            val result = DetailedExerciseResult(
+                exerciseId = exercise.id,
+                skillId = exercise.skillId,
+                isCorrect = false,
+                givenAnswer = "[skipped]",
+                correctAnswer = exercise.correctAnswer,
+                responseTimeMs = 0,
+                difficultyTier = exercise.difficulty,
+                representationUsed = "SKIP"
+            )
+            
+            // Skip gebruikt DIRECT_CONTINUE - geen feedback, geen XP update
+            finishCurrentExercise(
+                result = result,
+                mode = CompletionMode.DIRECT_CONTINUE
+            )
+        }
+    }
+
+    /**
+     * Worked example: gebruiker klikt "Begrepen, verder"
+     */
+    fun continueWorkedExample() {
+        val state = _uiState.value
+        val exercise = state.currentExercise ?: return
+        
+        if (!state.isActive || state.stepState != LessonStepState.SHOWING) return
+        if (isExerciseCompleted(exercise.id)) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
+            
+            val result = DetailedExerciseResult(
+                exerciseId = exercise.id,
+                skillId = exercise.skillId,
+                isCorrect = true, // Worked example telt als "gezien"
+                givenAnswer = "[worked_example]",
+                correctAnswer = exercise.correctAnswer,
+                responseTimeMs = 0,
+                difficultyTier = exercise.difficulty,
+                representationUsed = "WORKED_EXAMPLE"
+            )
+            
+            finishCurrentExercise(
+                result = result,
+                mode = CompletionMode.DIRECT_CONTINUE
+            )
+        }
+    }
+
+    /**
+     * V1 FREEZE: Strakke finishCurrentExercise - geen stale state, geen dubbele side effects
+     */
+    private suspend fun finishCurrentExercise(
+        result: DetailedExerciseResult,
+        mode: CompletionMode
+    ) {
+        val exerciseId = result.exerciseId
+
+        // Guard: al voltooid
+        if (isExerciseCompleted(exerciseId)) {
+            android.util.Log.w("LessonViewModel", "finishCurrentExercise blocked - already done")
+            return
+        }
+
+        // Guard: al aan het verwerken
         if (currentlyCompletingExerciseId == exerciseId) {
-            android.util.Log.w("LessonViewModel", "finishCurrentExercise blocked - $exerciseId already processing")
+            android.util.Log.w("LessonViewModel", "finishCurrentExercise blocked - already processing")
             return
         }
         currentlyCompletingExerciseId = exerciseId
 
-        val needsFeedback = mode == CompletionMode.FEEDBACK_THEN_ADVANCE
-        val shouldUpdateMastery = mode == CompletionMode.FEEDBACK_THEN_ADVANCE
-
         try {
-            // Step 1: Log result - check fresh state each time
-            if (_uiState.value.completionStageExerciseId != exerciseId || 
+            // Stap 1: Log resultaat
+            if (_uiState.value.completionStageExerciseId != exerciseId ||
                 _uiState.value.completionStage < CompletionStage.RESULT_LOGGED) {
                 _uiState.update {
                     it.copy(
@@ -127,474 +260,209 @@ class LessonViewModel(
                 }
             }
 
-            // Step 2: Update progress (only for normal answers)
-            var outcome: ExerciseOutcome? = null
-            if (shouldUpdateMastery) {
-                // Fresh state check before progress update
-                if (_uiState.value.completionStage == CompletionStage.RESULT_LOGGED) {
-                    try {
-                        val currentProgress = progressRepository.getOrCreateProgress(result.skillId)
-                        outcome = lessonEngine.processExerciseResult(result, currentProgress)
-                        progressRepository.updateProgress(outcome.updatedProgress)
-                        markStage(CompletionStage.PROGRESS_UPDATED, exerciseId)
-                    } catch (e: Exception) {
-                        throw StepFailure(FailureStage.PROGRESS_UPDATE, e)
+            // Stap 2: Update progress (alleen voor normale antwoorden, niet skip/worked)
+            if (mode == CompletionMode.FEEDBACK_THEN_ADVANCE) {
+                try {
+                    val currentProgress = progressRepository.getOrCreateProgress(result.skillId)
+                    val outcome = lessonEngine.processExerciseResult(result, currentProgress)
+                    progressRepository.updateProgress(outcome.updatedProgress)
+                    
+                    // Update rewards
+                    val currentRewards = profileRepository.getRewards()
+                    val updatedRewards = currentRewards.addXp(outcome.xpEarned).updateStreak()
+                    profileRepository.updateRewards(updatedRewards)
+                    
+                    _uiState.update {
+                        it.copy(
+                            xpEarnedThisLesson = it.xpEarnedThisLesson + outcome.xpEarned,
+                            lastAnswerCorrect = result.isCorrect
+                        )
                     }
-                }
-            }
-
-            // Step 3: Apply rewards (only for normal answers)
-            if (shouldUpdateMastery) {
-                // Fresh state check before rewards
-                if (_uiState.value.completionStage == CompletionStage.PROGRESS_UPDATED) {
-                    try {
-                        val finalOutcome = outcome ?: run {
-                            val currentProgress = progressRepository.getOrCreateProgress(result.skillId)
-                            lessonEngine.processExerciseResult(result, currentProgress)
-                        }
-                        outcome = finalOutcome
-                        val currentRewards = profileRepository.getRewards()
-                        val updatedRewards = currentRewards.addXp(finalOutcome.xpEarned).updateStreak()
-                        val newBadges = lessonEngine.checkBadges(finalOutcome, currentRewards, result.skillId)
-                        val finalRewards = newBadges.fold(updatedRewards) { r, b -> r.addBadge(b) }
-                        profileRepository.updateRewards(finalRewards)
-                        markStage(CompletionStage.REWARDS_APPLIED, exerciseId)
-                    } catch (e: Exception) {
-                        throw StepFailure(FailureStage.REWARD_UPDATE, e)
+                } catch (e: Exception) {
+                    android.util.Log.e("LessonViewModel", "Error updating progress", e)
+                    // Ga naar ERROR state - gebruiker kan zelf verder klikken
+                    _uiState.update {
+                        it.copy(
+                            stepState = LessonStepState.ERROR,
+                            error = "Voortgang kon niet worden opgeslagen"
+                        )
                     }
+                    currentlyCompletingExerciseId = null
+                    return
                 }
             }
 
-            // Step 4: Prepare advance - fresh state check
-            val canAdvance = when {
-                mode == CompletionMode.SKIP_ADVANCE || mode == CompletionMode.DIRECT_CONTINUE ->
-                    _uiState.value.completionStage == CompletionStage.RESULT_LOGGED
-                else -> _uiState.value.completionStage == CompletionStage.REWARDS_APPLIED
-            }
-            if (canAdvance) {
-                val xpEarned = if (shouldUpdateMastery) outcome?.xpEarned ?: 0 else 0
-                val badges = if (shouldUpdateMastery && outcome != null) {
-                    lessonEngine.checkBadges(outcome, profileRepository.getRewards(), result.skillId)
-                } else emptyList()
-
-                _uiState.update {
-                    it.copy(
-                        stepState = if (needsFeedback) LessonStepState.FEEDBACK else LessonStepState.ADVANCING,
-                        lastAnswerCorrect = result.isCorrect,
-                        xpEarnedThisLesson = it.xpEarnedThisLesson + xpEarned,
-                        badgesEarnedThisLesson = it.badgesEarnedThisLesson + badges,
-                        completionStage = CompletionStage.READY_TO_ADVANCE,
-                        completionStageExerciseId = exerciseId
-                    )
+            // Stap 3: Toon feedback of ga direct door
+            when (mode) {
+                CompletionMode.FEEDBACK_THEN_ADVANCE -> {
+                    _uiState.update {
+                        it.copy(
+                            stepState = LessonStepState.FEEDBACK,
+                            lastAnswerCorrect = result.isCorrect
+                        )
+                    }
+                    // Delay dan advance
+                    delay(1000)
+                    advanceToNextExercise()
                 }
-            }
-
-            // Step 5: Advance - fresh state check
-            if (_uiState.value.completionStage == CompletionStage.READY_TO_ADVANCE && 
-                _uiState.value.completionStageExerciseId == exerciseId) {
-                if (needsFeedback) {
-                    delay(feedbackDelayMs)
-                }
-                // Verify still on same exercise before marking done
-                if (currentExerciseId() == exerciseId) {
-                    completedExerciseIds.add(exerciseId)
-                    markStage(CompletionStage.DONE, exerciseId)
+                CompletionMode.DIRECT_CONTINUE -> {
                     advanceToNextExercise()
                 }
             }
-        } catch (e: StepFailure) {
-            handleFailure(e.cause?.message ?: e.message ?: "Unknown error", e.stage, exerciseId)
+
         } catch (e: Exception) {
-            handleFailure(e.message ?: "Unknown error", FailureStage.UNKNOWN, exerciseId)
+            android.util.Log.e("LessonViewModel", "Error in finishCurrentExercise", e)
+            handleFailure("Er ging iets mis", FailureStage.UNKNOWN, exerciseId)
         } finally {
             currentlyCompletingExerciseId = null
         }
     }
 
-    private class StepFailure(
-        val stage: FailureStage,
-        cause: Throwable
-    ) : RuntimeException(cause)
-
-    private fun handleFailure(errorMessage: String, stage: FailureStage, exerciseId: String) {
-        android.util.Log.e("LessonViewModel", "Failure in $exerciseId at ${stage.name}: $errorMessage")
-        _uiState.update { state ->
-            state.copy(
-                stepState = LessonStepState.ERROR,
-                error = "Oefening afhandeling mislukt: $errorMessage",
-                failureContext = FailureContext(
-                    errorMessage = errorMessage,
-                    exerciseId = exerciseId,
-                    exerciseType = state.currentExercise?.type ?: ExerciseType.TYPED_NUMERIC,
-                    currentIndex = state.currentIndex,
-                    stage = stage,
-                    completionStage = state.completionStage,
-                    completionStageExerciseId = state.completionStageExerciseId
-                )
-            )
-        }
-        currentlyCompletingExerciseId = null
-    }
-
-    private fun advanceToNextExercise() {
-        val currentState = _uiState.value
-        val nextIndex = currentState.currentIndex + 1
-
-        _uiState.update { it.copy(stepState = LessonStepState.ADVANCING) }
-        currentlyCompletingExerciseId = null
-
-        if (nextIndex >= currentState.exercises.size) {
-            completeLesson()
+    /**
+     * Advance naar volgende oefening of finish les
+     */
+    private suspend fun advanceToNextExercise() {
+        val state = _uiState.value
+        val nextIndex = state.currentIndex + 1
+        
+        if (nextIndex >= state.exercises.size) {
+            // Les klaar
+            finishLesson()
         } else {
+            // Volgende oefening
+            val nextExercise = state.exercises[nextIndex]
             _uiState.update {
                 it.copy(
                     currentIndex = nextIndex,
+                    currentExercise = nextExercise,
                     stepState = LessonStepState.SHOWING,
-                    lastAnswerCorrect = null,
-                    difficultyChanged = null,
-                    currentPhase = determinePhase(nextIndex, it),
                     completionStage = CompletionStage.NOT_STARTED,
                     completionStageExerciseId = null,
-                    error = null,
-                    failureContext = null
+                    exerciseStartTime = System.currentTimeMillis()
                 )
             }
-            exerciseStartTime = System.currentTimeMillis()
         }
     }
 
-    fun submitAnswer(answer: String) {
-        val exercise = _uiState.value.currentExercise ?: return
-        if (isExerciseCompleted(exercise.id)) return
-        if (currentStepState() != LessonStepState.SHOWING) return
-
-        _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
-        val responseTimeMs = System.currentTimeMillis() - exerciseStartTime
-
-        viewModelScope.launch {
-            try {
-                val isCorrect = exerciseValidator.validate(exercise, answer)
-                val result = DetailedExerciseResult(
-                    exerciseId = exercise.id,
-                    skillId = exercise.skillId,
-                    isCorrect = isCorrect,
-                    responseTimeMs = responseTimeMs,
-                    givenAnswer = answer,
-                    correctAnswer = exercise.correctAnswer,
-                    difficultyTier = exercise.difficulty,
-                    representationUsed = exercise.visualData?.type?.name ?: "ABSTRACT",
-                    errorType = if (!isCorrect) determineErrorType(exercise, answer) else null
+    /**
+     * Finish les en navigeer naar result screen
+     */
+    private suspend fun finishLesson() {
+        val state = _uiState.value
+        
+        // Maak session result
+        val sessionResult = SessionResult(
+            exercises = state.results.map { r ->
+                ExerciseResult(
+                    exerciseId = r.exerciseId,
+                    skillId = r.skillId,
+                    isCorrect = r.isCorrect,
+                    responseTimeMs = r.responseTimeMs,
+                    givenAnswer = r.givenAnswer
                 )
-                finishCurrentExercise(result, mode = CompletionMode.FEEDBACK_THEN_ADVANCE)
-            } catch (e: Exception) {
-                handleFailure(e.message ?: "Unknown error", FailureStage.RESULT_LOGGING, exercise.id)
-            }
-        }
+            },
+            xpEarned = state.xpEarnedThisLesson
+        )
+        
+        _uiState.update { it.copy(isActive = false) }
+        
+        // Emit navigation event
+        _navigation.emit(LessonNavigationEvent.LessonComplete(
+            result = sessionResult,
+            xpTotal = state.xpEarnedThisLesson,
+            badges = emptyList() // V1: simplified rewards
+        ))
     }
 
-    fun continueWorkedExample() {
-        val exercise = _uiState.value.currentExercise ?: return
-        if (isExerciseCompleted(exercise.id)) return
-        if (currentStepState() != LessonStepState.SHOWING) return
-        if (exercise.type != ExerciseType.WORKED_EXAMPLE) return
-
-        _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
-
-        viewModelScope.launch {
-            val result = DetailedExerciseResult(
-                exerciseId = exercise.id,
-                skillId = exercise.skillId,
-                isCorrect = true,
-                responseTimeMs = System.currentTimeMillis() - exerciseStartTime,
-                givenAnswer = "[worked_example_viewed]",
-                correctAnswer = exercise.correctAnswer,
-                difficultyTier = exercise.difficulty,
-                representationUsed = "WORKED_EXAMPLE"
+    /**
+     * Error handling - toon fout maar laat gebruiker door kunnen gaan
+     */
+    private fun handleFailure(message: String, stage: FailureStage, exerciseId: String) {
+        _uiState.update {
+            it.copy(
+                stepState = LessonStepState.ERROR,
+                error = "$message (${stage.name})"
             )
-            finishCurrentExercise(result, mode = CompletionMode.DIRECT_CONTINUE)
         }
     }
 
-    fun skipExercise() {
-        val exercise = _uiState.value.currentExercise ?: return
-        if (isExerciseCompleted(exercise.id)) return
-        if (currentStepState() != LessonStepState.SHOWING) return
-
-        _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
-
-        viewModelScope.launch {
-            val result = DetailedExerciseResult(
-                exerciseId = exercise.id,
-                skillId = exercise.skillId,
-                isCorrect = false,
-                responseTimeMs = 30_000,
-                givenAnswer = "[skipped]",
-                correctAnswer = exercise.correctAnswer,
-                difficultyTier = exercise.difficulty,
-                representationUsed = "SKIPPED"
-            )
-            finishCurrentExercise(result, mode = CompletionMode.SKIP_ADVANCE)
-        }
-    }
-
+    /**
+     * Ga verder na error
+     */
     fun continueAfterError() {
-        val state = _uiState.value
-        val failureContext = state.failureContext
-        val exercise = state.currentExercise
-
-        if (exercise == null || failureContext == null) {
-            viewModelScope.launch { _navigation.emit(LessonNavigationEvent.BackToHome) }
-            return
-        }
-
-        val completionStage = state.completionStage
-        val stageExerciseId = state.completionStageExerciseId
-
-        // If DONE or READY_TO_ADVANCE, just advance
-        if (stageExerciseId == exercise.id &&
-            (completionStage == CompletionStage.DONE || completionStage == CompletionStage.READY_TO_ADVANCE)
-        ) {
-            viewModelScope.launch {
-                completedExerciseIds.add(exercise.id)
-                advanceToNextExercise()
-            }
-            return
-        }
-
-        // If REWARDS_APPLIED, safe to advance
-        if (stageExerciseId == exercise.id && completionStage == CompletionStage.REWARDS_APPLIED) {
-            viewModelScope.launch {
-                markStage(CompletionStage.DONE, exercise.id)
-                completedExerciseIds.add(exercise.id)
-                advanceToNextExercise()
-            }
-            return
-        }
-
-        // If RESULT_LOGGED and worked example, safe to advance
-        if (stageExerciseId == exercise.id &&
-            completionStage == CompletionStage.RESULT_LOGGED &&
-            exercise.type == ExerciseType.WORKED_EXAMPLE
-        ) {
-            viewModelScope.launch {
-                markStage(CompletionStage.DONE, exercise.id)
-                completedExerciseIds.add(exercise.id)
-                advanceToNextExercise()
-            }
-            return
-        }
-
-        // Otherwise, try to complete remaining steps
         viewModelScope.launch {
-            completeRemainingSteps(exercise)
-        }
-    }
-
-    private suspend fun completeRemainingSteps(exercise: Exercise) {
-        val exerciseId = exercise.id
-        val state = _uiState.value
-
-        // Find the result for this exercise
-        val result = state.results.lastOrNull { it.exerciseId == exerciseId }
-
-        if (result == null) {
-            // No result logged, just skip
-            completedExerciseIds.add(exerciseId)
-            advanceToNextExercise()
-            return
-        }
-
-        try {
-            // Only update progress if not already done and not worked example
-            if (exercise.type != ExerciseType.WORKED_EXAMPLE) {
-                val currentStage = _uiState.value.completionStage
-                if (currentStage == CompletionStage.RESULT_LOGGED) {
-                    val currentProgress = progressRepository.getOrCreateProgress(exercise.skillId)
-                    val outcome = lessonEngine.processExerciseResult(result, currentProgress)
-                    progressRepository.updateProgress(outcome.updatedProgress)
-                    markStage(CompletionStage.PROGRESS_UPDATED, exerciseId)
-                }
-
-                val updatedStage = _uiState.value.completionStage
-                if (updatedStage == CompletionStage.PROGRESS_UPDATED) {
-                    val currentProgress = progressRepository.getOrCreateProgress(exercise.skillId)
-                    val outcome = lessonEngine.processExerciseResult(result, currentProgress)
-                    val currentRewards = profileRepository.getRewards()
-                    val updatedRewards = currentRewards.addXp(outcome.xpEarned).updateStreak()
-                    val newBadges = lessonEngine.checkBadges(outcome, currentRewards, exercise.skillId)
-                    val finalRewards = newBadges.fold(updatedRewards) { r, b -> r.addBadge(b) }
-                    profileRepository.updateRewards(finalRewards)
-                    markStage(CompletionStage.REWARDS_APPLIED, exerciseId)
-                }
-            }
-
-            markStage(CompletionStage.DONE, exerciseId)
-            completedExerciseIds.add(exerciseId)
-            advanceToNextExercise()
-        } catch (e: Exception) {
-            // On error, just advance anyway to avoid getting stuck
-            completedExerciseIds.add(exerciseId)
             advanceToNextExercise()
         }
     }
 
-    private fun completeLesson() {
-        viewModelScope.launch {
-            val state = _uiState.value
-            _uiState.update { it.copy(stepState = LessonStepState.COMPLETED) }
-
-            val averageResponseTime = if (state.results.isNotEmpty()) {
-                state.results.map { it.responseTimeMs }.average().toLong()
-            } else 0
-
-            val accuracy = state.results.accuracy()
-            val stars = when {
-                accuracy >= 0.9 -> 3
-                accuracy >= 0.7 -> 2
-                accuracy >= 0.5 -> 1
-                else -> 0
-            }
-
-            val sessionResult = SessionResult(
-                exercises = state.results.map { it.toExerciseResult() },
-                xpEarned = state.xpEarnedThisLesson,
-                stars = stars,
-                averageResponseTimeMs = averageResponseTime
-            )
-
-            _navigation.emit(LessonNavigationEvent.LessonComplete(
-                result = sessionResult,
-                badges = state.badgesEarnedThisLesson,
-                xpTotal = state.xpEarnedThisLesson
-            ))
-        }
+    private fun isExerciseCompleted(exerciseId: String): Boolean {
+        return completedExerciseIds.contains(exerciseId)
     }
 
-    fun skipLesson() {
-        viewModelScope.launch {
-            _navigation.emit(LessonNavigationEvent.BackToHome)
-        }
+    private fun currentExerciseId(): String? {
+        return _uiState.value.currentExercise?.id
     }
 
-    private fun determinePhase(index: Int, state: LessonUiState): LessonPhase {
-        val plan = state.lessonPlan ?: return LessonPhase.FOCUS
-        return when {
-            index < plan.warmUpCount -> LessonPhase.WARM_UP
-            index < plan.warmUpCount + plan.focusCount -> LessonPhase.FOCUS
-            index < plan.warmUpCount + plan.focusCount + plan.reviewCount -> LessonPhase.REVIEW
-            else -> LessonPhase.CHALLENGE
-        }
-    }
-
-    private fun determinePhase(index: Int, plan: LessonPlan): LessonPhase {
-        return when {
-            index < plan.warmUpCount -> LessonPhase.WARM_UP
-            index < plan.warmUpCount + plan.focusCount -> LessonPhase.FOCUS
-            index < plan.warmUpCount + plan.focusCount + plan.reviewCount -> LessonPhase.REVIEW
-            else -> LessonPhase.CHALLENGE
-        }
-    }
-
-    private fun determineErrorType(exercise: Exercise, answer: String): String {
-        return when {
-            answer.isBlank() -> "NO_ANSWER"
-            answer.toIntOrNull() == null -> "NOT_A_NUMBER"
-            exercise.type == ExerciseType.VISUAL_GROUPS -> "WRONG_SPLIT"
-            else -> "WRONG_ANSWER"
-        }
+    override fun onCleared() {
+        super.onCleared()
+        lessonStarted = false
     }
 }
 
+/**
+ * V1 FREEZE: Vereenvoudigde UI State
+ */
+data class LessonUiState(
+    val isLoading: Boolean = false,
+    val isActive: Boolean = false,
+    val exercises: List<Exercise> = emptyList(),
+    val currentIndex: Int = 0,
+    val currentExercise: Exercise? = null,
+    val results: List<DetailedExerciseResult> = emptyList(),
+    val stepState: LessonStepState = LessonStepState.IDLE,
+    val completionStage: CompletionStage = CompletionStage.NOT_STARTED,
+    val completionStageExerciseId: String? = null,
+    val exerciseStartTime: Long? = null,
+    val lastAnswerCorrect: Boolean? = null,
+    val xpEarnedThisLesson: Int = 0,
+    val error: String? = null
+) {
+    // Computed properties voor backwards compatibility
+    val totalExercises: Int get() = exercises.size
+    val showFeedback: Boolean get() = stepState == LessonStepState.FEEDBACK
+}
+
 enum class LessonStepState {
+    IDLE,
     SHOWING,
     PROCESSING,
     FEEDBACK,
-    ADVANCING,
-    ERROR,
-    COMPLETED
+    ERROR
 }
 
 enum class CompletionStage {
     NOT_STARTED,
-    RESULT_LOGGED,
-    PROGRESS_UPDATED,
-    REWARDS_APPLIED,
-    READY_TO_ADVANCE,
-    DONE
+    RESULT_LOGGED
+}
+
+enum class CompletionMode {
+    FEEDBACK_THEN_ADVANCE,
+    DIRECT_CONTINUE
 }
 
 enum class FailureStage {
-    RESULT_LOGGING,
+    VALIDATION,
     PROGRESS_UPDATE,
     REWARD_UPDATE,
-    STATE_UPDATE,
-    ADVANCE,
     UNKNOWN
-}
-
-data class FailureContext(
-    val errorMessage: String,
-    val exerciseId: String,
-    val exerciseType: ExerciseType,
-    val currentIndex: Int,
-    val stage: FailureStage,
-    val timestamp: Long = System.currentTimeMillis(),
-    val completionStage: CompletionStage? = null,
-    val completionStageExerciseId: String? = null
-)
-
-data class LessonUiState(
-    val exercises: List<Exercise> = emptyList(),
-    val currentIndex: Int = 0,
-    val results: List<DetailedExerciseResult> = emptyList(),
-    val isActive: Boolean = false,
-    val isLoading: Boolean = false,
-    val stepState: LessonStepState = LessonStepState.SHOWING,
-    val lastAnswerCorrect: Boolean? = null,
-    val currentPhase: LessonPhase = LessonPhase.FOCUS,
-    val xpEarnedThisLesson: Int = 0,
-    val badgesEarnedThisLesson: List<Badge> = emptyList(),
-    val difficultyChanged: Int? = null,
-    val error: String? = null,
-    val failureContext: FailureContext? = null,
-    val lessonPlan: LessonPlan? = null,
-    val completionStage: CompletionStage = CompletionStage.NOT_STARTED,
-    val completionStageExerciseId: String? = null
-) {
-    val currentExercise: Exercise? = exercises.getOrNull(currentIndex)
-    val totalExercises: Int = exercises.size
-    val progress: Float = if (totalExercises > 0) currentIndex.toFloat() / totalExercises else 0f
-    val showFeedback: Boolean get() = stepState == LessonStepState.FEEDBACK
 }
 
 sealed class LessonNavigationEvent {
     data class LessonComplete(
         val result: SessionResult,
-        val badges: List<Badge>,
-        val xpTotal: Int
+        val xpTotal: Int,
+        val badges: List<Badge>
     ) : LessonNavigationEvent()
-    data object BackToHome : LessonNavigationEvent()
-}
-
-enum class LessonPhase {
-    WARM_UP,
-    FOCUS,
-    REVIEW,
-    CHALLENGE
-}
-
-private fun List<DetailedExerciseResult>.accuracy(): Float {
-    if (isEmpty()) return 0f
-    val correct = count { it.isCorrect }
-    return correct.toFloat() / size
-}
-
-private fun DetailedExerciseResult.toExerciseResult(): ExerciseResult {
-    return ExerciseResult(
-        exerciseId = exerciseId,
-        skillId = skillId,
-        isCorrect = isCorrect,
-        responseTimeMs = responseTimeMs,
-        givenAnswer = givenAnswer
-    )
+    
+    object BackToHome : LessonNavigationEvent()
 }

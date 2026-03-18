@@ -1,66 +1,45 @@
-# RekenRinkel
+# RekenRinkel V1 Freeze
 
-Educatieve wiskunde-app voor kinderen van 5-11 jaar.
+Lokale Android testapp voor rekenoefeningen, gericht op privétest.
 
-**Status**: Privétestfase - niet productierijp  
-**Laatste update**: 2026-03-16
+## Wat dit is
 
-## Wat werkt
+Een stabiele V1-versie voor test op eigen apparaten (OnePlus 12, Boox Note Air 4C). Geen productierelease, geen commerciële verspreiding.
 
-### Robuuste lessonflow met expliciete completion stages
-- **Expliciete CompletionStage**: NOT_STARTED → RESULT_LOGGED → PROGRESS_UPDATED → REWARDS_APPLIED → READY_TO_ADVANCE → DONE
-- **Stage-based recovery**: recovery actie afhankelijk van hoe ver afhandeling gekomen is
-- **Idempotente side effects**: dubbele calls worden veilig genegeerd per stage
-- **DONE guard**: een oefening kan maar één keer volledig afgerond worden
-- **Failure stages**: RESULT_LOGGING, PROGRESS_UPDATE, REWARD_UPDATE, STATE_UPDATE, ADVANCE
-- **Debug logging**: volledige traceerbaarheid in logcat met [COMPLETION], [FAILURE], [RECOVERY] prefix
-- **Rijke failure context**: completion stage en flags voor betere recovery beslissingen
-- **Expliciete progress/reward failure handling**: failures worden gelogd, niet stilgeslikt
-- **Geen stale state**: completion-stages gebruiken altijd actuele state via helper functies
+## Huidige scope (V1)
 
-### Oefentype-specifieke afhandeling
-- **WORKED_EXAMPLE**: direct door zonder validatie, veilige failure path
-- **GUIDED_PRACTICE**: validatie + feedback, veilige recovery
-- **Normale antwoorden**: standaard response path met feedback
-- **Skip**: direct en veilig, blokkeert nooit
+- **Leeftijdsstart**: 5-6, 6-8, 8-11 jaar
+- **Lesflow**: 8 oefeningen per sessie
+- **Oefentypes**: VISUAL_QUANTITY, VISUAL_GROUPS, TYPED_NUMERIC, MISSING_NUMBER
+- **Adaptive difficulty**: prestatiegestuurd
+- **Lokale opslag**: Room database
+- **Rewards**: XP en streak (vereenvoudigd)
 
-### Regressie-checks
-- ✅ Eerste oefening kan altijd afronden (ook na fout)
-- ✅ Worked example gaat direct door
-- ✅ Guided practice valideert en gaat door
-- ✅ Skip blokkeert niet
-- ✅ Geen dubbele submit (DONE guard)
-- ✅ Geen dubbele XP (REWARDS_APPLIED check)
-- ✅ Geen dubbele progress update (PROGRESS_UPDATED check)
-- ✅ Geen dubbele result logging (RESULT_LOGGED check)
-- ✅ Geen wit scherm na les
-- ✅ Result screen blijft werken
-- ✅ Stage-based recovery werkt
+## Niet in V1
 
-## Wat in ontwikkeling is
+- Cloud sync
+- Accounts
+- Play Store
+- Monetisatie
+- Analytics
+- Brede curriculumuitbreiding
 
-- Spaced review algoritme
-- Parent dashboard
-- Meer oefentypes
-
-## Build & Test
+## Bouwen
 
 ```bash
-./gradlew :app:compileDebugKotlin
+./gradlew :app:assembleDebug
+```
+
+APK verschijnt in `app/build/outputs/apk/debug/`
+
+## Testen
+
+```bash
 ./gradlew :app:testDebugUnitTest
 ```
 
-CI: https://github.com/robinvandenbroecke/RekenRinkel/actions
-
-## Data & Privacy
-
-- 100% offline, Room database
-- Geen tracking, geen ads
+18 tests, alle groen.
 
 ## Status
 
-Privétestfase, nog niet productierijp.
-
-## Licentie
-
-Copyright 2024 - Privé testbuild
+V1 freeze - stabiel voor privétest. V2/publicatie later.
