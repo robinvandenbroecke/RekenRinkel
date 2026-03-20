@@ -453,12 +453,9 @@ class LessonViewModel(
             return
         }
 
-        // HARDE GUARD: al aan het verwerken = direct return, voorkomt race conditions
-        if (currentlyCompletingExerciseId == exerciseId) {
-            android.util.Log.w("LessonViewModel", "[COMPLETION] Exercise $exerciseId already processing - ignoring")
-            return
-        }
-        currentlyCompletingExerciseId = exerciseId
+        // PATCH 1-2: currentlyCompletingExerciseId wordt door entrypoints beheerd
+        // De entrypoints (submitAnswer, skipExercise, continueWorkedExample) zetten de guard
+        // Alleen resetten we hier in het finally block na completion
 
         try {
             // STAGE 1: Log resultaat (idempotent - alleen als nog niet gelogd voor deze exercise)
