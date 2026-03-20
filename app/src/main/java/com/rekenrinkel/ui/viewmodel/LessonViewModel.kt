@@ -588,13 +588,9 @@ class LessonViewModel(
         } catch (e: Exception) {
             android.util.Log.e("LessonViewModel", "[FAILURE] Unexpected error in finishCurrentExercise", e)
             handleFailure("Er ging iets mis", FailureStage.UNKNOWN, exerciseId)
-        } finally {
-            // PATCH 4: Reset guard als laatste safety net
-            // Entrypoints resetten normaal, maar bij exception in finishCurrentExercise
-            // kunnen we hier ook resetten voor safety
-            currentlyCompletingExerciseId = null
-            android.util.Log.d("LessonViewModel", "[GUARD] Reset in finishCurrentExercise finally for $exerciseId")
         }
+        // PATCH 1: GEEN finally block met onvoorwaardelijke reset
+        // De guard wordt alleen gereset in entrypoints wanneer item echt klaar is
     }
 
     /**
