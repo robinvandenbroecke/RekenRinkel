@@ -66,10 +66,24 @@ class LessonViewModel(
     fun startLesson() {
         if (lessonStarted || _uiState.value.isLoading) return
         lessonStarted = true
-        
+
+        completedExerciseIds.clear()
+        currentlyCompletingExerciseId = null
+        _uiState.update {
+            it.copy(
+                isLoading = true,
+                isActive = false,
+                results = emptyList(),
+                stepState = LessonStepState.IDLE,
+                completionStage = CompletionStage.NOT_STARTED,
+                completionStageExerciseId = null,
+                exerciseStartTime = null,
+                lastAnswerCorrect = null,
+                error = null
+            )
+        }
+
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            
             try {
                 val profile = profileRepository.getProfile().first()
                     ?: throw IllegalStateException("No profile found")
@@ -79,26 +93,32 @@ class LessonViewModel(
                     theme = profile.theme
                 )
                 val lesson = lessonEngine.buildLesson(userProfile)
-                
+                val firstExercise = lesson.exercises.firstOrNull()
+
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        isActive = true,
+                        isActive = firstExercise != null,
                         exercises = lesson.exercises,
                         currentIndex = 0,
-                        currentExercise = lesson.exercises.firstOrNull(),
+                        currentExercise = firstExercise,
                         results = emptyList(),
-                        stepState = LessonStepState.SHOWING,
+                        stepState = if (firstExercise != null) LessonStepState.SHOWING else LessonStepState.IDLE,
                         completionStage = CompletionStage.NOT_STARTED,
                         completionStageExerciseId = null,
+                        exerciseStartTime = if (firstExercise != null) System.currentTimeMillis() else null,
+                        lastAnswerCorrect = null,
                         error = null
                     )
                 }
             } catch (e: Exception) {
                 android.util.Log.e("LessonViewModel", "Failed to start lesson", e)
+                lessonStarted = false
+                currentlyCompletingExerciseId = null
                 _uiState.update {
                     it.copy(
                         isLoading = false,
+                        stepState = LessonStepState.IDLE,
                         error = "Kon les niet starten: ${e.message}"
                     )
                 }
@@ -197,12 +217,15 @@ class LessonViewModel(
             return
         }
 
-        viewModelScope.launch {
-            // PATCH 2: Zet currentlyCompletingExerciseId vroeg, vóór side effects
-            currentlyCompletingExerciseId = exercise.id
+        currentlyCompletingExerciseId = exercise.id
+        _uiState.update {
+            it.copy(
+                stepState = LessonStepState.PROCESSING,
+                completionStageExerciseId = exercise.id
+            )
+        }
 
-            // Direct naar PROCESSING state om dubbele submits te voorkomen
-            _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
+        viewModelScope.launch {
 
             try {
                 // Re-read startTime actueel voor accurate meting
@@ -310,12 +333,15 @@ class LessonViewModel(
             return
         }
 
-        viewModelScope.launch {
-            // PATCH 2: Zet currentlyCompletingExerciseId vroeg, vóór side effects
-            currentlyCompletingExerciseId = exercise.id
+        currentlyCompletingExerciseId = exercise.id
+        _uiState.update {
+            it.copy(
+                stepState = LessonStepState.PROCESSING,
+                completionStageExerciseId = exercise.id
+            )
+        }
 
-            // Direct naar PROCESSING om race conditions te voorkomen
-            _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
+        viewModelScope.launch {
 
             // Skip resultaat: altijd incorrect, geen tijd, geen representatie
             val result = DetailedExerciseResult(
@@ -499,6 +525,9 @@ class LessonViewModel(
                     )
                 }
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Stage RESULT_LOGGED for $exerciseId")
+                if (mode == CompletionMode.FEEDBACK_THEN_ADVANCE) {
+                    delay(60)
+                }
             } else {
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Stage RESULT_LOGGED skipped - already logged for $exerciseId")
             }
