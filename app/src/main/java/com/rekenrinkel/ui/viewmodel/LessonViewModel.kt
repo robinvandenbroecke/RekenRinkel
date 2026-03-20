@@ -151,9 +151,16 @@ class LessonViewModel(
             return
         }
         
-        // Guard: oefening al voltooid
+        // Guard: oefening al voltooid (completedExerciseIds check)
         if (isExerciseCompleted(exercise.id)) {
             android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise already completed")
+            return
+        }
+        
+        // Guard: oefening al DONE (completionStage check)
+        if (currentCompletionStageExerciseId() == exercise.id && 
+            currentCompletionState() == CompletionStage.DONE) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise already DONE")
             return
         }
         
