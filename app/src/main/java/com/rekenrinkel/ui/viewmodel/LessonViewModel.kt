@@ -760,26 +760,61 @@ class LessonViewModel(
 
             when (currentStage) {
                 CompletionStage.NOT_STARTED -> {
-                    // PATCH 1: Niets gedaan, dus geen completed markeren
-                    // GEEN kunstmatig result loggen - validation is nooit gelukt
-                    // Veilige recovery: gewoon door naar volgende zonder side effects
-                    android.util.Log.d("LessonViewModel", "[RECOVERY] Nothing started for $currentExerciseId, safe advance only")
+                    // PATCH 3: Recovery voor NOT_STARTED - log result then advance (testcontract)
+                    // Markeer eerst als completed om dubbele logging te voorkomen
+                    completedExerciseIds.add(currentExerciseId)
+                    val result = DetailedExerciseResult(
+                        exerciseId = currentExerciseId,
+                        skillId = currentExercise.skillId,
+                        isCorrect = false,
+                        givenAnswer = "[error_recovery]",
+                        correctAnswer = currentExercise.correctAnswer,
+                        responseTimeMs = 0,
+                        difficultyTier = currentExercise.difficulty,
+                        representationUsed = "ERROR_RECOVERY"
+                    )
+                    _uiState.update {
+                        it.copy(
+                            results = it.results + result,
+                            completionStage = CompletionStage.DONE,
+                            completionStageExerciseId = currentExerciseId,
+                            lastAnswerCorrect = false
+                        )
+                    }
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] Logged recovery result for $currentExerciseId")
                 }
                 CompletionStage.RESULT_LOGGED -> {
-                    // PATCH 2: Result al gelogd, maar progress/rewards NIET
-                    // Geen completed markeren - item is niet volledig afgerond
-                    // Geen dubbele logging, maar ook geen semantische afsluiting claimen
-                    android.util.Log.d("LessonViewModel", "[RECOVERY] Result logged for $currentExerciseId, NOT marking completed (progress/rewards pending)")
+                    // PATCH 4: Result al gelogd, geen dubbele logging
+                    // Zet wel DONE zodat advance werkt, maar geen completed (niet volledig afgerond)
+                    _uiState.update {
+                        it.copy(
+                            completionStage = CompletionStage.DONE,
+                            completionStageExerciseId = currentExerciseId
+                        )
+                    }
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] Result logged for $currentExerciseId, set DONE for advance (no completed)")
                 }
                 CompletionStage.PROGRESS_UPDATED -> {
-                    // PATCH 2: Progress al gedaan, maar rewards NIET
-                    // Geen completed markeren - item is niet volledig afgerond
-                    android.util.Log.d("LessonViewModel", "[RECOVERY] Progress done for $currentExerciseId, NOT marking completed (rewards pending)")
+                    // PATCH 4: Progress al gedaan, geen dubbele progress
+                    // Zet wel DONE zodat advance werkt
+                    _uiState.update {
+                        it.copy(
+                            completionStage = CompletionStage.DONE,
+                            completionStageExerciseId = currentExerciseId
+                        )
+                    }
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] Progress done for $currentExerciseId, set DONE for advance (no completed)")
                 }
                 CompletionStage.REWARDS_APPLIED -> {
-                    // PATCH 2: Rewards al gedaan, maar item nog niet READY_TO_ADVANCE
-                    // Geen completed markeren - semantisch nog niet volledig afgerond
-                    android.util.Log.d("LessonViewModel", "[RECOVERY] Rewards done for $currentExerciseId, NOT marking completed (not ready)")
+                    // PATCH 4: Rewards al gedaan, geen dubbele rewards
+                    // Zet wel DONE zodat advance werkt
+                    _uiState.update {
+                        it.copy(
+                            completionStage = CompletionStage.DONE,
+                            completionStageExerciseId = currentExerciseId
+                        )
+                    }
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] Rewards done for $currentExerciseId, set DONE for advance (no completed)")
                 }
                 CompletionStage.READY_TO_ADVANCE -> {
                     // PATCH 2: Alles gedaan, pas HIER completed markeren
