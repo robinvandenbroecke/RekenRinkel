@@ -191,6 +191,12 @@ class LessonViewModel(
             return
         }
 
+        // PATCH 6: Extra guard - item al in guarded completion
+        if (currentlyCompletingExerciseId != null && currentlyCompletingExerciseId != exercise.id) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - different exercise being processed")
+            return
+        }
+
         viewModelScope.launch {
             // PATCH 2: Zet currentlyCompletingExerciseId vroeg, vóór side effects
             currentlyCompletingExerciseId = exercise.id
@@ -306,6 +312,12 @@ class LessonViewModel(
             return
         }
 
+        // PATCH 6: Extra guard - ander item al in guarded completion
+        if (currentlyCompletingExerciseId != null && currentlyCompletingExerciseId != exercise.id) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - different exercise being processed")
+            return
+        }
+
         viewModelScope.launch {
             // PATCH 2: Zet currentlyCompletingExerciseId vroeg, vóór side effects
             currentlyCompletingExerciseId = exercise.id
@@ -395,6 +407,12 @@ class LessonViewModel(
         // Guard: oefening moet van type WORKED_EXAMPLE zijn
         if (exercise.type != ExerciseType.WORKED_EXAMPLE) {
             android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - not a worked example")
+            return
+        }
+
+        // PATCH 6: Extra guard - ander item al in guarded completion
+        if (currentlyCompletingExerciseId != null && currentlyCompletingExerciseId != exercise.id) {
+            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - different exercise being processed")
             return
         }
 
