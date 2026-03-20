@@ -182,12 +182,14 @@ class LessonEngine(
             accessibleSkills, progressMap, focusSkill, CHALLENGE_COUNT
         )
 
-        // Combineer alle phases in didactische volgorde.
-        // Flowtests observeren expliciete phase-overgangen, dus hier niet meer herschikken.
+        // Combineer alle phases
         val allExercises = warmUpExercises + focusExercises + reviewExercises + challengeExercises
 
+        // Smart shuffle met variatie garantie
+        val shuffledExercises = smartShuffleWithVariation(allExercises)
+
         return LessonPlan(
-            exercises = allExercises,
+            exercises = shuffledExercises,
             focusSkillId = focusSkill.id,
             warmUpCount = warmUpExercises.size,
             focusCount = focusExercises.size,
@@ -602,14 +604,11 @@ class LessonEngine(
             skill.id != focusSkill.id
         }.shuffled()
 
-        val result = mutableListOf<Exercise>()
-        for (index in 0 until count) {
+        return (0 until count).map { index ->
             val skill = masteredSkills.getOrNull(index) ?: focusSkill
             // Warm-up altijd difficulty 1 (makkelijk)
-            val ex = safeGenerateRegular(skill.id, 1) ?: break
-            result += ex
+            exerciseEngine.generateExercise(skill.id, 1)
         }
-        return result
     }
 
     private fun buildFocusBlock(
@@ -619,16 +618,22 @@ class LessonEngine(
     ): List<Exercise> {
         val progress = progressMap[focusSkill.id]
         val difficulty = progress?.currentDifficultyTier ?: 1
-
+        
+        // PATCH 4: Echte end-to-end CPA flow voor foundation/optellen cluster
         val config = ContentRepository.getConfig(focusSkill.id)
         val skillCpaPhase = config?.cpaPhase ?: com.rekenrinkel.domain.content.CpaPhase.CONCRETE
         val currentCpaPhase = progress?.currentCpaPhase ?: com.rekenrinkel.domain.content.CpaPhase.CONCRETE
+        
+        // Bepaal toegestane CPA-fase op basis van mastery
         val allowedCpaPhase = determineAllowedCpaPhase(currentCpaPhase, progress)
+        
+        // Gebruik de strengere van skill-fase en toegestane fase
         val effectiveCpaPhase = minOf(skillCpaPhase, allowedCpaPhase)
-
+        
+        // Specifieke flow voor foundation/optellen cluster
         val isFoundationArithmetic = focusSkill.id in setOf(
             "foundation_number_bonds_5",
-            "foundation_number_bonds_10",
+            "foundation_number_bonds_10", 
             "arithmetic_add_10_concrete",
             "arithmetic_add_10_pictorial",
             "arithmetic_add_10_abstract",
@@ -637,65 +642,78 @@ class LessonEngine(
             "arithmetic_sub_10_abstract"
         )
 
-        val result = mutableListOf<Exercise>()
-
-        fun addWorkedOrFallback(): Boolean {
-            val ex = safeGenerateWorked(focusSkill.id, difficulty)
-                ?: safeGenerateGuided(focusSkill.id, difficulty)
-                ?: safeGenerateRegular(focusSkill.id, difficulty)
-            return if (ex != null) { result += ex; true } else false
-        }
-
-        fun addGuidedOrFallback(): Boolean {
-            val ex = safeGenerateGuided(focusSkill.id, difficulty)
-                ?: safeGenerateRegular(focusSkill.id, difficulty)
-            return if (ex != null) { result += ex; true } else false
-        }
-
-        fun addRegularOnly(): Boolean {
-            val ex = safeGenerateRegular(focusSkill.id, difficulty)
-            return if (ex != null) { result += ex; true } else false
-        }
-
-        when {
+        // DIDACTISCHE STRUCTUUR: worked example -> guided -> independent
+        // Specifiek per CPA-fase en cluster
+        return when {
+            // Speciale behandeling voor foundation/optellen cluster
             isFoundationArithmetic && effectiveCpaPhase == com.rekenrinkel.domain.content.CpaPhase.CONCRETE -> {
-                if (!addWorkedOrFallback()) return result
-                repeat(3) { if (!addGuidedOrFallback()) return result }
+                // CONCRETE: 1 worked example + 3 guided
+                listOf(
+                    exerciseEngine.generateWorkedExample(focusSkill.id, difficulty),
+                    exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty),
+                    exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty),
+                    exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty)
+                )
             }
             isFoundationArithmetic && effectiveCpaPhase == com.rekenrinkel.domain.content.CpaPhase.PICTORIAL -> {
-                if (!addWorkedOrFallback()) return result
-                if (!addGuidedOrFallback()) return result
-                repeat(2) { if (!addRegularOnly()) return result }
+                // PICTORIAL: 1 worked + 1 guided + 2 independent
+                listOf(
+                    exerciseEngine.generateWorkedExample(focusSkill.id, difficulty),
+                    exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty),
+                    exerciseEngine.generateExercise(focusSkill.id, difficulty),
+                    exerciseEngine.generateExercise(focusSkill.id, difficulty)
+                )
             }
             isFoundationArithmetic && effectiveCpaPhase == com.rekenrinkel.domain.content.CpaPhase.ABSTRACT -> {
+                // ABSTRACT: 1 guided + 3 independent (als er al attempts zijn)
                 if (progress != null && progress.totalAttempts() >= 5) {
-                    repeat(4) { if (!addRegularOnly()) return result }
+                    listOf(
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty),
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty),
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty),
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty)
+                    )
                 } else {
-                    if (!addGuidedOrFallback()) return result
-                    repeat(3) { if (!addRegularOnly()) return result }
+                    listOf(
+                        exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty),
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty),
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty),
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty)
+                    )
                 }
             }
+            // Default voor andere skills
             effectiveCpaPhase == com.rekenrinkel.domain.content.CpaPhase.CONCRETE -> {
-                if (!addWorkedOrFallback()) return result
-                repeat(count - 1) { if (!addGuidedOrFallback()) return result }
+                listOf(
+                    exerciseEngine.generateWorkedExample(focusSkill.id, difficulty)
+                ) + (1 until count).map {
+                    exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty)
+                }
             }
             effectiveCpaPhase == com.rekenrinkel.domain.content.CpaPhase.PICTORIAL -> {
-                if (!addGuidedOrFallback()) return result
-                repeat(count - 1) { if (!addRegularOnly()) return result }
+                listOf(
+                    exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty)
+                ) + (1 until count).map {
+                    exerciseEngine.generateExercise(focusSkill.id, difficulty)
+                }
             }
             else -> {
+                // ABSTRACT/MIXED
                 if (progress == null || progress.totalAttempts() < 3) {
-                    if (!addGuidedOrFallback()) return result
-                    repeat(count - 1) { if (!addRegularOnly()) return result }
+                    listOf(
+                        exerciseEngine.generateGuidedExercise(focusSkill.id, difficulty)
+                    ) + (1 until count).map {
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty)
+                    }
                 } else {
-                    repeat(count) { if (!addRegularOnly()) return result }
+                    (0 until count).map {
+                        exerciseEngine.generateExercise(focusSkill.id, difficulty)
+                    }
                 }
             }
         }
-
-        return result
     }
-
+    
     /**
      * PATCH 3: Bepaal welke CPA-fase toegestaan is op basis van mastery
      * CONCRETE nodig voor PICTORIAL, PICTORIAL nodig voor ABSTRACT
@@ -761,15 +779,12 @@ class LessonEngine(
             }
         }.take(count * 2) // Meer kandidaten voor variatie
 
-        val result = mutableListOf<Exercise>()
-        for (index in 0 until count) {
+        return (0 until count).map { index ->
             val skill = reviewCandidates.getOrNull(index) ?: focusSkill
             val progress = progressMap[skill.id]
             val difficulty = (progress?.currentDifficultyTier ?: 1).coerceAtMost(3) // Review niet te moeilijk
-            val ex = safeGenerateRegular(skill.id, difficulty) ?: break
-            result += ex
+            exerciseEngine.generateExercise(skill.id, difficulty)
         }
-        return result
     }
 
     private fun buildChallengeBlock(
@@ -785,26 +800,14 @@ class LessonEngine(
             (progress == null && skill.prerequisites.isNotEmpty()) // Net unlocked
         }.shuffled()
 
-        val result = mutableListOf<Exercise>()
-        for (index in 0 until count) {
+        return (0 until count).map { index ->
             val skill = challengeCandidates.getOrNull(index) ?: focusSkill
             val progress = progressMap[skill.id]
             // Challenge = +1 difficulty
             val difficulty = ((progress?.currentDifficultyTier ?: 1) + 1).coerceIn(1, 5)
-            val ex = safeGenerateRegular(skill.id, difficulty) ?: break
-            result += ex
+            exerciseEngine.generateExercise(skill.id, difficulty)
         }
-        return result
     }
-
-    private fun safeGenerateRegular(skillId: String, difficulty: Int): Exercise? =
-        runCatching { exerciseEngine.generateExercise(skillId, difficulty) }.getOrNull()
-
-    private fun safeGenerateGuided(skillId: String, difficulty: Int): Exercise? =
-        runCatching { exerciseEngine.generateGuidedExercise(skillId, difficulty) }.getOrNull()
-
-    private fun safeGenerateWorked(skillId: String, difficulty: Int): Exercise? =
-        runCatching { exerciseEngine.generateWorkedExample(skillId, difficulty) }.getOrNull()
 
     private fun smartShuffleWithVariation(exercises: List<Exercise>): List<Exercise> {
         if (exercises.size <= 3) return exercises.shuffled()

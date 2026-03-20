@@ -210,10 +210,7 @@ fun VisualDots(
     }
 }
 
-/**
- * PATCH 3: VisualBlocks component voor blokjes representatie
- * Eenvoudige vierkantjes met hoog contrast voor kinderoefeningen
- */
+
 @Composable
 fun VisualBlocks(
     count: Int,
@@ -221,7 +218,7 @@ fun VisualBlocks(
     color: Color = MaterialTheme.colorScheme.primary
 ) {
     val rows = (count + 4) / 5
-    
+
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
@@ -235,12 +232,33 @@ fun VisualBlocks(
                         modifier = Modifier
                             .padding(4.dp)
                             .size(24.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(RoundedCornerShape(6.dp))
                             .background(color)
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+fun MissingVisualFallback(
+    message: String = "Visuele inhoud ontbreekt",
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        tonalElevation = 1.dp,
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(16.dp)
+        )
     }
 }
 

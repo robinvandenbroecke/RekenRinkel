@@ -237,37 +237,16 @@ private fun ErrorOverlay(
     }
 }
 
-/**
- * PATCH 2 & 4: VISUAL_QUANTITY rendering expliciet per visualData.type
- * - Ondersteunt DOTS en BLOCKS
- * - Fail-safe: toont foutmelding bij ontbrekende/ongeldige visualData
- */
 @Composable
 private fun VisualContent(exercise: Exercise) {
     when (exercise.type) {
         ExerciseType.VISUAL_QUANTITY -> {
             val visualData = exercise.visualData
             val count = visualData?.count
-            
             when {
-                // PATCH 4: Fail-safe - geen leeg scherm bij ontbrekende data
-                visualData == null || count == null -> {
-                    MissingVisualFallback(
-                        message = "Visuele inhoud ontbreekt",
-                        exerciseType = exercise.type.name
-                    )
-                }
-                // PATCH 2: Expliciete type checking
-                visualData.type == VisualType.DOTS -> {
-                    VisualDots(count = count)
-                }
-                visualData.type == VisualType.BLOCKS -> {
-                    VisualBlocks(count = count)
-                }
-                // Fallback voor onbekende types - gebruik dots als default
-                else -> {
-                    VisualDots(count = count)
-                }
+                count == null -> MissingVisualFallback()
+                visualData.type == VisualType.BLOCKS -> VisualBlocks(count = count)
+                else -> VisualDots(count = count)
             }
         }
         ExerciseType.VISUAL_GROUPS -> {
@@ -284,65 +263,12 @@ private fun VisualContent(exercise: Exercise) {
                         )
                     )
                 }
-                // PATCH 4: Fail-safe voor VISUAL_GROUPS
-                else -> {
-                    MissingVisualFallback(
-                        message = "Groepen ontbreekt",
-                        exerciseType = exercise.type.name
-                    )
-                }
+                else -> MissingVisualFallback()
             }
         }
         else -> {
             // No visual for other types
         }
-    }
-}
-
-/**
- * PATCH 4: Fallback component voor ontbrekende visuele data
- * Toont duidelijke foutmelding in plaats van leeg scherm
- */
-@Composable
-private fun MissingVisualFallback(
-    message: String,
-    exerciseType: String
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "⚠️",
-                style = MaterialTheme.typography.headlineMedium
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = "(Type: $exerciseType)",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
-            )
-        }
-    }
-    
-    // Log naar console voor debugging
-    LaunchedEffect(Unit) {
-        android.util.Log.e("ExerciseScreen", "Missing visual data: $message for $exerciseType")
     }
 }
 
