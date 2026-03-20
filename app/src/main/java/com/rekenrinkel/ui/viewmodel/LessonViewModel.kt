@@ -559,159 +559,110 @@ class LessonViewModel(
         val state = _uiState.value
         val failureContext = state.failureContext
         val completion = currentCompletionState()
+        val currentExercise = state.currentExercise
 
         android.util.Log.d("LessonViewModel", "continueAfterError called")
         android.util.Log.d("LessonViewModel", "Failure stage: ${failureContext?.stage?.name ?: "null"}")
         android.util.Log.d("LessonViewModel", "Completion stage: ${completion.stage} (exercise: ${completion.exerciseId})")
         android.util.Log.d("LessonViewModel", "Exercise type: ${failureContext?.exerciseType}")
 
-        val stageBelongsToCurrentExercise = completion.exerciseId == failureContext?.exerciseId
-        val recoveryStage = if (stageBelongsToCurrentExercise) completion.stage else CompletionStage.NOT_STARTED
-        
-        android.util.Log.d("LessonViewModel", "Effective recovery stage: $recoveryStage (belongs to current: $stageBelongsToCurrentExercise)")
+        if (currentExercise == null) {
+            currentlyCompletingExerciseId = null
+            viewModelScope.launch { _navigation.emit(LessonNavigationEvent.BackToHome) }
+            return
+        }
 
-        // PATCH 6 & 9: Recovery afhankelijk van exercise type en completion stage
-        val recoveryAction = determineRecoveryAction(failureContext, recoveryStage)
-        android.util.Log.d("LessonViewModel", "Recovery action: $recoveryAction")
+        val recoveryStage = if (completion.exerciseId == currentExercise.id) completion.stage else CompletionStage.NOT_STARTED
+        val currentExerciseId = currentExercise.id
+        android.util.Log.d("LessonViewModel", "Effective recovery stage: $recoveryStage")
 
-        // PATCH 8: Log recovery execution
-        android.util.Log.d("LessonViewModel", "[RECOVERY] Executing action: $recoveryAction")
-        
-        when (recoveryAction) {
-            RecoveryAction.RETRY_CURRENT -> {
-                // PATCH 7: Probeer huidige opnieuw (alleen als NOT_STARTED)
-                android.util.Log.d("LessonViewModel", "[RECOVERY] RETRY_CURRENT - resetting to SHOWING")
-                viewModelScope.launch {
-                    _uiState.update {
-                        it.copy(
-                            stepState = LessonStepState.SHOWING,
-                            error = null,
-                            failureContext = null,
-                            completionStage = CompletionStage.NOT_STARTED,
-                            completionStageExerciseId = null
+        viewModelScope.launch {
+            when (recoveryStage) {
+                CompletionStage.NOT_STARTED -> {
+                    // Recovery contract: log exact één recovery-result en ga veilig door zonder progress/rewards.
+                    val alreadyLogged = state.results.any { it.exerciseId == currentExerciseId }
+                    if (!alreadyLogged) {
+                        val recoveryResult = DetailedExerciseResult(
+                            exerciseId = currentExercise.id,
+                            skillId = currentExercise.skillId,
+                            isCorrect = false,
+                            responseTimeMs = System.currentTimeMillis() - exerciseStartTime,
+                            givenAnswer = "[recovery_not_started]",
+                            correctAnswer = currentExercise.correctAnswer,
+                            difficultyTier = currentExercise.difficulty,
+                            representationUsed = "RECOVERY"
                         )
-                    }
-                    currentlyCompletingExerciseId = null
-                    // NOTE: UI state is leidend
-                }
-            }
-            
-            RecoveryAction.CONTINUE_REMAINING_STEPS -> {
-                // PATCH 5: Voltooi alleen resterende stappen (result al gelogd)
-                // Gebruik specifieke helper, niet blind finishCurrentExercise
-                android.util.Log.d("LessonViewModel", "[RECOVERY] CONTINUE_REMAINING_STEPS - completing remaining steps only")
-                viewModelScope.launch {
-                    val currentExercise = state.currentExercise
-                    if (currentExercise != null) {
-                        completeRemainingSteps(currentExercise, state)
+                        _uiState.update {
+                            it.copy(
+                                results = it.results + recoveryResult,
+                                completionStage = CompletionStage.RESULT_LOGGED,
+                                completionStageExerciseId = currentExercise.id,
+                                stepState = LessonStepState.ADVANCING,
+                                error = null,
+                                failureContext = null,
+                                lastAnswerCorrect = false
+                            )
+                        }
                     } else {
-                        advanceToNextExercise()
-                    }
-                }
-            }
-            
-            RecoveryAction.ADVANCE_TO_NEXT -> {
-                // PATCH 5: ADVANCE_TO_NEXT alleen als we zeker zijn dat side effects al gedaan zijn
-                // Dit mag alleen gebruikt worden als:
-                // - REWARDS_APPLIED of READY_TO_ADVANCE bereikt is (geen dubbele rewards)
-                // - of als het een WORKED_EXAMPLE/SKIP is (geen rewards nodig)
-                val canSafelyAdvance = recoveryStage >= CompletionStage.REWARDS_APPLIED ||
-                    failureContext?.exerciseType == ExerciseType.WORKED_EXAMPLE
-                
-                if (!canSafelyAdvance) {
-                    android.util.Log.w("LessonViewModel", "[RECOVERY] ADVANCE_TO_NEXT blocked - stage=$recoveryStage, type=${failureContext?.exerciseType}, using CONTINUE_REMAINING_STEPS instead")
-                    // Fallback naar veiliger recovery
-                    viewModelScope.launch {
-                        val currentExercise = state.currentExercise
-                        if (currentExercise != null) {
-                            completeRemainingSteps(currentExercise, state)
-                        } else {
-                            advanceToNextExercise()
+                        _uiState.update {
+                            it.copy(
+                                stepState = LessonStepState.ADVANCING,
+                                error = null,
+                                failureContext = null,
+                                completionStage = CompletionStage.RESULT_LOGGED,
+                                completionStageExerciseId = currentExercise.id
+                            )
                         }
                     }
-                    return
+                    currentlyCompletingExerciseId = currentExercise.id
+                    advanceToNextExercise()
                 }
-                
-                android.util.Log.d("LessonViewModel", "[RECOVERY] ADVANCE_TO_NEXT - safe advance (stage=$recoveryStage)")
-                viewModelScope.launch {
+                CompletionStage.RESULT_LOGGED,
+                CompletionStage.PROGRESS_UPDATED,
+                CompletionStage.REWARDS_APPLIED -> {
+                    // Geen side-effects meer opnieuw uitvoeren. Veilig door naar volgend item.
                     _uiState.update {
                         it.copy(
                             stepState = LessonStepState.ADVANCING,
                             error = null,
                             failureContext = null,
-                            completionStage = CompletionStage.NOT_STARTED,
-                            completionStageExerciseId = null
+                            completionStage = recoveryStage,
+                            completionStageExerciseId = currentExercise.id
                         )
                     }
-                    currentlyCompletingExerciseId = null
+                    currentlyCompletingExerciseId = currentExercise.id
                     advanceToNextExercise()
                 }
-            }
-            
-            RecoveryAction.COMPLETE_ADVANCE -> {
-                // PATCH 3: DONE was bereikt, oefening is volledig afgehandeld
-                // Markeer als handled en doe veilige advance
-                android.util.Log.d("LessonViewModel", "[RECOVERY] COMPLETE_ADVANCE - exercise fully done, completing advance")
-                failureContext?.let { handledExerciseIds.add(it.exerciseId) }
-                viewModelScope.launch {
+                CompletionStage.READY_TO_ADVANCE -> {
+                    // Alleen hier expliciet finaliseren.
+                    handledExerciseIds.add(currentExercise.id)
                     _uiState.update {
                         it.copy(
                             stepState = LessonStepState.ADVANCING,
                             error = null,
                             failureContext = null,
-                            completionStage = CompletionStage.NOT_STARTED,
-                            completionStageExerciseId = null
+                            completionStage = CompletionStage.DONE,
+                            completionStageExerciseId = currentExercise.id
                         )
                     }
-                    currentlyCompletingExerciseId = null
-                    // NOTE: UI state is leidend
+                    currentlyCompletingExerciseId = currentExercise.id
                     advanceToNextExercise()
                 }
-            }
-            
-            RecoveryAction.SKIP_TO_NEXT -> {
-                // Markeer huidige als handled en skip
-                android.util.Log.d("LessonViewModel", "[RECOVERY] SKIP_TO_NEXT - marking as handled and advancing")
-                failureContext?.let { handledExerciseIds.add(it.exerciseId) }
-                viewModelScope.launch {
+                CompletionStage.DONE -> {
                     _uiState.update {
                         it.copy(
                             stepState = LessonStepState.ADVANCING,
                             error = null,
                             failureContext = null,
-                            completionStage = CompletionStage.NOT_STARTED,
-                            completionStageExerciseId = null
+                            completionStage = CompletionStage.DONE,
+                            completionStageExerciseId = currentExercise.id
                         )
                     }
-                    currentlyCompletingExerciseId = null
-                    // NOTE: UI state is leidend
+                    currentlyCompletingExerciseId = currentExercise.id
                     advanceToNextExercise()
-                }
-            }
-
-            RecoveryAction.COMPLETE_LESSON -> {
-                // PATCH 7: Les voltooien (als alles DONE is)
-                android.util.Log.d("LessonViewModel", "[RECOVERY] COMPLETE_LESSON - completing lesson")
-                completeLesson()
-            }
-            
-            RecoveryAction.RETURN_HOME -> {
-                // Meest veilige fallback
-                android.util.Log.d("LessonViewModel", "[RECOVERY] RETURN_HOME - navigating back")
-                _uiState.update {
-                    it.copy(
-                        stepState = LessonStepState.SHOWING,
-                        error = null,
-                        failureContext = null
-                    )
-                }
-                viewModelScope.launch {
-                    _navigation.emit(LessonNavigationEvent.BackToHome)
                 }
             }
         }
-        
-        android.util.Log.d("LessonViewModel", "[RECOVERY] Action execution completed")
     }
 
     /**
