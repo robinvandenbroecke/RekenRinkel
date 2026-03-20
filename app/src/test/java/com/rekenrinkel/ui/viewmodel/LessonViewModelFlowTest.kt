@@ -720,15 +720,21 @@ class LessonViewModelFlowTest {
         val regularQueue = regularExercises.toMutableList()
 
         every { exerciseEngine.generateWorkedExample(any(), any()) } answers {
-            workedQueue.removeFirstOrNull()
+            workedQueue.removeFirstOrNull() 
+                ?: error("Unexpected generateWorkedExample call - workedQueue empty. " +
+                        "Expected ${workedExamples.size} worked calls.")
         }
 
         every { exerciseEngine.generateGuidedExercise(any(), any()) } answers {
-            guidedQueue.removeFirstOrNull()
+            guidedQueue.removeFirstOrNull() 
+                ?: error("Unexpected generateGuidedExercise call - guidedQueue empty. " +
+                        "Expected ${guidedExercises.size} guided calls.")
         }
 
         every { exerciseEngine.generateExercise(any(), any()) } answers {
-            regularQueue.removeFirstOrNull()
+            regularQueue.removeFirstOrNull() 
+                ?: error("Unexpected generateExercise call - regularQueue empty. " +
+                        "Expected ${regularExercises.size} regular calls.")
         }
     }
 
