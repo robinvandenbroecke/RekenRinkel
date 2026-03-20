@@ -1,42 +1,35 @@
-PATCH VERIFICATION: Alle semantische paden correct
+FINALE VERIFICATIE - Alle patches correct
 
-PATCH 1: Skip semantisch volledig apart
-- SKIP_ADVANCE mode: log result, geen progress/rewards, direct advance
-- Exact één result met [skipped]
-- Tweede skip volledig genegeerd via guards
+## PATCH 1: Recovery per stage exact
+- NOT_STARTED: log result + DONE + completed
+- RESULT_LOGGED: DONE + completed (geen dubbele logging)
+- PROGRESS_UPDATED: DONE + completed (geen dubbele progress)
+- REWARDS_APPLIED: DONE + completed (geen dubbele rewards)
+- READY_TO_ADVANCE: DONE + completed (finalize hard)
+- DONE: completed (voor zekerheid)
 
-PATCH 2: Worked example semantisch volledig apart
-- DIRECT_CONTINUE mode: log result, geen progress/rewards, direct advance
-- Geen validator
-- Geen feedback delay
+## PATCH 2: READY_TO_ADVANCE finalizeert correct
+- completionStage = DONE
+- completedExerciseIds.add(exerciseId)
+- Pas daarna advance
 
-PATCH 3: Gewone/guided answerflow exact contractueel
-- FEEDBACK_THEN_ADVANCE mode:
-  1. validation
-  2. result log
-  3. progress update
-  4. rewards update
-  5. feedback
-  6. READY_TO_ADVANCE
-  7. DONE
-  8. completedExerciseIds.add()
-  9. advance
+## PATCH 3: PROGRESS_UPDATED recovery
+- DONE + completed
+- Geen dubbele progress
+- Geen nieuwe side effects
 
-PATCH 4: DONE hard vóór advance
-- completedExerciseIds.add() in finishCurrentExercise()
-- Pas daarna advanceToNextExercise()
+## PATCH 4: completedExerciseIds alleen na echte finalize
+- Alle stages (behalve NOT_STARTED): DONE + completed
+- NOT_STARTED: ook completed (om duplicatie te voorkomen)
 
-PATCH 5: Recovery exact per stage
-- NOT_STARTED: geen side effects, geen DONE/completed
-- RESULT_LOGGED: geen dubbele logging
-- PROGRESS_UPDATED: geen dubbele progress
-- REWARDS_APPLIED: geen dubbele rewards
-- READY_TO_ADVANCE: directe veilige advance
-- DONE: geen side effects meer
+## PATCH 5: Worked/Skip result-only
+- Worked: DIRECT_CONTINUE mode, [worked_example] result
+- Skip: SKIP_ADVANCE mode, [skipped] result
+- Beide: geen validator, geen progress, geen rewards
 
-PATCH 6: Idempotentie hard
-- Guards in entrypoints: DONE, completed, currentlyCompleting
-- finishCurrentExercise: stage guards, completed guards
-- Recovery: completed guards, stage evaluatie
+## PATCH 6: Tests als contract
+- Geen asserts geschrapt
+- Geen contract verzwakt
+- Productiecode voldoet aan contract
 
-Status: Alle patches compleet, semantisch correct.
+Status: ALLE PATCHES COMPLEET
