@@ -469,6 +469,148 @@ class LessonViewModelFlowTest {
         assertEquals(2, viewModel.uiState.value.results.size)
     }
 
+    @Test
+    fun `DONE must be set before advance - strict ordering`() = runTest {
+        // EXPLICIETE LESSON SEQUENCE
+        val ex1 = createExercise("ex1", ExerciseType.TYPED_NUMERIC)
+        val ex2 = createExercise("ex2", ExerciseType.TYPED_NUMERIC)
+        
+        setupExactLessonSequence(
+            warmupRegular = ex1,
+            focusItems = listOf(LessonItem.Regular(ex2)),
+            reviewRegular = emptyList(),
+            challengeRegular = createExercise("challenge", ExerciseType.TYPED_NUMERIC)
+        )
+        every { exerciseValidator.validate(any(), any()) } returns true
+
+        viewModel.startLesson()
+        advanceTimeBy(500)
+
+        // Submit answer
+        viewModel.submitAnswer("5")
+        advanceTimeBy(50)
+
+        // During processing, completion stage progresses
+        val stageDuringProcessing = viewModel.uiState.value.completionStage
+        assertTrue("Stage should be at least RESULT_LOGGED", 
+            stageDuringProcessing >= CompletionStage.RESULT_LOGGED)
+
+        // Wait for completion
+        advanceTimeBy(1500)
+
+        // Now exercise should be DONE and we should have advanced
+        assertEquals(1, viewModel.uiState.value.currentIndex)
+        assertEquals("ex2", viewModel.uiState.value.currentExercise?.id)
+        
+        // New exercise should reset completion state
+        assertEquals(CompletionStage.NOT_STARTED, viewModel.uiState.value.completionStage)
+    }
+
+    @Test
+    fun `skip does not call progress or rewards - only logs result`() = runTest {
+        // EXPLICIETE LESSON SEQUENCE
+        val ex1 = createExercise("ex1", ExerciseType.TYPED_NUMERIC)
+        val ex2 = createExercise("ex2", ExerciseType.TYPED_NUMERIC)
+        
+        setupExactLessonSequence(
+            warmupRegular = ex1,
+            focusItems = listOf(LessonItem.Regular(ex2)),
+            reviewRegular = emptyList(),
+            challengeRegular = createExercise("challenge", ExerciseType.TYPED_NUMERIC)
+        )
+
+        viewModel.startLesson()
+        advanceTimeBy(500)
+
+        // Skip exercise
+        viewModel.skipExercise()
+        advanceTimeBy(100)
+
+        // Result logged
+        assertEquals(1, viewModel.uiState.value.results.size)
+        assertEquals("[skipped]", viewModel.uiState.value.results.first().givenAnswer)
+
+        // But progress and rewards NOT called for skip
+        coVerify(exactly = 0) { progressRepository.getOrCreateProgress(any()) }
+        coVerify(exactly = 0) { progressRepository.updateProgress(any()) }
+        coVerify(exactly = 0) { profileRepository.updateRewards(any()) }
+
+        // Advanced to next
+        advanceTimeBy(500)
+        assertEquals(1, viewModel.uiState.value.currentIndex)
+    }
+
+    @Test
+    fun `worked example does not call progress or rewards - only logs result`() = runTest {
+        // EXPLICIETE LESSON SEQUENCE met worked example
+        val warmUp = createExercise("warmup", ExerciseType.TYPED_NUMERIC)
+        val workedEx = createExercise("worked", ExerciseType.WORKED_EXAMPLE)
+        val nextEx = createExercise("next", ExerciseType.TYPED_NUMERIC)
+        
+        setupExactLessonSequence(
+            warmupRegular = warmUp,
+            focusItems = listOf(LessonItem.Worked(workedEx)),
+            reviewRegular = emptyList(),
+            challengeRegular = createExercise("challenge", ExerciseType.TYPED_NUMERIC)
+        )
+
+        viewModel.startLesson()
+        advanceTimeBy(500)
+
+        // Skip to worked example
+        viewModel.skipExercise()
+        advanceTimeBy(100)
+
+        // Clear mocks to verify only worked example behavior
+        clearMocks(progressRepository, profileRepository)
+        coEvery { progressRepository.getOrCreateProgress(any()) } returns SkillProgress("test_skill")
+        coEvery { profileRepository.getRewards() } returns Rewards()
+
+        // Continue worked example
+        viewModel.continueWorkedExample()
+        advanceTimeBy(100)
+
+        // Result logged
+        assertEquals(2, viewModel.uiState.value.results.size) // skip + worked
+        
+        // But progress and rewards NOT called for worked example
+        coVerify(exactly = 0) { progressRepository.getOrCreateProgress(any()) }
+        coVerify(exactly = 0) { progressRepository.updateProgress(any()) }
+        coVerify(exactly = 0) { profileRepository.updateRewards(any()) }
+
+        // Advanced to next
+        assertEquals(2, viewModel.uiState.value.currentIndex)
+    }
+
+    @Test
+    fun `recovery from NOT_STARTED logs result then advances`() = runTest {
+        // EXPLICIETE LESSON SEQUENCE
+        val ex1 = createExercise("ex1", ExerciseType.TYPED_NUMERIC)
+        val ex2 = createExercise("ex2", ExerciseType.TYPED_NUMERIC)
+        
+        setupExactLessonSequence(
+            warmupRegular = ex1,
+            focusItems = listOf(LessonItem.Regular(ex2)),
+            reviewRegular = emptyList(),
+            challengeRegular = createExercise("challenge", ExerciseType.TYPED_NUMERIC)
+        )
+
+        viewModel.startLesson()
+        advanceTimeBy(500)
+
+        // Simulate error during lesson start (NOT_STARTED state)
+        assertEquals(CompletionStage.NOT_STARTED, viewModel.uiState.value.completionStage)
+
+        // Recover
+        viewModel.continueAfterError()
+        advanceTimeBy(1000)
+
+        // Recovery logs a result and advances
+        assertEquals(1, viewModel.uiState.value.results.size)
+        assertEquals("[error_recovery]", viewModel.uiState.value.results.first().givenAnswer)
+        assertEquals(1, viewModel.uiState.value.currentIndex)
+    }
+
     /**
      * Sealed class voor expliciete lesson items - maakt de sequence leesbaar en type-veilig.
      */

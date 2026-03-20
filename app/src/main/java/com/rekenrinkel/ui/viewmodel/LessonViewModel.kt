@@ -100,20 +100,46 @@ class LessonViewModel(
 
     /**
      * Verwerk een antwoord - met strikte guards tegen dubbele submit
+     * 
+     * SEMANTIEK:
+     * 1. Valideer antwoord
+     * 2. Log resultaat
+     * 3. Update progress
+     * 4. Update rewards
+     * 5. Toon feedback
+     * 6. Advance na delay
+     * 
+     * DUBBELE SUBMIT PREVENTIE:
+     * - State check: alleen in SHOWING state
+     * - Processing guard: direct naar PROCESSING state
+     * - Completion guard: exercise mag niet al DONE zijn
      */
     fun submitAnswer(answer: String) {
         val state = _uiState.value
         val exercise = state.currentExercise ?: return
         
-        // Guard: les niet actief of al in verwerking
-        if (!state.isActive || state.stepState != LessonStepState.SHOWING) {
+        // Guard: les niet actief
+        if (!state.isActive) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - lesson not active")
+            return
+        }
+        
+        // Guard: alleen toestaan in SHOWING state (niet in PROCESSING, FEEDBACK, etc.)
+        if (state.stepState != LessonStepState.SHOWING) {
             android.util.Log.w("LessonViewModel", "submitAnswer ignored - wrong state: ${state.stepState}")
             return
         }
         
-        // Guard: oefening al voltooid
+        // Guard: oefening al voltooid (completedExerciseIds check)
         if (isExerciseCompleted(exercise.id)) {
             android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise already completed")
+            return
+        }
+        
+        // Guard: oefening al in completion flow (completionStage check)
+        if (state.completionStageExerciseId == exercise.id && 
+            state.completionStage >= CompletionStage.RESULT_LOGGED) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise already being processed")
             return
         }
 
@@ -136,10 +162,11 @@ class LessonViewModel(
                     representationUsed = exercise.visualData?.type?.name ?: "SYMBOLS"
                 )
                 
-                // Verwerk completion met juiste mode
+                // Verwerk completion met FEEDBACK_THEN_ADVANCE mode
+                // (zowel correct als incorrect tonen feedback)
                 finishCurrentExercise(
                     result = result,
-                    mode = if (isCorrect) CompletionMode.FEEDBACK_THEN_ADVANCE else CompletionMode.FEEDBACK_THEN_ADVANCE
+                    mode = CompletionMode.FEEDBACK_THEN_ADVANCE
                 )
             } catch (e: Exception) {
                 android.util.Log.e("LessonViewModel", "Error in submitAnswer", e)
@@ -154,15 +181,38 @@ class LessonViewModel(
     }
 
     /**
-     * Skip huidige oefening - altijd direct advance, nooit valideren
+     * Skip huidige oefening - semantisch strikte implementatie
+     * 
+     * VERPLICHTE EIGENSCHAPPEN:
+     * 1. Exact één result wordt gelogd (givenAnswer = "[skipped]")
+     * 2. Geen validator aanroep
+     * 3. Geen gewone feedback semantiek (geen FEEDBACK state)
+     * 4. Directe veilige advance
+     * 5. Geen progress/rewards side effects (SKIP_ADVANCE mode)
+     * 6. DONE na correcte afhandeling
+     * 
+     * SKIPPED exercises tellen mee voor les-voortgang maar niet voor statistieken.
      */
     fun skipExercise() {
         val state = _uiState.value
         val exercise = state.currentExercise ?: return
         
-        // Guard: les niet actief of al in verwerking
-        if (!state.isActive || state.stepState != LessonStepState.SHOWING) {
-            android.util.Log.w("LessonViewModel", "skipExercise ignored - wrong state")
+        // Guard: les niet actief
+        if (!state.isActive) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - lesson not active")
+            return
+        }
+        
+        // Guard: al in verwerking (skip kan niet worden onderbroken)
+        if (state.stepState == LessonStepState.PROCESSING || 
+            state.stepState == LessonStepState.ADVANCING) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - already processing")
+            return
+        }
+        
+        // Guard: niet in SHOWING state (bijv. al in FEEDBACK of ERROR)
+        if (state.stepState != LessonStepState.SHOWING) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - wrong state: ${state.stepState}")
             return
         }
         
@@ -173,8 +223,10 @@ class LessonViewModel(
         }
 
         viewModelScope.launch {
+            // Direct naar PROCESSING om race conditions te voorkomen
             _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
             
+            // Skip resultaat: altijd incorrect, geen tijd, geen representatie
             val result = DetailedExerciseResult(
                 exerciseId = exercise.id,
                 skillId = exercise.skillId,
@@ -186,7 +238,9 @@ class LessonViewModel(
                 representationUsed = "SKIP"
             )
             
-            // Skip gebruikt eigen completion-mode: geen validator, geen feedback, directe veilige advance
+            android.util.Log.d("LessonViewModel", "[SKIP] Processing skip for exercise ${exercise.id}")
+            
+            // Skip gebruikt SKIP_ADVANCE mode: log result, maar geen progress/rewards, direct advance
             finishCurrentExercise(
                 result = result,
                 mode = CompletionMode.SKIP_ADVANCE
@@ -196,13 +250,43 @@ class LessonViewModel(
 
     /**
      * Worked example: gebruiker klikt "Begrepen, verder"
+     * 
+     * SEMANTIEK:
+     * 1. Geen validatie nodig (worked example = demonstratie)
+     * 2. Log resultaat als "gezien"
+     * 3. Geen progress/rewards (DIRECT_CONTINUE mode)
+     * 4. Direct advance zonder feedback delay
+     * 5. DONE na afhandeling
+     * 
+     * Worked examples zijn didactische demonstraties, geen te evalueren antwoorden.
      */
     fun continueWorkedExample() {
         val state = _uiState.value
         val exercise = state.currentExercise ?: return
         
-        if (!state.isActive || state.stepState != LessonStepState.SHOWING) return
-        if (isExerciseCompleted(exercise.id)) return
+        // Guard: les niet actief
+        if (!state.isActive) {
+            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - lesson not active")
+            return
+        }
+        
+        // Guard: alleen in SHOWING state
+        if (state.stepState != LessonStepState.SHOWING) {
+            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - wrong state: ${state.stepState}")
+            return
+        }
+        
+        // Guard: oefening al voltooid
+        if (isExerciseCompleted(exercise.id)) {
+            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - already completed")
+            return
+        }
+        
+        // Guard: oefening moet van type WORKED_EXAMPLE zijn
+        if (exercise.type != ExerciseType.WORKED_EXAMPLE) {
+            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - not a worked example")
+            return
+        }
 
         viewModelScope.launch {
             _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
@@ -218,6 +302,9 @@ class LessonViewModel(
                 representationUsed = "WORKED_EXAMPLE"
             )
             
+            android.util.Log.d("LessonViewModel", "[WORKED] Continuing worked example ${exercise.id}")
+            
+            // DIRECT_CONTINUE: log result, maar geen progress/rewards, direct advance
             finishCurrentExercise(
                 result = result,
                 mode = CompletionMode.DIRECT_CONTINUE
@@ -226,22 +313,33 @@ class LessonViewModel(
     }
 
     /**
-     * ROBUUSTE LESSONFLOW: Stage-based completion met expliciete state machine
+     * ROBUUSTE LESSONFLOW: Stage-based completion met harde side-effect afscherming
      * 
      * KERNPRINCIPES:
      * 1. Elke stage is idempotent - meerdere calls met zelfde exerciseId zijn veilig
-     * 2. DONE betekent: alle side effects uitgevoerd, exercise definitief afgesloten
-     * 3. Advance gebeurt alleen als huidige exercise DONE is
-     * 4. Recovery kan alleen vanaf ERROR state, en markeert huidige exercise als DONE
+     * 2. Onder RESULT_LOGGED: result wordt niet opnieuw gelogd
+     * 3. Onder PROGRESS_UPDATED: progress wordt niet opnieuw geüpdatet
+     * 4. Onder REWARDS_APPLIED: rewards worden niet opnieuw toegepast
+     * 5. Onder READY_TO_ADVANCE: alleen nog veilige advance mogelijk
+     * 6. Onder DONE: niets meer - exercise is definitief afgesloten
+     * 7. Advance gebeurt alleen als huidige exercise DONE is
+     * 8. Recovery evalueert per stage wat al gebeurd is
      * 
      * Completion stages: NOT_STARTED → RESULT_LOGGED → PROGRESS_UPDATED → REWARDS_APPLIED → READY_TO_ADVANCE → DONE
-     * Failure stages: RESULT_LOGGING, PROGRESS_UPDATE, REWARD_UPDATE, ADVANCE, UNKNOWN
+     * Failure stages: VALIDATION, RESULT_LOGGING, PROGRESS_UPDATE, REWARD_UPDATE, ADVANCE, UNKNOWN
      */
     private suspend fun finishCurrentExercise(
         result: DetailedExerciseResult,
         mode: CompletionMode
     ) {
         val exerciseId = result.exerciseId
+
+        // HARDE GUARD: onder DONE = direct return, niets meer doen
+        if (currentCompletionState() == CompletionStage.DONE && 
+            currentUiState().completionStageExerciseId == exerciseId) {
+            android.util.Log.w("LessonViewModel", "[COMPLETION] Exercise $exerciseId already DONE - no action")
+            return
+        }
 
         // HARDE GUARD: al voltooid = direct return, geen side effects
         if (isExerciseCompleted(exerciseId)) {
@@ -270,9 +368,12 @@ class LessonViewModel(
                     )
                 }
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Stage RESULT_LOGGED for $exerciseId")
+            } else {
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Stage RESULT_LOGGED skipped - already logged for $exerciseId")
             }
 
             // STAGE 2 & 3: Update progress en rewards (alleen voor FEEDBACK_THEN_ADVANCE mode)
+            // SKIP_ADVANCE en DIRECT_CONTINUE slaan progress/rewards over voor snelle flow
             if (mode == CompletionMode.FEEDBACK_THEN_ADVANCE) {
                 
                 // STAGE 2: Progress update (idempotent - alleen als nog niet geüpdatet)
@@ -291,6 +392,8 @@ class LessonViewModel(
                         handleFailure("Voortgang kon niet worden opgeslagen", FailureStage.PROGRESS_UPDATE, exerciseId)
                         return  // Exit zonder advance - gebruiker kan recovery proberen
                     }
+                } else {
+                    android.util.Log.d("LessonViewModel", "[COMPLETION] Stage PROGRESS_UPDATED skipped - already done for $exerciseId")
                 }
 
                 // STAGE 3: Rewards update (idempotent - alleen als nog niet toegepast)
@@ -314,13 +417,21 @@ class LessonViewModel(
                         handleFailure("Rewards konden niet worden opgeslagen", FailureStage.REWARD_UPDATE, exerciseId)
                         return  // Exit zonder advance - gebruiker kan recovery proberen
                     }
+                } else {
+                    android.util.Log.d("LessonViewModel", "[COMPLETION] Stage REWARDS_APPLIED skipped - already done for $exerciseId")
                 }
+            } else {
+                // SKIP_ADVANCE of DIRECT_CONTINUE: sla progress/rewards over
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Progress/Rewards skipped for mode $mode")
             }
 
             // STAGE 4: Ready to advance - alle side effects zijn nu veilig uitgevoerd
+            // Alleen updaten als nog niet bereikt
             if (currentCompletionState() < CompletionStage.READY_TO_ADVANCE) {
                 _uiState.update { it.copy(completionStage = CompletionStage.READY_TO_ADVANCE) }
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Stage READY_TO_ADVANCE for $exerciseId")
+            } else {
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Stage READY_TO_ADVANCE already set for $exerciseId")
             }
 
             // STAGE 5: DONE - exercise is definitief afgesloten, advance is nu veilig
@@ -475,21 +586,80 @@ class LessonViewModel(
     }
 
     /**
-     * Ga verder na error - markeert huidige exercise als "completed" zonder resultaat
-     * zodat we verder kunnen naar de volgende oefening.
+     * Ga verder na error - semantisch exacte recovery
      * 
-     * Dit is een "graceful degradation" - gebruiker mist de voortgang van deze oefening,
-     * maar kan wel verder met de les.
+     * RECOVERY LOGICA per stage:
+     * - NOT_STARTED: geen side effects gedaan, log result nu alsnog, daarna advance
+     * - RESULT_LOGGED: alleen result gelogd, skip progress/rewards, direct advance
+     * - PROGRESS_UPDATED: result + progress gedaan, skip rewards, direct advance
+     * - REWARDS_APPLIED: alles gedaan, direct advance
+     * - READY_TO_ADVANCE of DONE: direct advance
+     * 
+     * BELANGRIJK: recovery doet nooit dubbele side effects. Als een stage al bereikt is,
+     * wordt die overgeslagen.
      */
     fun continueAfterError() {
         viewModelScope.launch {
-            val currentExerciseId = currentUiState().currentExercise?.id
-            if (currentExerciseId != null) {
-                // Markeer als completed zonder resultaat te loggen
-                // (resultaat was al gelogd als we in RESULT_LOGGED of verder waren)
-                completedExerciseIds.add(currentExerciseId)
-                android.util.Log.w("LessonViewModel", "[RECOVERY] Skipping exercise $currentExerciseId after error")
+            val state = currentUiState()
+            val currentExercise = state.currentExercise
+            val currentExerciseId = currentExercise?.id
+            val currentStage = state.completionStage
+            
+            if (currentExerciseId == null) {
+                android.util.Log.e("LessonViewModel", "[RECOVERY] No current exercise to recover")
+                return@launch
             }
+            
+            android.util.Log.w("LessonViewModel", "[RECOVERY] Recovering exercise $currentExerciseId from stage $currentStage")
+            
+            // Markeer als completed zodat we niet opnieuw proberen
+            completedExerciseIds.add(currentExerciseId)
+            
+            when (currentStage) {
+                CompletionStage.NOT_STARTED -> {
+                    // Niets gedaan yet - log result nu alsnog zodat er een record is
+                    // Dit voorkomt dat de oefening volledig verloren gaat
+                    val result = DetailedExerciseResult(
+                        exerciseId = currentExerciseId,
+                        skillId = currentExercise.skillId,
+                        isCorrect = false,
+                        givenAnswer = "[error_recovery]",
+                        correctAnswer = currentExercise.correctAnswer,
+                        responseTimeMs = 0,
+                        difficultyTier = currentExercise.difficulty,
+                        representationUsed = "ERROR_RECOVERY"
+                    )
+                    _uiState.update {
+                        it.copy(
+                            results = it.results + result,
+                            completionStage = CompletionStage.DONE,
+                            completionStageExerciseId = currentExerciseId,
+                            lastAnswerCorrect = false
+                        )
+                    }
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] Logged recovery result for $currentExerciseId")
+                }
+                CompletionStage.RESULT_LOGGED,
+                CompletionStage.PROGRESS_UPDATED,
+                CompletionStage.REWARDS_APPLIED,
+                CompletionStage.READY_TO_ADVANCE -> {
+                    // Side effects al (deels) gedaan, markeer als DONE
+                    _uiState.update {
+                        it.copy(
+                            completionStage = CompletionStage.DONE,
+                            completionStageExerciseId = currentExerciseId,
+                            lastAnswerCorrect = false
+                        )
+                    }
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] Marked $currentExerciseId as DONE (was at $currentStage)")
+                }
+                CompletionStage.DONE -> {
+                    // Al klaar, niets doen
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] Exercise $currentExerciseId already DONE")
+                }
+            }
+            
+            // Reset error state en advance
             advanceAfterError()
         }
     }
