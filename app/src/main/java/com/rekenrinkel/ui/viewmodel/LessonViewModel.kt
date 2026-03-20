@@ -230,16 +230,23 @@ class LessonViewModel(
                     )
                 }
             } finally {
-                // Reset guard pas wanneer item DONE of in error state is
+                // PATCH 4: Reset guard op semantisch juiste plek
+                // Reset pas na succesvolle completion (DONE) of expliciete error
                 if (currentCompletionState() == CompletionStage.DONE ||
                     currentStepState() == LessonStepState.ERROR) {
                     currentlyCompletingExerciseId = null
+                    android.util.Log.d("LessonViewModel", "[GUARD] Reset after submit for exercise ${exercise.id}")
                 }
             }
         }
     }
 
     /**
+     * PATCH 3: Dubbele user-actions blijven geblokkeerd
+     * - Tweede submitAnswer() op zelfde item → return
+     * - Tweede skipExercise() op zelfde item → return  
+     * - Tweede continueWorkedExample() op zelfde item → return
+     * 
      * PATCH 5: Skip volledig idempotent
      *
      * IDEMPOTENTIE GARANTIES:
@@ -324,10 +331,11 @@ class LessonViewModel(
                     mode = CompletionMode.SKIP_ADVANCE
                 )
             } finally {
-                // Reset guard pas wanneer item DONE of in error state is
+                // PATCH 4: Reset guard na completion of error
                 if (currentCompletionState() == CompletionStage.DONE ||
                     currentStepState() == LessonStepState.ERROR) {
                     currentlyCompletingExerciseId = null
+                    android.util.Log.d("LessonViewModel", "[GUARD] Reset after skip for exercise ${exercise.id}")
                 }
             }
         }
@@ -409,10 +417,11 @@ class LessonViewModel(
                     mode = CompletionMode.DIRECT_CONTINUE
                 )
             } finally {
-                // Reset guard pas wanneer item DONE of in error state is
+                // PATCH 4: Reset guard na completion of error
                 if (currentCompletionState() == CompletionStage.DONE ||
                     currentStepState() == LessonStepState.ERROR) {
                     currentlyCompletingExerciseId = null
+                    android.util.Log.d("LessonViewModel", "[GUARD] Reset after worked for exercise ${exercise.id}")
                 }
             }
         }
@@ -580,7 +589,11 @@ class LessonViewModel(
             android.util.Log.e("LessonViewModel", "[FAILURE] Unexpected error in finishCurrentExercise", e)
             handleFailure("Er ging iets mis", FailureStage.UNKNOWN, exerciseId)
         } finally {
+            // PATCH 4: Reset guard als laatste safety net
+            // Entrypoints resetten normaal, maar bij exception in finishCurrentExercise
+            // kunnen we hier ook resetten voor safety
             currentlyCompletingExerciseId = null
+            android.util.Log.d("LessonViewModel", "[GUARD] Reset in finishCurrentExercise finally for $exerciseId")
         }
     }
 
