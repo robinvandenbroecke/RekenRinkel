@@ -11,14 +11,31 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
 /**
- * PATCH 1 (V1 FREEZE): Strakke, betrouwbare LessonViewModel
+ * OPTIE B - PRODUCTIE ARCHITECTUUR: Stage-based LessonViewModel
+ * 
+ * Deze ViewModel implementeert een strikte state machine voor lesson flow:
+ * 
+ * LessonStepState (UI states):
+ * - SHOWING → PROCESSING → FEEDBACK → ADVANCING → SHOWING (next)
+ * - ERROR kan op elk moment optreden, met recovery
+ * 
+ * CompletionStage (interne flow stages):
+ * NOT_STARTED → RESULT_LOGGED → PROGRESS_UPDATED → REWARDS_APPLIED → READY_TO_ADVANCE → DONE
+ * 
+ * CompletionMode (per exercise type):
+ * - FEEDBACK_THEN_ADVANCE: normale oefeningen (result + progress + rewards + feedback)
+ * - DIRECT_CONTINUE: worked examples (result only, direct advance)
+ * - SKIP_ADVANCE: skipped exercises (result only, no progress/rewards)
+ * 
+ * FailureStage (error context):
+ * VALIDATION, RESULT_LOGGING, PROGRESS_UPDATE, REWARD_UPDATE, ADVANCE, UNKNOWN
  * 
  * KERNPRINCIPES:
- * 1. Geen enkele oefening wordt dubbel verwerkt
- * 2. State wijzigt alleen via goed gedefinieerde stappen
- * 3. Geen stale state - altijd actuele _uiState.value reads
- * 4. Duidelijke error handling zonder "hang"
- * 5. Skip werkt altijd correct
+ * 1. DONE moet altijd bereikt worden vóór advance naar volgende oefening
+ * 2. Elke stage is idempotent - meerdere calls zijn veilig
+ * 3. Geen dubbele side effects door strikte stage guards
+ * 4. Recovery evalueert per stage wat al gebeurd is
+ * 5. Skip heeft strikte semantiek: exact één result, geen validator, direct advance
  */
 class LessonViewModel(
     private val progressRepository: ProgressRepository,

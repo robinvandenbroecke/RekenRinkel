@@ -13,6 +13,33 @@ import kotlinx.coroutines.test.*
 import org.junit.*
 import org.junit.Assert.*
 
+/**
+ * OPTIE B - CONTRACT TESTS: Stage-based LessonFlow
+ *
+ * Deze tests definieren het contract voor de lesson flow:
+ *
+ * 1. EXPLICIETE LESSON SEQUENCES
+ *    Elke test definieert exact welke oefeningen in welke volgorde komen:
+ *    - warmup (altijd regular)
+ *    - focus items (mix van worked/guided/regular)
+ *    - review (altijd regular)
+ *    - challenge (altijd regular)
+ *
+ * 2. SEMANTISCHE CONTRACTEN
+ *    - Normale oefening: result → progress → rewards → feedback → advance → DONE
+ *    - Worked example: result → direct advance → DONE (geen progress/rewards)
+ *    - Guided practice: zelfde als normale oefening
+ *    - Skip: result → direct advance → DONE (geen progress/rewards/validator)
+ *
+ * 3. STAGE TRANSITIES
+ *    NOT_STARTED → RESULT_LOGGED → PROGRESS_UPDATED → REWARDS_APPLIED → READY_TO_ADVANCE → DONE
+ *
+ * 4. ERROR RECOVERY
+ *    - NOT_STARTED: log recovery result, advance
+ *    - RESULT_LOGGED+: markeer als DONE, advance (geen dubbele side effects)
+ *
+ * Geen "ongeveer" tests - elke test controleert exacte state transitions.
+ */
 @ExperimentalCoroutinesApi
 class LessonViewModelFlowTest {
 
