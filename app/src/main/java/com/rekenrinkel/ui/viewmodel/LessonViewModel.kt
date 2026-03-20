@@ -760,8 +760,7 @@ class LessonViewModel(
 
             when (currentStage) {
                 CompletionStage.NOT_STARTED -> {
-                    // PATCH 1: NOT_STARTED - log result then advance (testcontract)
-                    // GEEN completed/DONE - er is nog niets gedaan
+                    // Testcontract: log exact één recovery-result, geen progress/rewards.
                     val result = DetailedExerciseResult(
                         exerciseId = currentExerciseId,
                         skillId = currentExercise.skillId,
@@ -776,47 +775,70 @@ class LessonViewModel(
                         it.copy(
                             results = it.results + result,
                             completionStage = CompletionStage.RESULT_LOGGED,
+                            completionStageExerciseId = currentExerciseId,
+                            error = null
+                        )
+                    }
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] NOT_STARTED -> logged one recovery result for $currentExerciseId")
+                    advanceAfterError()
+                }
+                CompletionStage.RESULT_LOGGED -> {
+                    // Result bestaat al; niets meer loggen. Geen progress/rewards in recovery.
+                    _uiState.update {
+                        it.copy(
+                            error = null,
+                            completionStage = CompletionStage.DONE,
                             completionStageExerciseId = currentExerciseId
                         )
                     }
-                    android.util.Log.d("LessonViewModel", "[RECOVERY] Logged result for $currentExerciseId, NOT_STARTED -> RESULT_LOGGED")
-                }
-                CompletionStage.RESULT_LOGGED -> {
-                    // PATCH 1: Result al gelogd, GEEN completed/DONE
-                    // Er is nog geen progress/rewards - item niet volledig afgerond
-                    // Alleen veilige advance zonder semantische afsluiting
-                    android.util.Log.d("LessonViewModel", "[RECOVERY] Result logged for $currentExerciseId, advance only (no completed)")
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] RESULT_LOGGED -> DONE for $currentExerciseId (no re-log)")
+                    advanceAfterError()
                 }
                 CompletionStage.PROGRESS_UPDATED -> {
-                    // PATCH 1: Progress al gedaan, GEEN completed/DONE
-                    // Er is nog geen rewards - item niet volledig afgerond
-                    android.util.Log.d("LessonViewModel", "[RECOVERY] Progress done for $currentExerciseId, advance only (no completed)")
-                }
-                CompletionStage.REWARDS_APPLIED -> {
-                    // PATCH 1: Rewards al gedaan, GEEN completed/DONE
-                    // Nog niet READY_TO_ADVANCE - item niet volledig afgerond
-                    android.util.Log.d("LessonViewModel", "[RECOVERY] Rewards done for $currentExerciseId, advance only (no completed)")
-                }
-                CompletionStage.READY_TO_ADVANCE -> {
-                    // PATCH 1: Alles gedaan, hier WEL completed/DONE
+                    // Progress bestaat al; niet opnieuw. Geen rewards in recovery.
                     _uiState.update {
                         it.copy(
+                            error = null,
+                            completionStage = CompletionStage.DONE,
+                            completionStageExerciseId = currentExerciseId
+                        )
+                    }
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] PROGRESS_UPDATED -> DONE for $currentExerciseId (no re-progress/reward)")
+                    advanceAfterError()
+                }
+                CompletionStage.REWARDS_APPLIED -> {
+                    // Rewards bestaan al; finalize expliciet naar DONE.
+                    _uiState.update {
+                        it.copy(
+                            error = null,
+                            completionStage = CompletionStage.DONE,
+                            completionStageExerciseId = currentExerciseId
+                        )
+                    }
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] REWARDS_APPLIED -> DONE for $currentExerciseId")
+                    advanceAfterError()
+                }
+                CompletionStage.READY_TO_ADVANCE -> {
+                    // Hier is expliciete finalize correct.
+                    _uiState.update {
+                        it.copy(
+                            error = null,
                             completionStage = CompletionStage.DONE,
                             completionStageExerciseId = currentExerciseId
                         )
                     }
                     completedExerciseIds.add(currentExerciseId)
-                    android.util.Log.d("LessonViewModel", "[RECOVERY] Ready to advance for $currentExerciseId, DONE + completed")
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] READY_TO_ADVANCE -> DONE + completed for $currentExerciseId")
+                    advanceAfterError()
                 }
                 CompletionStage.DONE -> {
-                    // Al klaar, markeer als completed voor zekerheid
+                    // Niets meer finalizen; alleen veilig verder.
                     completedExerciseIds.add(currentExerciseId)
-                    android.util.Log.d("LessonViewModel", "[RECOVERY] Exercise $currentExerciseId already DONE, marked completed")
+                    _uiState.update { it.copy(error = null) }
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] DONE -> advance only for $currentExerciseId")
+                    advanceAfterError()
                 }
             }
-
-            // PATCH 3: Reset error state en advance (geen completion "verzinnen")
-            advanceAfterError()
         }
     }
 
