@@ -229,24 +229,27 @@ class LessonViewModel(
                         error = "Antwoord kon niet worden verwerkt"
                     )
                 }
-            } finally {
-                // PATCH 4: Reset guard op semantisch juiste plek
-                // Reset pas na succesvolle completion (DONE) of expliciete error
-                if (currentCompletionState() == CompletionStage.DONE ||
-                    currentStepState() == LessonStepState.ERROR) {
-                    currentlyCompletingExerciseId = null
-                    android.util.Log.d("LessonViewModel", "[GUARD] Reset after submit for exercise ${exercise.id}")
+            } catch (e: Exception) {
+                android.util.Log.e("LessonViewModel", "Error in submitAnswer", e)
+                _uiState.update {
+                    it.copy(
+                        stepState = LessonStepState.ERROR,
+                        error = "Antwoord kon niet worden verwerkt"
+                    )
                 }
+                // PATCH 3-4: Reset guard bij error, anders blijft hij actief tot advance
+                currentlyCompletingExerciseId = null
             }
+            // GEEN finally reset - guard blijft actief tijdens feedback/advance
         }
     }
 
     /**
      * PATCH 3: Dubbele user-actions blijven geblokkeerd
      * - Tweede submitAnswer() op zelfde item → return
-     * - Tweede skipExercise() op zelfde item → return  
+     * - Tweede skipExercise() op zelfde item → return
      * - Tweede continueWorkedExample() op zelfde item → return
-     * 
+     *
      * PATCH 5: Skip volledig idempotent
      *
      * IDEMPOTENTIE GARANTIES:
@@ -330,14 +333,18 @@ class LessonViewModel(
                     result = result,
                     mode = CompletionMode.SKIP_ADVANCE
                 )
-            } finally {
-                // PATCH 4: Reset guard na completion of error
-                if (currentCompletionState() == CompletionStage.DONE ||
-                    currentStepState() == LessonStepState.ERROR) {
-                    currentlyCompletingExerciseId = null
-                    android.util.Log.d("LessonViewModel", "[GUARD] Reset after skip for exercise ${exercise.id}")
+            } catch (e: Exception) {
+                android.util.Log.e("LessonViewModel", "[SKIP] Error during skip", e)
+                _uiState.update {
+                    it.copy(
+                        stepState = LessonStepState.ERROR,
+                        error = "Overslaan mislukt"
+                    )
                 }
+                // PATCH 3-4: Reset guard bij error, anders blijft hij actief tot advance
+                currentlyCompletingExerciseId = null
             }
+            // GEEN finally reset - guard blijft actief tijdens advance
         }
     }
 
@@ -416,14 +423,18 @@ class LessonViewModel(
                     result = result,
                     mode = CompletionMode.DIRECT_CONTINUE
                 )
-            } finally {
-                // PATCH 4: Reset guard na completion of error
-                if (currentCompletionState() == CompletionStage.DONE ||
-                    currentStepState() == LessonStepState.ERROR) {
-                    currentlyCompletingExerciseId = null
-                    android.util.Log.d("LessonViewModel", "[GUARD] Reset after worked for exercise ${exercise.id}")
+            } catch (e: Exception) {
+                android.util.Log.e("LessonViewModel", "[WORKED] Error during worked example", e)
+                _uiState.update {
+                    it.copy(
+                        stepState = LessonStepState.ERROR,
+                        error = "Doorgaan mislukt"
+                    )
                 }
+                // PATCH 3-4: Reset guard bij error, anders blijft hij actief tot advance
+                currentlyCompletingExerciseId = null
             }
+            // GEEN finally reset - guard blijft actief tijdens advance
         }
     }
 
@@ -633,6 +644,10 @@ class LessonViewModel(
         val nextIndex = currentState.currentIndex + 1
         val exercises = currentState.exercises
 
+        // PATCH 4: Reset guard PAS NA volledige completion, vóór overgang naar nieuw item
+        currentlyCompletingExerciseId = null
+        android.util.Log.d("LessonViewModel", "[GUARD] Reset in advance for completed exercise $completedExerciseId")
+
         if (nextIndex >= exercises.size) {
             finishLesson()
         } else {
@@ -655,6 +670,9 @@ class LessonViewModel(
      * Finish les en navigeer naar result screen
      */
     private suspend fun finishLesson() {
+        // PATCH 4: Zekerstellen dat guard gereset is bij les-einde
+        currentlyCompletingExerciseId = null
+        
         val results = currentUiState().results
         val xpEarned = currentUiState().xpEarnedThisLesson
 
