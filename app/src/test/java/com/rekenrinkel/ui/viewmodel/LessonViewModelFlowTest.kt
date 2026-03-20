@@ -70,178 +70,274 @@ class LessonViewModelFlowTest {
     }
 
     @Test
-    fun `submitAnswer - should show feedback then auto-advance`() = runTest {
-        setupLessonWithExercises(
-            regularExercises = listOf(
-                createExercise("warmup"),
-                createExercise("focus_independent_1"),
-                createExercise("focus_independent_2"),
-                createExercise("review_1"),
-                createExercise("review_2"),
-                createExercise("challenge")
-            ),
-            workedExamples = listOf(createExercise("focus_worked", ExerciseType.WORKED_EXAMPLE)),
-            guidedExercises = listOf(createExercise("focus_guided", ExerciseType.GUIDED_PRACTICE))
+    fun `submitAnswer - regular exercise flow with explicit sequence`() = runTest {
+        // EXPLICIETE LESSON SEQUENCE: warm-up (regular) → focus (guided) → review (regular)
+        val warmUp = createExercise("warmup", ExerciseType.TYPED_NUMERIC)
+        val focusGuided = createExercise("focus_guided", ExerciseType.GUIDED_PRACTICE)
+        val review1 = createExercise("review_1", ExerciseType.TYPED_NUMERIC)
+        
+        setupExactLessonSequence(
+            warmupRegular = warmUp,
+            focusItems = listOf(LessonItem.Guided(focusGuided)),
+            reviewRegular = listOf(review1),
+            challengeRegular = createExercise("challenge", ExerciseType.TYPED_NUMERIC)
         )
         every { exerciseValidator.validate(any(), any()) } returns true
 
         viewModel.startLesson()
         advanceTimeBy(500)
 
+        // Start: warm-up exercise showing
+        assertEquals(0, viewModel.uiState.value.currentIndex)
+        assertEquals("warmup", viewModel.uiState.value.currentExercise?.id)
+        assertEquals(LessonStepState.SHOWING, viewModel.uiState.value.stepState)
+
+        // Submit answer
         viewModel.submitAnswer("5")
         advanceTimeBy(100)
 
+        // Should show feedback
         assertEquals(LessonStepState.FEEDBACK, viewModel.uiState.value.stepState)
 
         advanceTimeBy(1000)
 
+        // Advanced to guided practice
         assertEquals(1, viewModel.uiState.value.currentIndex)
+        assertEquals("focus_guided", viewModel.uiState.value.currentExercise?.id)
+        assertEquals(ExerciseType.GUIDED_PRACTICE, viewModel.uiState.value.currentExercise?.type)
         assertEquals(LessonStepState.SHOWING, viewModel.uiState.value.stepState)
     }
 
     @Test
     fun `continueWorkedExample - should advance directly without feedback`() = runTest {
+        // EXPLICIETE LESSON SEQUENCE met worked example voor jonger kind (age 6)
         mockProfile(age = 6)
-        setupLessonWithExercises(
-            regularExercises = listOf(
-                createExercise("warmup"),
-                createExercise("review_1"),
-                createExercise("review_2"),
-                createExercise("challenge")
+        val warmUp = createExercise("warmup", ExerciseType.TYPED_NUMERIC)
+        val focusWorked = createExercise("focus_worked", ExerciseType.WORKED_EXAMPLE)
+        val focusGuided = createExercise("focus_guided", ExerciseType.GUIDED_PRACTICE)
+        val review1 = createExercise("review_1", ExerciseType.TYPED_NUMERIC)
+        
+        setupExactLessonSequence(
+            warmupRegular = warmUp,
+            focusItems = listOf(
+                LessonItem.Worked(focusWorked),
+                LessonItem.Guided(focusGuided)
             ),
-            workedExamples = listOf(createExercise("focus_worked", ExerciseType.WORKED_EXAMPLE)),
-            guidedExercises = listOf(
-                createExercise("focus_guided_1", ExerciseType.GUIDED_PRACTICE),
-                createExercise("focus_guided_2", ExerciseType.GUIDED_PRACTICE),
-                createExercise("focus_guided_3", ExerciseType.GUIDED_PRACTICE)
-            )
+            reviewRegular = listOf(review1),
+            challengeRegular = createExercise("challenge", ExerciseType.TYPED_NUMERIC)
         )
 
         viewModel.startLesson()
         advanceTimeBy(500)
 
+        // Skip warm-up to get to worked example
         viewModel.skipExercise()
         advanceTimeBy(100)
+        
+        // Now at worked example
         assertEquals(1, viewModel.uiState.value.currentIndex)
+        assertEquals("focus_worked", viewModel.uiState.value.currentExercise?.id)
         assertEquals(ExerciseType.WORKED_EXAMPLE, viewModel.uiState.value.currentExercise?.type)
 
+        // Continue worked example - should advance directly without feedback
         viewModel.continueWorkedExample()
         advanceTimeBy(100)
 
+        // Advanced to guided practice
         assertEquals(2, viewModel.uiState.value.currentIndex)
+        assertEquals("focus_guided", viewModel.uiState.value.currentExercise?.id)
+        assertEquals(ExerciseType.GUIDED_PRACTICE, viewModel.uiState.value.currentExercise?.type)
         assertEquals(LessonStepState.SHOWING, viewModel.uiState.value.stepState)
     }
 
     @Test
     fun `guidedPractice - should validate and advance with feedback`() = runTest {
+        // EXPLICIETE LESSON SEQUENCE: warm-up → worked → guided → review
         mockProfile(age = 6)
-        setupLessonWithExercises(
-            regularExercises = listOf(
-                createExercise("warmup"),
-                createExercise("review_1"),
-                createExercise("review_2"),
-                createExercise("challenge")
+        val warmUp = createExercise("warmup", ExerciseType.TYPED_NUMERIC)
+        val focusWorked = createExercise("focus_worked", ExerciseType.WORKED_EXAMPLE)
+        val focusGuided = createExercise("focus_guided", ExerciseType.GUIDED_PRACTICE)
+        val review1 = createExercise("review_1", ExerciseType.TYPED_NUMERIC)
+        
+        setupExactLessonSequence(
+            warmupRegular = warmUp,
+            focusItems = listOf(
+                LessonItem.Worked(focusWorked),
+                LessonItem.Guided(focusGuided)
             ),
-            workedExamples = listOf(createExercise("focus_worked", ExerciseType.WORKED_EXAMPLE)),
-            guidedExercises = listOf(
-                createExercise("focus_guided_1", ExerciseType.GUIDED_PRACTICE),
-                createExercise("focus_guided_2", ExerciseType.GUIDED_PRACTICE),
-                createExercise("focus_guided_3", ExerciseType.GUIDED_PRACTICE)
-            )
+            reviewRegular = listOf(review1),
+            challengeRegular = createExercise("challenge", ExerciseType.TYPED_NUMERIC)
         )
         every { exerciseValidator.validate(any(), any()) } returns true
 
         viewModel.startLesson()
         advanceTimeBy(500)
 
+        // Navigate to worked example
         viewModel.skipExercise()
         advanceTimeBy(100)
         viewModel.continueWorkedExample()
         advanceTimeBy(100)
+        
+        // Now at guided practice
+        assertEquals(2, viewModel.uiState.value.currentIndex)
+        assertEquals("focus_guided", viewModel.uiState.value.currentExercise?.id)
         assertEquals(ExerciseType.GUIDED_PRACTICE, viewModel.uiState.value.currentExercise?.type)
 
+        // Submit answer on guided practice
         viewModel.submitAnswer("5")
         advanceTimeBy(100)
 
+        // Should show feedback (guided practice uses normal feedback flow)
         assertEquals(LessonStepState.FEEDBACK, viewModel.uiState.value.stepState)
 
         advanceTimeBy(1000)
 
+        // Advanced to next exercise
         assertEquals(3, viewModel.uiState.value.currentIndex)
-    }
-
-    @Test
-    fun `skipExercise - should advance directly`() = runTest {
-        val exercises = listOf(createExercise("1"), createExercise("2"))
-        setupLessonWithExercises(exercises)
-
-        viewModel.startLesson()
-        advanceTimeBy(500)
-
-        viewModel.skipExercise()
-        advanceTimeBy(100)
-
-        assertEquals(1, viewModel.uiState.value.currentIndex)
         assertEquals(LessonStepState.SHOWING, viewModel.uiState.value.stepState)
     }
 
     @Test
-    fun `skipExercise - should log exactly one result`() = runTest {
-        val exercises = listOf(createExercise("1"), createExercise("2"))
-        setupLessonWithExercises(exercises)
+    fun `skipExercise - should advance directly without feedback`() = runTest {
+        // EXPLICIETE LESSON SEQUENCE met twee regular exercises
+        val ex1 = createExercise("ex1", ExerciseType.TYPED_NUMERIC)
+        val ex2 = createExercise("ex2", ExerciseType.TYPED_NUMERIC)
+        
+        setupExactLessonSequence(
+            warmupRegular = ex1,
+            focusItems = listOf(LessonItem.Regular(ex2)),
+            reviewRegular = emptyList(),
+            challengeRegular = createExercise("challenge", ExerciseType.TYPED_NUMERIC)
+        )
 
         viewModel.startLesson()
         advanceTimeBy(500)
 
+        // Start at first exercise
+        assertEquals(0, viewModel.uiState.value.currentIndex)
+        assertEquals("ex1", viewModel.uiState.value.currentExercise?.id)
+
+        // Skip should advance directly without feedback
         viewModel.skipExercise()
         advanceTimeBy(100)
 
-        assertEquals(1, viewModel.uiState.value.results.size)
-        assertEquals("[skipped]", viewModel.uiState.value.results.first().givenAnswer)
-
-        advanceTimeBy(1000)
-
         assertEquals(1, viewModel.uiState.value.currentIndex)
-        assertEquals(1, viewModel.uiState.value.results.size)
+        assertEquals("ex2", viewModel.uiState.value.currentExercise?.id)
+        assertEquals(LessonStepState.SHOWING, viewModel.uiState.value.stepState)
     }
 
     @Test
-    fun `double submit - should ignore second submit`() = runTest {
-        val exercises = listOf(createExercise("1"), createExercise("2"))
-        setupLessonWithExercises(exercises)
+    fun `skipExercise - should log exactly one result without duplicates`() = runTest {
+        // EXPLICIETE LESSON SEQUENCE
+        val ex1 = createExercise("ex1", ExerciseType.TYPED_NUMERIC)
+        val ex2 = createExercise("ex2", ExerciseType.TYPED_NUMERIC)
+        
+        setupExactLessonSequence(
+            warmupRegular = ex1,
+            focusItems = listOf(LessonItem.Regular(ex2)),
+            reviewRegular = emptyList(),
+            challengeRegular = createExercise("challenge", ExerciseType.TYPED_NUMERIC)
+        )
+
+        viewModel.startLesson()
+        advanceTimeBy(500)
+
+        // Skip first exercise
+        viewModel.skipExercise()
+        advanceTimeBy(100)
+
+        // Exactly one result logged
+        assertEquals(1, viewModel.uiState.value.results.size)
+        assertEquals("ex1", viewModel.uiState.value.results.first().exerciseId)
+        assertEquals("[skipped]", viewModel.uiState.value.results.first().givenAnswer)
+
+        // Advance completes
+        advanceTimeBy(1000)
+
+        // Still exactly one result, now at next exercise
+        assertEquals(1, viewModel.uiState.value.currentIndex)
+        assertEquals(1, viewModel.uiState.value.results.size)
+        
+        // Skip second exercise
+        viewModel.skipExercise()
+        advanceTimeBy(100)
+        
+        // Now two results
+        assertEquals(2, viewModel.uiState.value.results.size)
+    }
+
+    @Test
+    fun `double submit - should ignore second submit and log only once`() = runTest {
+        // EXPLICIETE LESSON SEQUENCE
+        val ex1 = createExercise("ex1", ExerciseType.TYPED_NUMERIC)
+        val ex2 = createExercise("ex2", ExerciseType.TYPED_NUMERIC)
+        
+        setupExactLessonSequence(
+            warmupRegular = ex1,
+            focusItems = listOf(LessonItem.Regular(ex2)),
+            reviewRegular = emptyList(),
+            challengeRegular = createExercise("challenge", ExerciseType.TYPED_NUMERIC)
+        )
         every { exerciseValidator.validate(any(), any()) } returns true
 
         viewModel.startLesson()
         advanceTimeBy(500)
 
+        // Double submit
         viewModel.submitAnswer("5")
-        viewModel.submitAnswer("5")
+        viewModel.submitAnswer("5")  // Should be ignored
         advanceTimeBy(1500)
 
+        // Only one result logged
         assertEquals(1, viewModel.uiState.value.results.size)
+        assertEquals(1, viewModel.uiState.value.currentIndex)
     }
 
     @Test
-    fun `exception during finish - should show error`() = runTest {
-        val exercises = listOf(createExercise("1"), createExercise("2"))
-        setupLessonWithExercises(exercises)
+    fun `exception during validation - should show error and allow recovery`() = runTest {
+        // EXPLICIETE LESSON SEQUENCE
+        val ex1 = createExercise("ex1", ExerciseType.TYPED_NUMERIC)
+        val ex2 = createExercise("ex2", ExerciseType.TYPED_NUMERIC)
+        
+        setupExactLessonSequence(
+            warmupRegular = ex1,
+            focusItems = listOf(LessonItem.Regular(ex2)),
+            reviewRegular = emptyList(),
+            challengeRegular = createExercise("challenge", ExerciseType.TYPED_NUMERIC)
+        )
         every { exerciseValidator.validate(any(), any()) } throws RuntimeException("Test error")
 
         viewModel.startLesson()
         advanceTimeBy(500)
 
+        // Submit triggers error
         viewModel.submitAnswer("5")
         advanceTimeBy(1000)
 
+        // Error state shown
         assertNotNull(viewModel.uiState.value.error)
+        assertEquals(LessonStepState.ERROR, viewModel.uiState.value.stepState)
+        
+        // Current exercise unchanged (for recovery context)
+        assertEquals("ex1", viewModel.uiState.value.currentExercise?.id)
     }
 
     @Test
-    fun `error after result logged - recovery should not log again`() = runTest {
-        val exercises = listOf(createExercise("1"), createExercise("2"))
-        setupLessonWithExercises(exercises)
+    fun `error during progress update - recovery should not double log result`() = runTest {
+        // EXPLICIETE LESSON SEQUENCE
+        val ex1 = createExercise("ex1", ExerciseType.TYPED_NUMERIC)
+        val ex2 = createExercise("ex2", ExerciseType.TYPED_NUMERIC)
+        
+        setupExactLessonSequence(
+            warmupRegular = ex1,
+            focusItems = listOf(LessonItem.Regular(ex2)),
+            reviewRegular = emptyList(),
+            challengeRegular = createExercise("challenge", ExerciseType.TYPED_NUMERIC)
+        )
         every { exerciseValidator.validate(any(), any()) } returns true
         
+        // First progress update fails
         var callCount = 0
         coEvery { progressRepository.getOrCreateProgress(any()) } answers {
             callCount++
@@ -252,132 +348,240 @@ class LessonViewModelFlowTest {
         viewModel.startLesson()
         advanceTimeBy(500)
 
+        // Submit triggers error during progress update
         viewModel.submitAnswer("5")
         advanceTimeBy(500)
 
         assertEquals(LessonStepState.ERROR, viewModel.uiState.value.stepState)
         
+        // Fix the mock for recovery
         coEvery { progressRepository.getOrCreateProgress(any()) } returns SkillProgress("test_skill")
 
+        // Recover
         viewModel.continueAfterError()
         advanceTimeBy(1000)
 
+        // Advanced to next, still only one result
         assertEquals(1, viewModel.uiState.value.currentIndex)
         assertEquals(1, viewModel.uiState.value.results.size)
+        assertEquals("ex1", viewModel.uiState.value.results.first().exerciseId)
     }
 
     @Test
-    fun `completion stages use actual state`() = runTest {
-        val exercises = listOf(createExercise("1"), createExercise("2"))
-        setupLessonWithExercises(exercises)
+    fun `completion stages progression - NOT_STARTED to DONE`() = runTest {
+        // EXPLICIETE LESSON SEQUENCE
+        val ex1 = createExercise("ex1", ExerciseType.TYPED_NUMERIC)
+        val ex2 = createExercise("ex2", ExerciseType.TYPED_NUMERIC)
+        
+        setupExactLessonSequence(
+            warmupRegular = ex1,
+            focusItems = listOf(LessonItem.Regular(ex2)),
+            reviewRegular = emptyList(),
+            challengeRegular = createExercise("challenge", ExerciseType.TYPED_NUMERIC)
+        )
         every { exerciseValidator.validate(any(), any()) } returns true
 
         viewModel.startLesson()
         advanceTimeBy(500)
 
+        // Initial state
         assertEquals(CompletionStage.NOT_STARTED, viewModel.uiState.value.completionStage)
+        assertNull(viewModel.uiState.value.completionStageExerciseId)
 
+        // Submit answer
         viewModel.submitAnswer("5")
         advanceTimeBy(50)
 
-        assertTrue(viewModel.uiState.value.completionStage >= CompletionStage.RESULT_LOGGED)
+        // Result logged stage
+        assertEquals(CompletionStage.RESULT_LOGGED, viewModel.uiState.value.completionStage)
+        assertEquals("ex1", viewModel.uiState.value.completionStageExerciseId)
 
+        // Complete flow
         advanceTimeBy(1500)
 
+        // Exercise done, advanced to next
         assertEquals(1, viewModel.uiState.value.currentIndex)
+        assertEquals("ex2", viewModel.uiState.value.currentExercise?.id)
+        // New exercise resets completion stage
+        assertEquals(CompletionStage.NOT_STARTED, viewModel.uiState.value.completionStage)
     }
 
     @Test
-    fun `no double side effects`() = runTest {
-        val exercises = listOf(createExercise("1"), createExercise("2"))
-        setupLessonWithExercises(exercises)
+    fun `no double side effects on rapid submit`() = runTest {
+        // EXPLICIETE LESSON SEQUENCE
+        val ex1 = createExercise("ex1", ExerciseType.TYPED_NUMERIC)
+        val ex2 = createExercise("ex2", ExerciseType.TYPED_NUMERIC)
+        
+        setupExactLessonSequence(
+            warmupRegular = ex1,
+            focusItems = listOf(LessonItem.Regular(ex2)),
+            reviewRegular = emptyList(),
+            challengeRegular = createExercise("challenge", ExerciseType.TYPED_NUMERIC)
+        )
         every { exerciseValidator.validate(any(), any()) } returns true
 
         viewModel.startLesson()
         advanceTimeBy(500)
 
+        // Rapid double submit
         viewModel.submitAnswer("5")
-        viewModel.submitAnswer("5")
+        viewModel.submitAnswer("5")  // Should be ignored
         advanceTimeBy(1500)
 
+        // No double side effects
         assertEquals(1, viewModel.uiState.value.results.size)
         assertEquals(1, viewModel.uiState.value.currentIndex)
+        
+        // Verify progress update only called once
+        coVerify(exactly = 1) { progressRepository.updateProgress(any()) }
     }
 
     @Test
-    fun `normal exercise - should go through all completion stages`() = runTest {
-        val exercises = listOf(createExercise("1"), createExercise("2"))
-        setupLessonWithExercises(exercises)
+    fun `normal exercise flow - complete lesson lifecycle`() = runTest {
+        // EXPLICIETE LESSON SEQUENCE met minimale les
+        val ex1 = createExercise("ex1", ExerciseType.TYPED_NUMERIC)
+        val ex2 = createExercise("ex2", ExerciseType.TYPED_NUMERIC)
+        
+        setupExactLessonSequence(
+            warmupRegular = ex1,
+            focusItems = listOf(LessonItem.Regular(ex2)),
+            reviewRegular = emptyList(),
+            challengeRegular = createExercise("challenge", ExerciseType.TYPED_NUMERIC)
+        )
         every { exerciseValidator.validate(any(), any()) } returns true
 
         viewModel.startLesson()
         advanceTimeBy(500)
 
+        // Complete first exercise
         assertEquals(CompletionStage.NOT_STARTED, viewModel.uiState.value.completionStage)
-
         viewModel.submitAnswer("5")
         advanceTimeBy(1500)
 
+        // Advanced to second
         assertEquals(1, viewModel.uiState.value.currentIndex)
+        
+        // Complete second exercise
+        viewModel.submitAnswer("5")
+        advanceTimeBy(1500)
+        
+        // Should have 2 results
+        assertEquals(2, viewModel.uiState.value.results.size)
     }
 
     /**
-     * Bouw een expliciete lesson-sequence die de LessonEngine-aanroepvolgorde weerspiegelt.
-     * 
-     * We mocken de generatoren per methode zonder algemene fallback-queue.
-     * Onverwachte extra calls falen de test direct.
+     * Sealed class voor expliciete lesson items - maakt de sequence leesbaar en type-veilig.
      */
+    private sealed class LessonItem {
+        abstract val exercise: Exercise
+        data class Regular(override val exercise: Exercise) : LessonItem()
+        data class Worked(override val exercise: Exercise) : LessonItem()
+        data class Guided(override val exercise: Exercise) : LessonItem()
+    }
+
+    /**
+     * PRODUCTIETROUWE TEST HELPER - Exacte LessonEngine-aanroepvolgorde
+     * 
+     * Deze helper bouwt een lesson die exact overeenkomt met hoe LessonEngine.buildLesson() werkt:
+     * 1. Warm-up: altijd regular exercise (difficulty 1)
+     * 2. Focus block: mix van worked/guided/regular afhankelijk van CPA-fase en leeftijd
+     * 3. Review: altijd regular exercises
+     * 4. Challenge: altijd regular exercise
+     * 
+     * Geen padding, geen fallback - elke aanroep moet expliciet voorzien zijn.
+     */
+    private fun setupExactLessonSequence(
+        warmupRegular: Exercise,
+        focusItems: List<LessonItem>,
+        reviewRegular: List<Exercise>,
+        challengeRegular: Exercise
+    ) {
+        // Bouw de volledige sequence in exacte LessonEngine-volgorde
+        val sequence = mutableListOf<LessonItem>()
+        
+        // 1. Warm-up: altijd regular
+        sequence.add(LessonItem.Regular(warmupRegular))
+        
+        // 2. Focus items: in de volgorde zoals ze in de lesson zitten
+        sequence.addAll(focusItems)
+        
+        // 3. Review items: altijd regular
+        reviewRegular.forEach { sequence.add(LessonItem.Regular(it)) }
+        
+        // 4. Challenge: altijd regular
+        sequence.add(LessonItem.Regular(challengeRegular))
+        
+        // Maak queues per generator type voor strikte ordering
+        val regularQueue = sequence.filterIsInstance<LessonItem.Regular>().map { it.exercise }.toMutableList()
+        val workedQueue = sequence.filterIsInstance<LessonItem.Worked>().map { it.exercise }.toMutableList()
+        val guidedQueue = sequence.filterIsInstance<LessonItem.Guided>().map { it.exercise }.toMutableList()
+        
+        // Strict mocks - elke onverwachte call faalt de test
+        every { exerciseEngine.generateExercise(any(), any()) } answers {
+            regularQueue.removeFirstOrNull()
+                ?: error("Unexpected generateExercise call - sequence exhausted. " +
+                        "Expected ${sequence.count { it is LessonItem.Regular }} regular calls.")
+        }
+
+        every { exerciseEngine.generateWorkedExample(any(), any()) } answers {
+            workedQueue.removeFirstOrNull()
+                ?: error("Unexpected generateWorkedExample call - sequence exhausted. " +
+                        "Expected ${sequence.count { it is LessonItem.Worked }} worked calls.")
+        }
+
+        every { exerciseEngine.generateGuidedExercise(any(), any()) } answers {
+            guidedQueue.removeFirstOrNull()
+                ?: error("Unexpected generateGuidedExercise call - sequence exhausted. " +
+                        "Expected ${sequence.count { it is LessonItem.Guided }} guided calls.")
+        }
+    }
+
+    /**
+     * Legacy overload - NIET GEBRUIKEN voor nieuwe tests
+     * Alleen voor backward compatibility met bestaande tests.
+     */
+    @Deprecated("Gebruik setupExactLessonSequence voor nieuwe tests", ReplaceWith("setupExactLessonSequence"))
     private fun setupLessonWithExercises(
         regularExercises: List<Exercise>,
         workedExamples: List<Exercise> = emptyList(),
         guidedExercises: List<Exercise> = emptyList()
     ) {
-        val workedQueue = workedExamples.toMutableList().apply {
-            while (size < 4) add(createExercise("worked_pad_$size", ExerciseType.WORKED_EXAMPLE))
-        }
-        val guidedQueue = guidedExercises.toMutableList().apply {
-            while (size < 6) add(createExercise("guided_pad_$size", ExerciseType.GUIDED_PRACTICE))
-        }
-        val regularQueue = regularExercises.toMutableList().apply {
-            while (size < 12) add(createExercise("regular_pad_$size"))
-        }
+        val workedQueue = workedExamples.toMutableList()
+        val guidedQueue = guidedExercises.toMutableList()
+        val regularQueue = regularExercises.toMutableList()
 
         every { exerciseEngine.generateWorkedExample(any(), any()) } answers {
             workedQueue.removeFirstOrNull()
-                ?: error("Unexpected generateWorkedExample call - sequence exhausted")
         }
 
         every { exerciseEngine.generateGuidedExercise(any(), any()) } answers {
             guidedQueue.removeFirstOrNull()
-                ?: error("Unexpected generateGuidedExercise call - sequence exhausted")
         }
 
         every { exerciseEngine.generateExercise(any(), any()) } answers {
             regularQueue.removeFirstOrNull()
-                ?: error("Unexpected generateExercise call - sequence exhausted")
         }
     }
 
     /**
-     * Default scenario voor profiel age=8: warm-up regular, daarna een guided focus item,
-     * daarna onafhankelijke regular focus items, review en challenge.
+     * Legacy overload - NIET GEBRUIKEN voor nieuwe tests
      */
+    @Deprecated("Gebruik setupExactLessonSequence voor nieuwe tests", ReplaceWith("setupExactLessonSequence"))
     private fun setupLessonWithExercises(exercises: List<Exercise>) {
         require(exercises.isNotEmpty())
         val warmup = exercises.first()
         val nextRegular = exercises.getOrElse(1) { createExercise("focus_regular_1") }
-        setupLessonWithExercises(
-            regularExercises = listOf(
-                warmup,
-                nextRegular,
-                createExercise("focus_regular_2"),
-                createExercise("focus_regular_3"),
-                createExercise("review_1"),
-                createExercise("review_2"),
-                createExercise("challenge")
+        setupExactLessonSequence(
+            warmupRegular = warmup,
+            focusItems = listOf(
+                LessonItem.Guided(createExercise("focus_guided", ExerciseType.GUIDED_PRACTICE)),
+                LessonItem.Regular(nextRegular)
             ),
-            workedExamples = emptyList(),
-            guidedExercises = listOf(createExercise("focus_guided", ExerciseType.GUIDED_PRACTICE))
+            reviewRegular = listOf(
+                createExercise("review_1"),
+                createExercise("review_2")
+            ),
+            challengeRegular = createExercise("challenge")
         )
     }
 
