@@ -132,30 +132,34 @@ class LessonViewModel(
      * - Completion guard: exercise mag niet al DONE zijn
      */
     fun submitAnswer(answer: String) {
-        val state = _uiState.value
-        val exercise = state.currentExercise ?: return
+        // Entry-guards met actuele state
+        val exercise = currentExerciseOrNull()
+        if (exercise == null) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - no current exercise")
+            return
+        }
         
         // Guard: les niet actief
-        if (!state.isActive) {
+        if (!currentUiState().isActive) {
             android.util.Log.w("LessonViewModel", "submitAnswer ignored - lesson not active")
             return
         }
         
-        // Guard: alleen toestaan in SHOWING state (niet in PROCESSING, FEEDBACK, etc.)
-        if (state.stepState != LessonStepState.SHOWING) {
-            android.util.Log.w("LessonViewModel", "submitAnswer ignored - wrong state: ${state.stepState}")
+        // Guard: alleen toestaan in SHOWING state
+        if (currentStepState() != LessonStepState.SHOWING) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - wrong state: ${currentStepState()}")
             return
         }
         
-        // Guard: oefening al voltooid (completedExerciseIds check)
+        // Guard: oefening al voltooid
         if (isExerciseCompleted(exercise.id)) {
             android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise already completed")
             return
         }
         
-        // Guard: oefening al in completion flow (completionStage check)
-        if (state.completionStageExerciseId == exercise.id && 
-            state.completionStage >= CompletionStage.RESULT_LOGGED) {
+        // Guard: oefening al in completion flow
+        if (currentCompletionStageExerciseId() == exercise.id && 
+            currentCompletionState() >= CompletionStage.RESULT_LOGGED) {
             android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise already being processed")
             return
         }
@@ -165,8 +169,11 @@ class LessonViewModel(
             _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
             
             try {
+                // Re-read startTime actueel voor accurate meting
+                val startTime = currentExerciseStartTime()
+                val responseTime = System.currentTimeMillis() - (startTime ?: System.currentTimeMillis())
+                
                 val isCorrect = exerciseValidator.validate(exercise, answer)
-                val responseTime = System.currentTimeMillis() - (state.exerciseStartTime ?: System.currentTimeMillis())
                 
                 val result = DetailedExerciseResult(
                     exerciseId = exercise.id,
@@ -180,7 +187,6 @@ class LessonViewModel(
                 )
                 
                 // Verwerk completion met FEEDBACK_THEN_ADVANCE mode
-                // (zowel correct als incorrect tonen feedback)
                 finishCurrentExercise(
                     result = result,
                     mode = CompletionMode.FEEDBACK_THEN_ADVANCE
@@ -199,7 +205,7 @@ class LessonViewModel(
 
     /**
      * Skip huidige oefening - semantisch strikte implementatie
-     * 
+     *
      * VERPLICHTE EIGENSCHAPPEN:
      * 1. Exact één result wordt gelogd (givenAnswer = "[skipped]")
      * 2. Geen validator aanroep
@@ -207,32 +213,36 @@ class LessonViewModel(
      * 4. Directe veilige advance
      * 5. Geen progress/rewards side effects (SKIP_ADVANCE mode)
      * 6. DONE na correcte afhandeling
-     * 
+     *
      * SKIPPED exercises tellen mee voor les-voortgang maar niet voor statistieken.
      */
     fun skipExercise() {
-        val state = _uiState.value
-        val exercise = state.currentExercise ?: return
-        
+        // Entry-guards met actuele state
+        val exercise = currentExerciseOrNull()
+        if (exercise == null) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - no current exercise")
+            return
+        }
+
         // Guard: les niet actief
-        if (!state.isActive) {
+        if (!currentUiState().isActive) {
             android.util.Log.w("LessonViewModel", "skipExercise ignored - lesson not active")
             return
         }
-        
-        // Guard: al in verwerking (skip kan niet worden onderbroken)
-        if (state.stepState == LessonStepState.PROCESSING || 
-            state.stepState == LessonStepState.ADVANCING) {
+
+        // Guard: al in verwerking
+        val currentStep = currentStepState()
+        if (currentStep == LessonStepState.PROCESSING || currentStep == LessonStepState.ADVANCING) {
             android.util.Log.w("LessonViewModel", "skipExercise ignored - already processing")
             return
         }
-        
-        // Guard: niet in SHOWING state (bijv. al in FEEDBACK of ERROR)
-        if (state.stepState != LessonStepState.SHOWING) {
-            android.util.Log.w("LessonViewModel", "skipExercise ignored - wrong state: ${state.stepState}")
+
+        // Guard: niet in SHOWING state
+        if (currentStep != LessonStepState.SHOWING) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - wrong state: $currentStep")
             return
         }
-        
+
         // Guard: oefening al voltooid
         if (isExerciseCompleted(exercise.id)) {
             android.util.Log.w("LessonViewModel", "skipExercise ignored - already completed")
@@ -242,7 +252,7 @@ class LessonViewModel(
         viewModelScope.launch {
             // Direct naar PROCESSING om race conditions te voorkomen
             _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
-            
+
             // Skip resultaat: altijd incorrect, geen tijd, geen representatie
             val result = DetailedExerciseResult(
                 exerciseId = exercise.id,
@@ -254,7 +264,7 @@ class LessonViewModel(
                 difficultyTier = exercise.difficulty,
                 representationUsed = "SKIP"
             )
-            
+
             android.util.Log.d("LessonViewModel", "[SKIP] Processing skip for exercise ${exercise.id}")
             
             // Skip gebruikt SKIP_ADVANCE mode: log result, maar geen progress/rewards, direct advance
@@ -267,38 +277,42 @@ class LessonViewModel(
 
     /**
      * Worked example: gebruiker klikt "Begrepen, verder"
-     * 
+     *
      * SEMANTIEK:
      * 1. Geen validatie nodig (worked example = demonstratie)
      * 2. Log resultaat als "gezien"
      * 3. Geen progress/rewards (DIRECT_CONTINUE mode)
      * 4. Direct advance zonder feedback delay
      * 5. DONE na afhandeling
-     * 
+     *
      * Worked examples zijn didactische demonstraties, geen te evalueren antwoorden.
      */
     fun continueWorkedExample() {
-        val state = _uiState.value
-        val exercise = state.currentExercise ?: return
-        
+        // Entry-guards met actuele state
+        val exercise = currentExerciseOrNull()
+        if (exercise == null) {
+            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - no current exercise")
+            return
+        }
+
         // Guard: les niet actief
-        if (!state.isActive) {
+        if (!currentUiState().isActive) {
             android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - lesson not active")
             return
         }
-        
+
         // Guard: alleen in SHOWING state
-        if (state.stepState != LessonStepState.SHOWING) {
-            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - wrong state: ${state.stepState}")
+        if (currentStepState() != LessonStepState.SHOWING) {
+            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - wrong state: ${currentStepState()}")
             return
         }
-        
+
         // Guard: oefening al voltooid
         if (isExerciseCompleted(exercise.id)) {
             android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - already completed")
             return
         }
-        
+
         // Guard: oefening moet van type WORKED_EXAMPLE zijn
         if (exercise.type != ExerciseType.WORKED_EXAMPLE) {
             android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - not a worked example")
@@ -712,11 +726,18 @@ class LessonViewModel(
         return completedExerciseIds.contains(exerciseId)
     }
 
+    // Actuele state helpers - voorkomen stale snapshots
     private fun currentUiState(): LessonUiState = _uiState.value
 
     private fun currentExerciseOrNull(): Exercise? = currentUiState().currentExercise
 
+    private fun currentStepState(): LessonStepState = currentUiState().stepState
+
     private fun currentCompletionState(): CompletionStage = currentUiState().completionStage
+
+    private fun currentCompletionStageExerciseId(): String? = currentUiState().completionStageExerciseId
+
+    private fun currentExerciseStartTime(): Long? = currentUiState().exerciseStartTime
 
     private fun currentIndex(): Int = currentUiState().currentIndex
 
