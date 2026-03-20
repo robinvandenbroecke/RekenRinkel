@@ -644,14 +644,14 @@ class LessonViewModel(
         val nextIndex = currentState.currentIndex + 1
         val exercises = currentState.exercises
 
-        // PATCH 4: Reset guard PAS NA volledige completion, vóór overgang naar nieuw item
-        currentlyCompletingExerciseId = null
-        android.util.Log.d("LessonViewModel", "[GUARD] Reset in advance for completed exercise $completedExerciseId")
-
         if (nextIndex >= exercises.size) {
+            // PATCH 1-4: Reset guard bij les einde
+            currentlyCompletingExerciseId = null
+            android.util.Log.d("LessonViewModel", "[GUARD] Reset at lesson end")
             finishLesson()
         } else {
             val nextExercise = exercises[nextIndex]
+            // PATCH 1: EERST nieuw item in state zetten
             _uiState.update {
                 it.copy(
                     currentIndex = nextIndex,
@@ -662,6 +662,9 @@ class LessonViewModel(
                     exerciseStartTime = System.currentTimeMillis()
                 )
             }
+            // PATCH 1-4: PAS DAN guard resetten (nieuw item is nu echt actief)
+            currentlyCompletingExerciseId = null
+            android.util.Log.d("LessonViewModel", "[GUARD] Reset after new item active: ${nextExercise.id}")
             android.util.Log.d("LessonViewModel", "[ADVANCE] Advanced to exercise $nextIndex: ${nextExercise.id}")
         }
     }
@@ -670,9 +673,7 @@ class LessonViewModel(
      * Finish les en navigeer naar result screen
      */
     private suspend fun finishLesson() {
-        // PATCH 4: Zekerstellen dat guard gereset is bij les-einde
-        currentlyCompletingExerciseId = null
-        
+        // Guard is al gereset in advanceToNextExercise vóór deze call
         val results = currentUiState().results
         val xpEarned = currentUiState().xpEarnedThisLesson
 
@@ -805,17 +806,17 @@ class LessonViewModel(
      * Advance na error - reset state en ga naar volgende
      */
     private suspend fun advanceAfterError() {
-        // PATCH 4: Reset guard bij recovery advance
-        currentlyCompletingExerciseId = null
-        
         val currentState = currentUiState()
         val nextIndex = currentState.currentIndex + 1
         val exercises = currentState.exercises
 
         if (nextIndex >= exercises.size) {
+            // PATCH 4: Reset guard bij les einde
+            currentlyCompletingExerciseId = null
             finishLesson()
         } else {
             val nextExercise = exercises[nextIndex]
+            // PATCH 4: EERST nieuw item in state zetten
             _uiState.update {
                 it.copy(
                     currentIndex = nextIndex,
@@ -827,6 +828,8 @@ class LessonViewModel(
                     exerciseStartTime = System.currentTimeMillis()
                 )
             }
+            // PATCH 4: PAS DAN guard resetten (nieuw item is nu echt actief)
+            currentlyCompletingExerciseId = null
             android.util.Log.d("LessonViewModel", "[RECOVERY] Advanced to exercise $nextIndex: ${nextExercise.id}")
         }
     }
