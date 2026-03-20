@@ -805,6 +805,9 @@ class LessonViewModel(
      * Advance na error - reset state en ga naar volgende
      */
     private suspend fun advanceAfterError() {
+        // PATCH 4: Reset guard bij recovery advance
+        currentlyCompletingExerciseId = null
+        
         val currentState = currentUiState()
         val nextIndex = currentState.currentIndex + 1
         val exercises = currentState.exercises
