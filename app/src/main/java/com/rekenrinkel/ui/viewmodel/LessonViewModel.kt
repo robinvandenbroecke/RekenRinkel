@@ -235,10 +235,10 @@ class LessonViewModel(
                         error = "Antwoord kon niet worden verwerkt"
                     )
                 }
-                // PATCH 3-4: Reset guard bij error, anders blijft hij actief tot advance
-                currentlyCompletingExerciseId = null
+                // PATCH 1: GEEN guard reset in catch - guard blijft actief tijdens error/recovery
+                // De guard wordt pas vrijgegeven na succesvolle advance of lesafronding
             }
-            // GEEN finally reset - guard blijft actief tijdens feedback/advance
+            // GEEN finally reset - guard blijft actief tijdens feedback/advance/error
         }
     }
 
@@ -345,10 +345,9 @@ class LessonViewModel(
                         error = "Overslaan mislukt"
                     )
                 }
-                // PATCH 3-4: Reset guard bij error, anders blijft hij actief tot advance
-                currentlyCompletingExerciseId = null
+                // PATCH 1: GEEN guard reset in catch - guard blijft actief tijdens error/recovery
             }
-            // GEEN finally reset - guard blijft actief tijdens advance
+            // GEEN finally reset - guard blijft actief tijdens advance/error
         }
     }
 
@@ -441,10 +440,9 @@ class LessonViewModel(
                         error = "Doorgaan mislukt"
                     )
                 }
-                // PATCH 3-4: Reset guard bij error, anders blijft hij actief tot advance
-                currentlyCompletingExerciseId = null
+                // PATCH 1: GEEN guard reset in catch - guard blijft actief tijdens error/recovery
             }
-            // GEEN finally reset - guard blijft actief tijdens advance
+            // GEEN finally reset - guard blijft actief tijdens advance/error
         }
     }
 
@@ -769,28 +767,17 @@ class LessonViewModel(
 
             when (currentStage) {
                 CompletionStage.NOT_STARTED -> {
-                    // Niets gedaan yet - log result nu alsnog zodat er een record is
-                    // Markeer EERST als completed om dubbele logging te voorkomen
+                    // PATCH 3: GEEN kunstmatig result loggen - validation/logging is nooit gelukt
+                    // Markeer als completed om herverwerking te voorkomen
                     completedExerciseIds.add(currentExerciseId)
-                    val result = DetailedExerciseResult(
-                        exerciseId = currentExerciseId,
-                        skillId = currentExercise.skillId,
-                        isCorrect = false,
-                        givenAnswer = "[error_recovery]",
-                        correctAnswer = currentExercise.correctAnswer,
-                        responseTimeMs = 0,
-                        difficultyTier = currentExercise.difficulty,
-                        representationUsed = "ERROR_RECOVERY"
-                    )
                     _uiState.update {
                         it.copy(
-                            results = it.results + result,
                             completionStage = CompletionStage.DONE,
                             completionStageExerciseId = currentExerciseId,
                             lastAnswerCorrect = false
                         )
                     }
-                    android.util.Log.d("LessonViewModel", "[RECOVERY] Logged recovery result for $currentExerciseId")
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] Nothing started for $currentExerciseId, marked DONE without result")
                 }
                 CompletionStage.RESULT_LOGGED -> {
                     // Alleen result gelogd, geen dubbele logging, wel DONE markeren
