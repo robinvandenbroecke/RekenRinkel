@@ -783,39 +783,24 @@ class LessonViewModel(
                     advanceAfterError()
                 }
                 CompletionStage.RESULT_LOGGED -> {
-                    // Result bestaat al; niets meer loggen. Geen progress/rewards in recovery.
-                    _uiState.update {
-                        it.copy(
-                            error = null,
-                            completionStage = CompletionStage.DONE,
-                            completionStageExerciseId = currentExerciseId
-                        )
-                    }
-                    android.util.Log.d("LessonViewModel", "[RECOVERY] RESULT_LOGGED -> DONE for $currentExerciseId (no re-log)")
+                    // Result bestaat al; niets meer loggen.
+                    // Geen finalize hier: alleen veilige advance zonder dubbele side effects.
+                    _uiState.update { it.copy(error = null) }
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] RESULT_LOGGED -> advance only for $currentExerciseId (no re-log, no finalize)")
                     advanceAfterError()
                 }
                 CompletionStage.PROGRESS_UPDATED -> {
-                    // Progress bestaat al; niet opnieuw. Geen rewards in recovery.
-                    _uiState.update {
-                        it.copy(
-                            error = null,
-                            completionStage = CompletionStage.DONE,
-                            completionStageExerciseId = currentExerciseId
-                        )
-                    }
-                    android.util.Log.d("LessonViewModel", "[RECOVERY] PROGRESS_UPDATED -> DONE for $currentExerciseId (no re-progress/reward)")
+                    // Result/progress bestaan al; niet opnieuw. Geen rewards in recovery.
+                    // Geen finalize hier: alleen veilige advance.
+                    _uiState.update { it.copy(error = null) }
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] PROGRESS_UPDATED -> advance only for $currentExerciseId (no re-progress/reward, no finalize)")
                     advanceAfterError()
                 }
                 CompletionStage.REWARDS_APPLIED -> {
-                    // Rewards bestaan al; finalize expliciet naar DONE.
-                    _uiState.update {
-                        it.copy(
-                            error = null,
-                            completionStage = CompletionStage.DONE,
-                            completionStageExerciseId = currentExerciseId
-                        )
-                    }
-                    android.util.Log.d("LessonViewModel", "[RECOVERY] REWARDS_APPLIED -> DONE for $currentExerciseId")
+                    // Rewards bestaan al; niet opnieuw.
+                    // Nog steeds geen verborgen finalize hier: alleen veilige advance.
+                    _uiState.update { it.copy(error = null) }
+                    android.util.Log.d("LessonViewModel", "[RECOVERY] REWARDS_APPLIED -> advance only for $currentExerciseId (no duplicate rewards, no finalize)")
                     advanceAfterError()
                 }
                 CompletionStage.READY_TO_ADVANCE -> {
