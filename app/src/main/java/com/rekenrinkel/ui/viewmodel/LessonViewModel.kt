@@ -116,8 +116,21 @@ class LessonViewModel(
     }
 
     /**
-     * Verwerk een antwoord - met strikte guards tegen dubbele submit
+     * PATCH 5-7: Volledig idempotente entrypoints
      * 
+     * IDEMPOTENTIE GARANTIES:
+     * - currentlyCompletingExerciseId guard blokkeert dubbele calls
+     * - completedExerciseIds guard blokkeert re-verwerking
+     * - CompletionStage guards blokkeren re-verwerking per stage
+     * 
+     * STAGE GEDREVEN SIDE EFFECTS:
+     * - NOT_STARTED: alles nog mogelijk
+     * - RESULT_LOGGED: nooit opnieuw result loggen
+     * - PROGRESS_UPDATED: nooit opnieuw progress
+     * - REWARDS_APPLIED: nooit opnieuw rewards/XP/stars/badges
+     * - READY_TO_ADVANCE: alleen nog veilige finalize/advance
+     * - DONE: niets meer
+     *
      * SEMANTIEK:
      * 1. Valideer antwoord
      * 2. Log resultaat
@@ -127,6 +140,7 @@ class LessonViewModel(
      * 6. Advance na delay
      * 
      * DUBBELE SUBMIT PREVENTIE:
+     * - currentlyCompletingExerciseId guard (eerste check)
      * - State check: alleen in SHOWING state
      * - Processing guard: direct naar PROCESSING state
      * - Completion guard: exercise mag niet al DONE zijn
@@ -226,7 +240,12 @@ class LessonViewModel(
     }
 
     /**
-     * Skip huidige oefening - semantisch strikte implementatie
+     * PATCH 5: Skip volledig idempotent
+     *
+     * IDEMPOTENTIE GARANTIES:
+     * - currentlyCompletingExerciseId guard blokkeert dubbele skip calls
+     * - completedExerciseIds guard blokkeert re-skip
+     * - SKIP_ADVANCE mode: geen progress/rewards side effects
      *
      * VERPLICHTE EIGENSCHAPPEN:
      * 1. Exact één result wordt gelogd (givenAnswer = "[skipped]")
@@ -673,15 +692,22 @@ class LessonViewModel(
     }
 
     /**
-     * Ga verder na error - semantisch exacte recovery
-     * 
+     * PATCH 6: Recovery exact stage-gedreven
+     *
+     * IDEMPOTENTIE GARANTIES:
+     * - RESULT_LOGGED al bereikt: result nooit opnieuw loggen
+     * - PROGRESS_UPDATED al bereikt: progress nooit opnieuw updaten
+     * - REWARDS_APPLIED al bereikt: rewards nooit opnieuw toekennen
+     * - READY_TO_ADVANCE al bereikt: direct veilige finalize/advance
+     * - DONE al bereikt: geen side effects meer
+     *
      * RECOVERY LOGICA per stage:
      * - NOT_STARTED: geen side effects gedaan, log result nu alsnog, daarna advance
      * - RESULT_LOGGED: alleen result gelogd, skip progress/rewards, direct advance
      * - PROGRESS_UPDATED: result + progress gedaan, skip rewards, direct advance
      * - REWARDS_APPLIED: alles gedaan, direct advance
      * - READY_TO_ADVANCE of DONE: direct advance
-     * 
+     *
      * BELANGRIJK: recovery doet nooit dubbele side effects. Als een stage al bereikt is,
      * wordt die overgeslagen.
      */
