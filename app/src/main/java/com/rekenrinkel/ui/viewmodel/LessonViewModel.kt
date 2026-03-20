@@ -138,50 +138,59 @@ class LessonViewModel(
             android.util.Log.w("LessonViewModel", "submitAnswer ignored - no current exercise")
             return
         }
-        
+
+        // PATCH 1: Harde guards - check currentlyCompletingExerciseId eerst
+        if (currentlyCompletingExerciseId == exercise.id) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${exercise.id} currently being processed")
+            return
+        }
+
         // Guard: les niet actief
         if (!currentUiState().isActive) {
             android.util.Log.w("LessonViewModel", "submitAnswer ignored - lesson not active")
             return
         }
-        
+
         // Guard: alleen toestaan in SHOWING state
         if (currentStepState() != LessonStepState.SHOWING) {
             android.util.Log.w("LessonViewModel", "submitAnswer ignored - wrong state: ${currentStepState()}")
             return
         }
-        
+
         // Guard: oefening al voltooid (completedExerciseIds check)
         if (isExerciseCompleted(exercise.id)) {
             android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise already completed")
             return
         }
-        
+
         // Guard: oefening al DONE (completionStage check)
-        if (currentCompletionStageExerciseId() == exercise.id && 
+        if (currentCompletionStageExerciseId() == exercise.id &&
             currentCompletionState() == CompletionStage.DONE) {
             android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise already DONE")
             return
         }
-        
+
         // Guard: oefening al in completion flow
-        if (currentCompletionStageExerciseId() == exercise.id && 
+        if (currentCompletionStageExerciseId() == exercise.id &&
             currentCompletionState() >= CompletionStage.RESULT_LOGGED) {
             android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise already being processed")
             return
         }
 
         viewModelScope.launch {
+            // PATCH 2: Zet currentlyCompletingExerciseId vroeg, vóór side effects
+            currentlyCompletingExerciseId = exercise.id
+
             // Direct naar PROCESSING state om dubbele submits te voorkomen
             _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
-            
+
             try {
                 // Re-read startTime actueel voor accurate meting
                 val startTime = currentExerciseStartTime()
                 val responseTime = System.currentTimeMillis() - (startTime ?: System.currentTimeMillis())
-                
+
                 val isCorrect = exerciseValidator.validate(exercise, answer)
-                
+
                 val result = DetailedExerciseResult(
                     exerciseId = exercise.id,
                     skillId = exercise.skillId,
@@ -192,7 +201,7 @@ class LessonViewModel(
                     difficultyTier = exercise.difficulty,
                     representationUsed = exercise.visualData?.type?.name ?: "SYMBOLS"
                 )
-                
+
                 // Verwerk completion met FEEDBACK_THEN_ADVANCE mode
                 finishCurrentExercise(
                     result = result,
@@ -200,11 +209,17 @@ class LessonViewModel(
                 )
             } catch (e: Exception) {
                 android.util.Log.e("LessonViewModel", "Error in submitAnswer", e)
-                _uiState.update { 
+                _uiState.update {
                     it.copy(
                         stepState = LessonStepState.ERROR,
                         error = "Antwoord kon niet worden verwerkt"
                     )
+                }
+            } finally {
+                // Reset guard pas wanneer item DONE of in error state is
+                if (currentCompletionState() == CompletionStage.DONE ||
+                    currentStepState() == LessonStepState.ERROR) {
+                    currentlyCompletingExerciseId = null
                 }
             }
         }
@@ -228,6 +243,12 @@ class LessonViewModel(
         val exercise = currentExerciseOrNull()
         if (exercise == null) {
             android.util.Log.w("LessonViewModel", "skipExercise ignored - no current exercise")
+            return
+        }
+
+        // PATCH 1: Harde guard - check currentlyCompletingExerciseId eerst
+        if (currentlyCompletingExerciseId == exercise.id) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${exercise.id} currently being processed")
             return
         }
 
@@ -257,6 +278,9 @@ class LessonViewModel(
         }
 
         viewModelScope.launch {
+            // PATCH 2: Zet currentlyCompletingExerciseId vroeg, vóór side effects
+            currentlyCompletingExerciseId = exercise.id
+
             // Direct naar PROCESSING om race conditions te voorkomen
             _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
@@ -273,12 +297,20 @@ class LessonViewModel(
             )
 
             android.util.Log.d("LessonViewModel", "[SKIP] Processing skip for exercise ${exercise.id}")
-            
-            // Skip gebruikt SKIP_ADVANCE mode: log result, maar geen progress/rewards, direct advance
-            finishCurrentExercise(
-                result = result,
-                mode = CompletionMode.SKIP_ADVANCE
-            )
+
+            try {
+                // Skip gebruikt SKIP_ADVANCE mode: log result, maar geen progress/rewards, direct advance
+                finishCurrentExercise(
+                    result = result,
+                    mode = CompletionMode.SKIP_ADVANCE
+                )
+            } finally {
+                // Reset guard pas wanneer item DONE of in error state is
+                if (currentCompletionState() == CompletionStage.DONE ||
+                    currentStepState() == LessonStepState.ERROR) {
+                    currentlyCompletingExerciseId = null
+                }
+            }
         }
     }
 
@@ -299,6 +331,12 @@ class LessonViewModel(
         val exercise = currentExerciseOrNull()
         if (exercise == null) {
             android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - no current exercise")
+            return
+        }
+
+        // PATCH 1: Harde guard - check currentlyCompletingExerciseId eerst
+        if (currentlyCompletingExerciseId == exercise.id) {
+            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${exercise.id} currently being processed")
             return
         }
 
@@ -327,8 +365,11 @@ class LessonViewModel(
         }
 
         viewModelScope.launch {
+            // PATCH 2: Zet currentlyCompletingExerciseId vroeg, vóór side effects
+            currentlyCompletingExerciseId = exercise.id
+
             _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
-            
+
             val result = DetailedExerciseResult(
                 exerciseId = exercise.id,
                 skillId = exercise.skillId,
@@ -341,12 +382,20 @@ class LessonViewModel(
             )
             
             android.util.Log.d("LessonViewModel", "[WORKED] Continuing worked example ${exercise.id}")
-            
-            // DIRECT_CONTINUE: log result, maar geen progress/rewards, direct advance
-            finishCurrentExercise(
-                result = result,
-                mode = CompletionMode.DIRECT_CONTINUE
-            )
+
+            try {
+                // DIRECT_CONTINUE: log result, maar geen progress/rewards, direct advance
+                finishCurrentExercise(
+                    result = result,
+                    mode = CompletionMode.DIRECT_CONTINUE
+                )
+            } finally {
+                // Reset guard pas wanneer item DONE of in error state is
+                if (currentCompletionState() == CompletionStage.DONE ||
+                    currentStepState() == LessonStepState.ERROR) {
+                    currentlyCompletingExerciseId = null
+                }
+            }
         }
     }
 
