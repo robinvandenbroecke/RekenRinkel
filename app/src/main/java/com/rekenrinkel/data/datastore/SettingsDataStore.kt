@@ -20,6 +20,7 @@ class SettingsDataStore(private val context: Context) {
         val PREMIUM_UNLOCKED = booleanPreferencesKey("premium_unlocked")
         val PARENT_MODE_ENABLED = booleanPreferencesKey("parent_mode_enabled")
         val EINK_MODE_ENABLED = booleanPreferencesKey("eink_mode_enabled")
+        val TTS_ENABLED = booleanPreferencesKey("tts_enabled")
     }
     
     val profileName: Flow<String> = context.dataStore.data.map { 
@@ -50,6 +51,10 @@ class SettingsDataStore(private val context: Context) {
         it[Keys.EINK_MODE_ENABLED] == true
     }
 
+    val ttsEnabled: Flow<Boolean> = context.dataStore.data.map {
+        it[Keys.TTS_ENABLED] != false  // Default true
+    }
+
     suspend fun setProfileName(name: String) {
         context.dataStore.edit { it[Keys.PROFILE_NAME] = name }
     }
@@ -76,6 +81,10 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun setEinkModeEnabled(enabled: Boolean) {
         context.dataStore.edit { it[Keys.EINK_MODE_ENABLED] = enabled }
+    }
+
+    suspend fun setTtsEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.TTS_ENABLED] = enabled }
     }
 
     suspend fun clearAll() {

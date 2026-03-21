@@ -20,6 +20,7 @@ import com.rekenrinkel.ui.theme.AppColors
 fun HomeScreen(
     profile: Profile?,
     progress: List<com.rekenrinkel.domain.model.SkillProgress> = emptyList(),
+    sessionsCompletedToday: Int = 0,
     onStartSession: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -56,10 +57,20 @@ fun HomeScreen(
             
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Daily goal card
+            DailyGoalCard(sessionsCompleted = sessionsCompletedToday)
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // PATCH 3 & 5: Leerdoelen sectie met echte skill data
-            val focusSkillId = profile?.placementAnalysisResult?.startSkills?.firstOrNull() 
+            // Show the most recently practiced skill, or the first start skill
+            val recentlyPracticed = progress
+                .filter { (it.lastPracticedAt ?: 0L) > 0L && !it.isMastered() }
+                .maxByOrNull { it.lastPracticedAt ?: 0L }
+            val focusSkillId = recentlyPracticed?.skillId
+                ?: profile?.placementAnalysisResult?.startSkills?.firstOrNull() 
                 ?: "foundation_subitize_5"
-            val focusSkillProgress = progress.find { it.skillId == focusSkillId }
+            val focusSkillProgress = recentlyPracticed ?: progress.find { it.skillId == focusSkillId }
             
             // Gebruik echte data indien beschikbaar, anders defaults
             val actualMasteryScore = focusSkillProgress?.masteryScore ?: 0
@@ -257,8 +268,15 @@ private fun LearningGoalsCard(
                 "mixed_transfer" -> "🔄"
                 else -> "📚"
             }
+            val cpaLabel = when (cpaPhase) {
+                "concrete" -> "Concreet"
+                "pictorial" -> "Picturaal"
+                "abstract" -> "Abstract"
+                "mixed_transfer" -> "Transfer"
+                else -> cpaPhase
+            }
             Text(
-                text = "$cpaIcon Fase: $cpaPhase",
+                text = "$cpaIcon Fase: $cpaLabel",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
@@ -290,7 +308,7 @@ private fun LearningGoalsCard(
             }
 
             Text(
-                text = if (isFocusMastered) "✅ Mastered!" else "$masteryScore% naar mastery",
+                text = if (isFocusMastered) "✅ Beheerst!" else "$masteryScore% naar beheersing",
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isFocusMastered) MaterialTheme.colorScheme.primary 
                         else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
@@ -305,6 +323,43 @@ private fun LearningGoalsCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = if (isNextUnlocked) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+            )
+        }
+    }
+}
+
+/**
+ * Daily goal card — tracks sessions completed today
+ */
+@Composable
+private fun DailyGoalCard(sessionsCompleted: Int, dailyGoal: Int = 3) {
+    val completed = sessionsCompleted.coerceAtMost(dailyGoal)
+    val isDone = completed >= dailyGoal
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDone) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = if (isDone) "Goed gedaan vandaag! 🎉" else "Vandaag: $completed/$dailyGoal lessen",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { completed.toFloat() / dailyGoal },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp),
+                color = if (isDone) MaterialTheme.colorScheme.primary else AppColors.Accent
             )
         }
     }
@@ -326,12 +381,23 @@ private fun formatSkillName(skillId: String): String {
         "arithmetic_sub_10_concrete" -> "Aftrekken tot 10 (concreet)"
         "arithmetic_sub_10_pictorial" -> "Aftrekken tot 10 (picturaal)"
         "arithmetic_sub_10_abstract" -> "Aftrekken tot 10 (abstract)"
+        "foundation_number_bonds_20" -> "Splitsen tot 20"
+        "arithmetic_add_10" -> "Optellen tot 10"
+        "arithmetic_sub_10" -> "Aftrekken tot 10"
+        "arithmetic_add_20" -> "Optellen tot 20"
+        "arithmetic_sub_20" -> "Aftrekken tot 20"
         "arithmetic_bridge_add" -> "Brug over 10"
         "patterns_doubles" -> "Dubbelen"
         "patterns_count_2" -> "Tellen per 2"
+        "patterns_count_5" -> "Tellen per 5"
+        "patterns_count_10" -> "Tellen per 10"
+        "advanced_compare_100" -> "Vergelijken tot 100"
         "advanced_groups" -> "Groepjes"
         "advanced_table_2" -> "Tafel van 2"
         "advanced_table_5" -> "Tafel van 5"
+        "advanced_table_10" -> "Tafel van 10"
+        "advanced_place_value" -> "Plaatswaarde"
+        "advanced_fractions_basics" -> "Breuken basis"
         else -> skillId.replace("_", " ").replaceFirstChar { it.uppercase() }
     }
 }

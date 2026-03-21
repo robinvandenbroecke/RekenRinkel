@@ -40,7 +40,8 @@ class MainViewModel(
         
         viewModelScope.launch {
             progressRepository.getAllProgress().collect { progress ->
-                _uiState.update { it.copy(progress = progress) }
+                val todaySessions = progressRepository.getSessionsCompletedToday()
+                _uiState.update { it.copy(progress = progress, sessionsCompletedToday = todaySessions) }
             }
         }
         
@@ -59,6 +60,12 @@ class MainViewModel(
         viewModelScope.launch {
             settingsDataStore.einkModeEnabled.collect { enabled ->
                 _uiState.update { it.copy(einkModeEnabled = enabled) }
+            }
+        }
+
+        viewModelScope.launch {
+            settingsDataStore.ttsEnabled.collect { enabled ->
+                _uiState.update { it.copy(ttsEnabled = enabled) }
             }
         }
     }
@@ -159,6 +166,12 @@ class MainViewModel(
     fun toggleEinkMode(enabled: Boolean) {
         viewModelScope.launch {
             settingsDataStore.setEinkModeEnabled(enabled)
+        }
+    }
+
+    fun toggleTts(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.setTtsEnabled(enabled)
         }
     }
 
@@ -291,8 +304,10 @@ data class MainUiState(
     val soundEnabled: Boolean = true,
     val isPremiumUnlocked: Boolean = false,
     val einkModeEnabled: Boolean = false,
+    val ttsEnabled: Boolean = true,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val sessionsCompletedToday: Int = 0
 )
 
 sealed class NavigationEvent {

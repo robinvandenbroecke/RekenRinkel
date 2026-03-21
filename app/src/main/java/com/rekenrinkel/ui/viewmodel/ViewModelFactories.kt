@@ -54,36 +54,3 @@ class MainViewModelFactory(
     }
 }
 
-/**
- * Factory for creating SessionViewModel with all dependencies
- */
-class SessionViewModelFactory(
-    private val context: Context
-) : ViewModelProvider.Factory {
-    
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(SessionViewModel::class.java)) {
-            val database = RekenRinkelDatabase.getDatabase(context)
-            
-            val progressRepository = ProgressRepository(
-                database.skillProgressDao()
-            )
-            
-            val exerciseEngine = ExerciseEngine()
-            val sessionEngine = SessionEngine(
-                exerciseEngine,
-                progressRepository
-            )
-            val exerciseValidator = ExerciseValidator()
-            
-            return SessionViewModel(
-                progressRepository,
-                exerciseEngine,
-                sessionEngine,
-                exerciseValidator
-            ) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
-    }
-}

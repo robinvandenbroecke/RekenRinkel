@@ -33,6 +33,7 @@ import com.rekenrinkel.ui.screens.session.SessionResultScreen
 import com.rekenrinkel.ui.screens.settings.SettingsScreen
 import com.rekenrinkel.ui.screens.placement.PlacementScreen
 import com.rekenrinkel.domain.engine.PlacementEngine
+import com.rekenrinkel.domain.engine.TtsManager
 import com.rekenrinkel.ui.theme.RekenRinkelTheme
 import com.rekenrinkel.ui.viewmodel.LessonNavigationEvent
 import com.rekenrinkel.ui.viewmodel.LessonViewModel
@@ -44,17 +45,25 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 
 class MainActivity : ComponentActivity() {
+    private var ttsManager: TtsManager? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+        ttsManager = TtsManager(this)
+
         setContent {
-            RekenRinkelApp()
+            RekenRinkelApp(ttsManager = ttsManager)
         }
+    }
+
+    override fun onDestroy() {
+        ttsManager?.shutdown()
+        super.onDestroy()
     }
 }
 
 @Composable
-fun RekenRinkelApp() {
+fun RekenRinkelApp(ttsManager: TtsManager? = null) {
     val navController = rememberNavController()
     val context = LocalContext.current
 
@@ -108,6 +117,7 @@ fun RekenRinkelApp() {
                     HomeScreen(
                         profile = uiState.profile,
                         progress = uiState.progress,
+                        sessionsCompletedToday = uiState.sessionsCompletedToday,
                         onStartSession = { viewModel.startSession() },
                         onOpenProfile = { viewModel.openProfile() },
                         onOpenSettings = { viewModel.openSettings() },
@@ -168,6 +178,8 @@ fun RekenRinkelApp() {
                         onPremiumToggle = { viewModel.togglePremiumUnlocked(it) },
                         einkModeEnabled = uiState.einkModeEnabled,
                         onEinkModeToggle = { viewModel.toggleEinkMode(it) },
+                        ttsEnabled = uiState.ttsEnabled,
+                        onTtsToggle = { viewModel.toggleTts(it) },
                         onResetProgress = { viewModel.resetProgress() },
                         onResetProfile = { viewModel.resetProfile() },
                         onOpenPremium = { navController.navigate("premium") },
@@ -265,6 +277,14 @@ fun RekenRinkelApp() {
 
                     val currentExercise = uiState.currentExercise
 
+                    // Configure TTS based on settings
+                    val ttsEnabled by settingsDataStore.ttsEnabled.collectAsState(initial = true)
+                    LaunchedEffect(ttsEnabled, uiState.profileAge) {
+                        ttsManager?.isEnabled = ttsEnabled && (uiState.profileAge <= 6 || ttsEnabled)
+                    }
+
+                    val einkMode by settingsDataStore.einkModeEnabled.collectAsState(initial = false)
+
                     if (currentExercise != null) {
                         ExerciseScreen(
                             exercise = currentExercise,
@@ -272,14 +292,19 @@ fun RekenRinkelApp() {
                             totalExercises = uiState.totalExercises,
                             showFeedback = uiState.showFeedback,
                             isLastAnswerCorrect = uiState.lastAnswerCorrect,
-                            error = uiState.error,  // PATCH 7: Error doorgeven
-                            stepState = uiState.stepState.name,  // PATCH 1: ERROR state doorgeven
-                            onAnswer = { answer ->
-                                viewModel.submitAnswer(answer)
-                            },
+                            error = uiState.error,
+                            stepState = uiState.stepState.name,
+                            profileAge = uiState.profileAge,
+                            errorHint = uiState.errorHint,
+                            showHintPersistent = uiState.showHint,
+                            showRevealAnswer = uiState.showRevealAnswer,
+                            wrongAttempts = uiState.wrongAttempts,
+                            einkModeEnabled = einkMode,
+                            ttsManager = ttsManager,
+                            onAnswer = { answer -> viewModel.submitAnswer(answer) },
                             onSkip = { viewModel.skipExercise() },
-                            onContinueAfterError = { viewModel.continueAfterError() },  // PATCH 4
-                            // PATCH 3: onFeedbackComplete verwijderd - ViewModel regelt advance
+                            onRevealAnswer = { viewModel.revealAnswer() },
+                            onContinueAfterError = { viewModel.continueAfterError() },
                             onExerciseShown = { viewModel.startExerciseTimer() },
                             onContinueWorkedExample = { viewModel.continueWorkedExample() }
                         )

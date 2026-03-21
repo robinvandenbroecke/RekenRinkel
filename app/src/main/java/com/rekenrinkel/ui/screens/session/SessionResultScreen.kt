@@ -242,7 +242,7 @@ fun SessionResultScreen(
                             if (accuracy >= 0.8f) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "🏆 Les Master! (80%+ accuracy)",
+                                    text = "🏆 Lesmeester! (80%+ score)",
                                     style = MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.primary
                                 )

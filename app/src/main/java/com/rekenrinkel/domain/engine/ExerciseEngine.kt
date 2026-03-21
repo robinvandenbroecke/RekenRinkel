@@ -21,9 +21,11 @@ class ExerciseEngine {
      */
     fun generateWorkedExample(skillId: String, difficulty: Int): Exercise {
         val baseExercise = generateExercise(skillId, difficulty)
+        val steps = generateWorkedExampleSteps(baseExercise)
         return baseExercise.copy(
             type = ExerciseType.WORKED_EXAMPLE,
-            hint = generateWorkedExampleHint(baseExercise),
+            hint = steps.joinToString("\n"),
+            workedSteps = steps,
             isScaffolded = true
         )
     }
@@ -40,27 +42,176 @@ class ExerciseEngine {
         )
     }
 
+    /**
+     * Generate multi-step worked example steps for progressive teaching.
+     */
+    private fun generateWorkedExampleSteps(exercise: Exercise): List<String> {
+        val hasVisualCount = exercise.visualData?.count != null
+        val hasVisualGroups = exercise.visualData?.groups != null
+
+        // Parse numbers from question
+        val addMatch = Regex("""(\d+) \+ (\d+)""").find(exercise.question)
+        val subMatch = Regex("""(\d+) - (\d+)""").find(exercise.question)
+        val mulMatch = Regex("""(\d+) [×x] (\d+)""").find(exercise.question)
+        val groupMatch = Regex("""(\d+) groepjes van (\d+)""").find(exercise.question)
+
+        return when {
+            // Visual counting
+            hasVisualCount -> {
+                val count = exercise.visualData!!.count!!
+                val counting = (1..count).joinToString("... ") { it.toString() }
+                listOf(
+                    "Kijk naar de stippen",
+                    "Tel mee: $counting...",
+                    "Er zijn $count stippen!"
+                )
+            }
+
+            // Multiplication / groups
+            mulMatch != null -> {
+                val n = mulMatch.groupValues[1].toInt()
+                val m = mulMatch.groupValues[2].toInt()
+                val total = n * m
+                val repeated = (1..n).joinToString(" + ") { m.toString() }
+                listOf(
+                    "Kijk: $n groepjes van $m",
+                    "$repeated = ?",
+                    "= $total"
+                )
+            }
+
+            groupMatch != null -> {
+                val groups = groupMatch.groupValues[1].toInt()
+                val perGroup = groupMatch.groupValues[2].toInt()
+                val total = groups * perGroup
+                val repeated = (1..groups).joinToString(" + ") { perGroup.toString() }
+                listOf(
+                    "Kijk: $groups groepjes van $perGroup",
+                    "$repeated = ?",
+                    "= $total"
+                )
+            }
+
+            // Addition
+            addMatch != null -> {
+                val a = addMatch.groupValues[1].toInt()
+                val b = addMatch.groupValues[2].toInt()
+                val sum = a + b
+                if (a < 10 && b < 10 && sum > 10) {
+                    // Bridge over 10
+                    val toTen = 10 - a
+                    val remainder = b - toTen
+                    listOf(
+                        "We beginnen bij $a",
+                        "$b splitsen: $toTen + $remainder",
+                        "$a + $toTen = 10",
+                        "10 + $remainder = $sum"
+                    )
+                } else {
+                    listOf(
+                        "We beginnen bij $a",
+                        "Tel er $b bij op",
+                        "$a + $b = $sum"
+                    )
+                }
+            }
+
+            // Subtraction
+            subMatch != null -> {
+                val a = subMatch.groupValues[1].toInt()
+                val b = subMatch.groupValues[2].toInt()
+                val result = a - b
+                if (a > 10 && result < 10 && a % 10 < b) {
+                    // Bridge over 10
+                    val toTen = a - 10
+                    val remainder = b - toTen
+                    listOf(
+                        "We beginnen bij $a",
+                        "Eerst $toTen eraf: $a - $toTen = 10",
+                        "Nog $remainder eraf: 10 - $remainder = $result"
+                    )
+                } else {
+                    listOf(
+                        "We beginnen bij $a",
+                        "Trek er $b vanaf",
+                        "$a - $b = $result"
+                    )
+                }
+            }
+
+            // Groups visual
+            hasVisualGroups -> {
+                val groups = exercise.visualData!!.groups!!
+                if (groups.size == 2) {
+                    listOf(
+                        "Kijk naar de twee groepjes",
+                        "${groups[0]} + ${groups[1]} = ?",
+                        "= ${exercise.correctAnswer}"
+                    )
+                } else {
+                    val repeated = groups.joinToString(" + ")
+                    listOf(
+                        "Kijk: ${groups.size} groepjes van ${groups.firstOrNull() ?: 0}",
+                        "$repeated = ?",
+                        "= ${exercise.correctAnswer}"
+                    )
+                }
+            }
+
+            // Fallback
+            else -> listOf(
+                "Laten we dit samen bekijken",
+                exercise.question,
+                "Het antwoord is: ${exercise.correctAnswer}"
+            )
+        }
+    }
+
     private fun generateWorkedExampleHint(exercise: Exercise): String {
         val hintText = exercise.hint ?: "Let op de stappen"
-        return when (exercise.type) {
-            ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC -> {
+        val hasVisualCount = exercise.visualData?.count != null
+        val hasVisualGroups = exercise.visualData?.groups != null
+
+        return when {
+            hasVisualCount -> {
+                val count = exercise.visualData!!.count!!
+                "Kijk goed naar de afbeelding.\n" +
+                "Tel de stippen: ${(1..count).joinToString(", ")}.\n" +
+                "Er zijn $count stippen.\n" +
+                "Het antwoord is: ${exercise.correctAnswer}"
+            }
+            hasVisualGroups -> {
+                val groups = exercise.visualData!!.groups!!
+                "Kijk naar de groepjes.\n" +
+                "Er zijn ${groups.size} groepjes van ${groups.firstOrNull() ?: 0}.\n" +
+                "${groups.size} × ${groups.firstOrNull() ?: 0} = ${exercise.correctAnswer}\n" +
+                "Het antwoord is: ${exercise.correctAnswer}"
+            }
+            exercise.type == ExerciseType.VISUAL_GROUPS || 
+            exercise.type == ExerciseType.TYPED_NUMERIC -> {
                 "Laten we dit samen bekijken:\n" +
                 "${exercise.question}\n" +
                 "Het antwoord is ${exercise.correctAnswer}.\n" +
                 "Let op: $hintText"
             }
-            else -> "Dit is een voorbeeld. Het antwoord is: ${exercise.correctAnswer}"
+            else -> {
+                "Laten we dit samen bekijken:\n" +
+                "${exercise.question}\n" +
+                "Het antwoord is: ${exercise.correctAnswer}.\n" +
+                "$hintText"
+            }
         }
     }
 
     private fun generateGuidedHint(exercise: Exercise): String {
         val hintText = exercise.hint ?: "Probeer het stap voor stap"
-        return when (exercise.type) {
-            ExerciseType.VISUAL_GROUPS, ExerciseType.TYPED_NUMERIC -> {
-                "Probeer zelf eerst:\n" +
-                "${exercise.question}\n" +
-                "Tip: $hintText\n" +
-                "(Je krijgt hulp als je er niet uit komt)"
+        val hasVisualCount = exercise.visualData?.count != null
+
+        return when {
+            hasVisualCount -> "Tel rustig: 1, 2, 3…\nWijs elk stipje aan terwijl je telt."
+            exercise.type == ExerciseType.VISUAL_GROUPS || 
+            exercise.type == ExerciseType.TYPED_NUMERIC -> {
+                "Tip: $hintText"
             }
             else -> hintText
         }
@@ -402,8 +553,8 @@ class ExerciseEngine {
             difficulty = difficulty,
             question = "De helft van $n = ?",
             visualData = if (difficulty <= 2) VisualData(
-                type = VisualType.GROUPS,
-                groups = listOf(correct, correct)
+                type = VisualType.DOTS,
+                count = n
             ) else null,
             correctAnswer = correct.toString(),
             distractors = generateNumericDistractors(correct, 1, 10).filter { it.toIntOrNull() != n }, // Niet het originele getal
