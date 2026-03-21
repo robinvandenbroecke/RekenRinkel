@@ -58,6 +58,7 @@ class LessonViewModel(
                 // PATCH 8: Reset guards bij start van nieuwe les
                 currentlyCompletingExerciseId = null
                 handledExerciseIds.clear()
+                completedExerciseIds.clear()
                 
                 // Haal user profile op
                 val profile = profileRepository.getProfile().firstOrNull()
@@ -174,11 +175,13 @@ class LessonViewModel(
             return
         }
 
-        // PATCH 1-4: Strict idempotency checks
-        if (isCompletionDoneForCurrentExercise(currentExercise.id)) {
-            android.util.Log.w("LessonViewModel", "[COMPLETION] BLOCKED - Exercise ${currentExercise.id} already DONE")
+        // PATCH 5: Strict idempotency - check completedExerciseIds
+        if (completedExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "[COMPLETION] BLOCKED - Exercise ${currentExercise.id} already in completedExerciseIds")
             return
         }
+
+        // PATCH 5: Strict idempotency - check handledExerciseIds
         if (handledExerciseIds.contains(currentExercise.id)) {
             android.util.Log.d("LessonViewModel", "[COMPLETION] Exercise ${currentExercise.id} already handled")
             return
@@ -344,8 +347,8 @@ class LessonViewModel(
                 val beforeAdvanceExerciseId = currentExercise.id
                 markCompletionStage(CompletionStage.DONE, beforeAdvanceExerciseId)
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 5 EXEC: Advancing from $beforeAdvanceExerciseId")
-                // PATCH 7: Add to handledExerciseIds before advance
-                handledExerciseIds.add(beforeAdvanceExerciseId)
+                // PATCH 7: Add to completedExerciseIds before advance
+                completedExerciseIds.add(beforeAdvanceExerciseId)
                 advanceToNextExercise()
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 5 DONE: exercise=$beforeAdvanceExerciseId fully completed")
             } else if (completion5.stage == CompletionStage.DONE) {
@@ -441,7 +444,11 @@ class LessonViewModel(
         // PATCH 2 & 7: Eerst DONE markeren, dan pas advance
         currentExercise?.let { exercise ->
             // PATCH 7: Zorg dat DONE al gezet is in finishCurrentExercise stap 5
-            // Hier alleen nog handledExerciseIds toevoegen als extra guard
+            // Hier alleen nog completedExerciseIds en handledExerciseIds toevoegen als extra guard
+            if (!completedExerciseIds.contains(exercise.id)) {
+                completedExerciseIds.add(exercise.id)
+                android.util.Log.d("LessonViewModel", "Exercise ${exercise.id} marked as completed in advanceToNextExercise")
+            }
             if (!handledExerciseIds.contains(exercise.id)) {
                 handledExerciseIds.add(exercise.id)
                 android.util.Log.d("LessonViewModel", "Exercise ${exercise.id} marked as handled in advanceToNextExercise")
@@ -487,8 +494,8 @@ class LessonViewModel(
         val currentExercise = state.currentExercise ?: return
 
         // PATCH 5: Hard idempotency - eerste geldige call gaat door, rest wordt genegeerd
-        if (isCompletionDoneForCurrentExercise(currentExercise.id)) {
-            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} already DONE")
+        if (completedExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} already in completedExerciseIds")
             return
         }
         if (handledExerciseIds.contains(currentExercise.id)) {
@@ -537,8 +544,8 @@ class LessonViewModel(
         val currentExercise = state.currentExercise ?: return
 
         // PATCH 5: Hard idempotency - eerste geldige call gaat door, rest wordt genegeerd
-        if (isCompletionDoneForCurrentExercise(currentExercise.id)) {
-            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${currentExercise.id} already DONE")
+        if (completedExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${currentExercise.id} already in completedExerciseIds")
             return
         }
         if (handledExerciseIds.contains(currentExercise.id)) {
@@ -589,8 +596,8 @@ class LessonViewModel(
         val currentExercise = state.currentExercise ?: return
 
         // PATCH 5: Hard idempotency - eerste geldige call gaat door, rest wordt genegeerd
-        if (isCompletionDoneForCurrentExercise(currentExercise.id)) {
-            android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${currentExercise.id} already DONE")
+        if (completedExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${currentExercise.id} already in completedExerciseIds")
             return
         }
         if (handledExerciseIds.contains(currentExercise.id)) {
@@ -646,7 +653,11 @@ class LessonViewModel(
             return
         }
 
-        // PATCH 5 & 6: Guard against already handled or currently processing exercises
+        // PATCH 5 & 6: Guard against already completed, handled, or currently processing exercises
+        if (completedExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "continueAfterError ignored - exercise ${currentExercise.id} already in completedExerciseIds")
+            return
+        }
         if (handledExerciseIds.contains(currentExercise.id)) {
             android.util.Log.w("LessonViewModel", "continueAfterError ignored - exercise ${currentExercise.id} already handled")
             return
@@ -683,7 +694,8 @@ class LessonViewModel(
                             difficultyTier = currentExercise.difficulty,
                             representationUsed = "RECOVERY"
                         )
-                        // PATCH 6 & 7: Eerst result loggen, dan DONE zetten + handled, dan advance
+                        // PATCH 6 & 7: Eerst result loggen, dan DONE zetten + completed + handled, dan advance
+                        completedExerciseIds.add(currentExercise.id)
                         handledExerciseIds.add(currentExercise.id)
                         _uiState.update {
                             it.copy(
@@ -697,7 +709,8 @@ class LessonViewModel(
                             )
                         }
                     } else {
-                        // PATCH 6: Al gelogd, zet alleen DONE + handled
+                        // PATCH 6: Al gelogd, zet alleen DONE + completed + handled
+                        completedExerciseIds.add(currentExercise.id)
                         handledExerciseIds.add(currentExercise.id)
                         _uiState.update {
                             it.copy(
@@ -714,7 +727,8 @@ class LessonViewModel(
                 CompletionStage.RESULT_LOGGED,
                 CompletionStage.PROGRESS_UPDATED,
                 CompletionStage.REWARDS_APPLIED -> {
-                    // PATCH 6: Geen side-effects meer opnieuw uitvoeren. Eerst DONE zetten, dan advance.
+                    // PATCH 6: Geen side-effects meer opnieuw uitvoeren. Eerst DONE zetten + completed + handled, dan advance.
+                    completedExerciseIds.add(currentExercise.id)
                     handledExerciseIds.add(currentExercise.id)
                     _uiState.update {
                         it.copy(
@@ -728,7 +742,8 @@ class LessonViewModel(
                     advanceToNextExercise()
                 }
                 CompletionStage.READY_TO_ADVANCE -> {
-                    // PATCH 6 & 7: Alleen hier expliciet finaliseren. Eerst DONE, dan advance.
+                    // PATCH 6 & 7: Alleen hier expliciet finaliseren. Eerst DONE + completed + handled, dan advance.
+                    completedExerciseIds.add(currentExercise.id)
                     handledExerciseIds.add(currentExercise.id)
                     _uiState.update {
                         it.copy(
@@ -743,6 +758,7 @@ class LessonViewModel(
                 }
                 CompletionStage.DONE -> {
                     // PATCH 6 & 7: Al afgerond, alleen nog advance als dat niet al gebeurd is
+                    completedExerciseIds.add(currentExercise.id)
                     handledExerciseIds.add(currentExercise.id)
                     _uiState.update {
                         it.copy(
