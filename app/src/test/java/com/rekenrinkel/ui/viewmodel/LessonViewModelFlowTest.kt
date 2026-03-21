@@ -45,6 +45,16 @@ class LessonViewModelFlowTest {
         coEvery { progressRepository.getAllProgress() } returns flowOf(emptyList())
         coEvery { progressRepository.updateProgress(any()) } just Runs
         coEvery { profileRepository.updateRewards(any()) } just Runs
+        
+        // Mock buildLesson om een LessonPlan met oefeningen terug te geven
+        coEvery { exerciseEngine.buildLesson(any(), any()) } answers {
+            LessonPlan(
+                exercises = emptyList(), // Wordt overschreven door setupLessonWithExercises
+                skill = "test_skill",
+                difficulty = 1,
+                estimatedDurationMinutes = 10
+            )
+        }
 
         viewModel = LessonViewModel(
             progressRepository,
@@ -280,6 +290,16 @@ class LessonViewModelFlowTest {
         }
         every { exerciseEngine.generateExercise(any(), any()) } answers {
             regularQueue.removeFirstOrNull() ?: error("Unexpected generateExercise call")
+        }
+        
+        // Overschrijf buildLesson mock voor deze specifieke test
+        coEvery { exerciseEngine.buildLesson(any(), any()) } answers {
+            LessonPlan(
+                exercises = exercises,
+                skill = "test_skill",
+                difficulty = 1,
+                estimatedDurationMinutes = 10
+            )
         }
     }
 
