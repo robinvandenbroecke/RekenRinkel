@@ -68,7 +68,11 @@ class LessonViewModelFlowTest {
 
         viewModel.startLesson()
 
+        println("DEBUG: After startLesson, currentIndex=${viewModel.uiState.value.currentIndex}, exercises.size=${viewModel.uiState.value.exercises.size}")
+
         viewModel.submitAnswer("5")
+
+        println("DEBUG: After submitAnswer, currentIndex=${viewModel.uiState.value.currentIndex}, stepState=${viewModel.uiState.value.stepState}")
 
         // Na submitAnswer: alles gebeurt synchroon, we zijn al bij oefening 2
         assertEquals(1, viewModel.uiState.value.currentIndex)
@@ -85,7 +89,11 @@ class LessonViewModelFlowTest {
 
         viewModel.startLesson()
 
+        println("DEBUG: After startLesson, currentIndex=${viewModel.uiState.value.currentIndex}, stepState=${viewModel.uiState.value.stepState}")
+
         viewModel.continueWorkedExample()
+
+        println("DEBUG: After continueWorkedExample, currentIndex=${viewModel.uiState.value.currentIndex}, stepState=${viewModel.uiState.value.stepState}")
 
         // Synchrone executie: direct naar volgende oefening
         assertEquals(1, viewModel.uiState.value.currentIndex)
