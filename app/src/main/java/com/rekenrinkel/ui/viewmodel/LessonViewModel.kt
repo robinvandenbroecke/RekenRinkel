@@ -174,28 +174,26 @@ class LessonViewModel(
             return
         }
 
+        // PATCH 1-4: Strict idempotency checks
         if (isCompletionDoneForCurrentExercise(currentExercise.id)) {
             android.util.Log.w("LessonViewModel", "[COMPLETION] BLOCKED - Exercise ${currentExercise.id} already DONE")
             return
         }
-
         if (handledExerciseIds.contains(currentExercise.id)) {
             android.util.Log.d("LessonViewModel", "[COMPLETION] Exercise ${currentExercise.id} already handled")
             return
         }
 
-        if (!isStageValidForExercise(currentExercise.id)) {
-            android.util.Log.w("LessonViewModel", "[COMPLETION] Stage mismatch detected, resetting to NOT_STARTED for ${currentExercise.id}")
+        // PATCH 1-4: Initialize stage for this exercise if not started or stale
+        val initialCompletion = currentCompletionState()
+        if (initialCompletion.exerciseId != currentExercise.id || initialCompletion.stage == CompletionStage.DONE) {
+            android.util.Log.d("LessonViewModel", "[COMPLETION] Initializing stage for ${currentExercise.id}")
             markCompletionStage(CompletionStage.NOT_STARTED, currentExercise.id)
         }
-
-        // PATCH 5: Set guard if not already set (fallback for recovery paths)
-        currentlyCompletingExerciseId = currentExercise.id
         
-        val initialCompletion = currentCompletionState()
         android.util.Log.d(
             "LessonViewModel",
-            "[COMPLETION] START exercise=${currentExercise.id}, type=${currentExercise.type}, mode=$mode, initialStage=${initialCompletion.stage}, stageExerciseId=${initialCompletion.exerciseId}"
+            "[COMPLETION] START exercise=${currentExercise.id}, type=${currentExercise.type}, mode=$mode, initialStage=${initialCompletion.stage}"
         )
 
         val needsFeedback = mode == CompletionMode.FEEDBACK_THEN_ADVANCE
@@ -208,9 +206,10 @@ class LessonViewModel(
         var rewardsUpdateFailed = false
 
         try {
+            // PATCH 1-4: Strict stage 1 - RESULT_LOGGED
             val completion1 = currentCompletionState()
             android.util.Log.d("LessonViewModel", "[COMPLETION] Step 1 CHECK: currentStage=${completion1.stage}, target=RESULT_LOGGED")
-            if (completion1.stage < CompletionStage.RESULT_LOGGED) {
+            if (completion1.stage == CompletionStage.NOT_STARTED) {
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 1 EXEC: Logging result for ${currentExercise.id}")
                 _uiState.update {
                     it.copy(
@@ -220,12 +219,15 @@ class LessonViewModel(
                     )
                 }
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 1 DONE: stage=RESULT_LOGGED")
-            } else {
+            } else if (completion1.stage == CompletionStage.RESULT_LOGGED) {
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 1 SKIP: result already logged")
+            } else {
+                android.util.Log.w("LessonViewModel", "[COMPLETION] Step 1 UNEXPECTED: stage=${completion1.stage}")
             }
 
+            // PATCH 1-4: Strict stage 2 - PROGRESS_UPDATED (only for normal flow)
             val completion2 = currentCompletionState()
-            android.util.Log.d("LessonViewModel", "[COMPLETION] Step 2 CHECK: currentStage=${completion2.stage}, target=PROGRESS_UPDATED")
+            android.util.Log.d("LessonViewModel", "[COMPLETION] Step 2 CHECK: currentStage=${completion2.stage}, target=PROGRESS_UPDATED, skipMastery=$skipMasteryUpdate")
             if (!skipMasteryUpdate && completion2.stage == CompletionStage.RESULT_LOGGED) {
                 try {
                     android.util.Log.d("LessonViewModel", "[COMPLETION] Step 2 EXEC: Updating progress for ${currentExercise.id}")
@@ -242,10 +244,14 @@ class LessonViewModel(
             } else if (skipMasteryUpdate) {
                 val reason = if (isSkip) "skip" else if (isWorkedExample) "worked example" else "direct continue"
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 2 SKIP: mastery update skipped for $reason")
-            } else {
+                // PATCH 3-4: For skip/worked, jump directly to READY_TO_ADVANCE after RESULT_LOGGED
+            } else if (completion2.stage == CompletionStage.PROGRESS_UPDATED) {
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 2 SKIP: progress already updated")
+            } else {
+                android.util.Log.w("LessonViewModel", "[COMPLETION] Step 2 UNEXPECTED: stage=${completion2.stage}")
             }
 
+            // PATCH 1-4: Strict stage 3 - REWARDS_APPLIED (only for normal flow)
             val completion3 = currentCompletionState()
             android.util.Log.d("LessonViewModel", "[COMPLETION] Step 3 CHECK: currentStage=${completion3.stage}, target=REWARDS_APPLIED")
             if (!skipMasteryUpdate && completion3.stage == CompletionStage.PROGRESS_UPDATED) {
@@ -271,17 +277,23 @@ class LessonViewModel(
             } else if (skipMasteryUpdate) {
                 val reason = if (isSkip) "skip" else if (isWorkedExample) "worked example" else "direct continue"
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 3 SKIP: rewards skipped for $reason")
-            } else {
+            } else if (completion3.stage == CompletionStage.REWARDS_APPLIED) {
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 3 SKIP: rewards already applied")
+            } else {
+                android.util.Log.w("LessonViewModel", "[COMPLETION] Step 3 UNEXPECTED: stage=${completion3.stage}")
             }
 
+            // PATCH 1-4: Strict stage 4 - READY_TO_ADVANCE
             val completion4 = currentCompletionState()
             android.util.Log.d("LessonViewModel", "[COMPLETION] Step 4 CHECK: currentStage=${completion4.stage}, target=READY_TO_ADVANCE")
+            
+            // PATCH 3-4: Different paths to READY_TO_ADVANCE based on mode
             val canPrepareAdvance = when {
-                skipMasteryUpdate -> completion4.stage == CompletionStage.RESULT_LOGGED
-                rewardsUpdateFailed -> completion4.stage == CompletionStage.PROGRESS_UPDATED
-                else -> completion4.stage == CompletionStage.REWARDS_APPLIED
+                skipMasteryUpdate -> completion4.stage == CompletionStage.RESULT_LOGGED  // skip/worked: RESULT_LOGGED -> READY_TO_ADVANCE
+                rewardsUpdateFailed -> completion4.stage == CompletionStage.PROGRESS_UPDATED  // partial failure
+                else -> completion4.stage == CompletionStage.REWARDS_APPLIED  // normal: REWARDS_APPLIED -> READY_TO_ADVANCE
             }
+            
             if (canPrepareAdvance) {
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 4 EXEC: Preparing advance for ${currentExercise.id}")
                 val xpEarned = if (skipMasteryUpdate) 0 else outcome?.xpEarned ?: 0
@@ -302,10 +314,13 @@ class LessonViewModel(
                     )
                 }
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 4 DONE: stage=READY_TO_ADVANCE")
+            } else if (completion4.stage == CompletionStage.READY_TO_ADVANCE) {
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 4 SKIP: already ready to advance")
             } else {
-                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 4 SKIP: not ready for advance")
+                android.util.Log.w("LessonViewModel", "[COMPLETION] Step 4 UNEXPECTED: stage=${completion4.stage}, skipMastery=$skipMasteryUpdate")
             }
 
+            // PATCH 1-4: Strict stage 5 - DONE -> advance
             val completion5 = currentCompletionState()
             android.util.Log.d("LessonViewModel", "[COMPLETION] Step 5 CHECK: currentStage=${completion5.stage}, target=DONE")
             if (completion5.stage == CompletionStage.READY_TO_ADVANCE) {
@@ -313,13 +328,18 @@ class LessonViewModel(
                 if (mode == CompletionMode.FEEDBACK_THEN_ADVANCE) {
                     delay(feedbackDurationMs)
                 }
+                // PATCH 4: First mark DONE, then advance
                 val beforeAdvanceExerciseId = currentExercise.id
                 markCompletionStage(CompletionStage.DONE, beforeAdvanceExerciseId)
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 5 EXEC: Advancing from $beforeAdvanceExerciseId")
+                // PATCH 4: Add to handledExerciseIds before advance
+                handledExerciseIds.add(beforeAdvanceExerciseId)
                 advanceToNextExercise()
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 5 DONE: exercise=$beforeAdvanceExerciseId fully completed")
+            } else if (completion5.stage == CompletionStage.DONE) {
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 5 SKIP: already DONE")
             } else {
-                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 5 SKIP: currentStage=${completion5.stage}")
+                android.util.Log.w("LessonViewModel", "[COMPLETION] Step 5 UNEXPECTED: currentStage=${completion5.stage}")
             }
 
             android.util.Log.d("LessonViewModel", "[COMPLETION] FINISH: exercise=${currentExercise.id} completed successfully")
@@ -337,9 +357,9 @@ class LessonViewModel(
                 else -> FailureStage.UNKNOWN
             }
             handleCompletionFailure(e.message ?: "Onbekende fout", failureStage, currentExercise)
-        } finally {
-            currentlyCompletingExerciseId = null
         }
+        // NOTE: finally block removed - reset happens in advanceToNextExercise() for success
+        // and in handleCompletionFailure() for errors
     }
 
     /**
@@ -646,8 +666,8 @@ class LessonViewModel(
                             difficultyTier = currentExercise.difficulty,
                             representationUsed = "RECOVERY"
                         )
-                        // PATCH 6 & 7: Eerst result loggen, dan DONE zetten, dan advance
-                        // handledExerciseIds wordt gezet in advanceToNextExercise
+                        // PATCH 6 & 7: Eerst result loggen, dan DONE zetten + handled, dan advance
+                        handledExerciseIds.add(currentExercise.id)
                         _uiState.update {
                             it.copy(
                                 results = it.results + recoveryResult,
@@ -660,7 +680,8 @@ class LessonViewModel(
                             )
                         }
                     } else {
-                        // PATCH 6: Al gelogd, zet alleen DONE
+                        // PATCH 6: Al gelogd, zet alleen DONE + handled
+                        handledExerciseIds.add(currentExercise.id)
                         _uiState.update {
                             it.copy(
                                 stepState = LessonStepState.ADVANCING,
@@ -677,7 +698,7 @@ class LessonViewModel(
                 CompletionStage.PROGRESS_UPDATED,
                 CompletionStage.REWARDS_APPLIED -> {
                     // PATCH 6: Geen side-effects meer opnieuw uitvoeren. Eerst DONE zetten, dan advance.
-                    // handledExerciseIds wordt gezet in advanceToNextExercise
+                    handledExerciseIds.add(currentExercise.id)
                     _uiState.update {
                         it.copy(
                             stepState = LessonStepState.ADVANCING,
@@ -691,7 +712,7 @@ class LessonViewModel(
                 }
                 CompletionStage.READY_TO_ADVANCE -> {
                     // PATCH 6 & 7: Alleen hier expliciet finaliseren. Eerst DONE, dan advance.
-                    // handledExerciseIds wordt gezet in advanceToNextExercise
+                    handledExerciseIds.add(currentExercise.id)
                     _uiState.update {
                         it.copy(
                             stepState = LessonStepState.ADVANCING,
@@ -705,6 +726,7 @@ class LessonViewModel(
                 }
                 CompletionStage.DONE -> {
                     // PATCH 6 & 7: Al afgerond, alleen nog advance als dat niet al gebeurd is
+                    handledExerciseIds.add(currentExercise.id)
                     _uiState.update {
                         it.copy(
                             stepState = LessonStepState.ADVANCING,
