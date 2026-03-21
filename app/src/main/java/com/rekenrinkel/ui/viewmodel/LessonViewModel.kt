@@ -55,6 +55,10 @@ class LessonViewModel(
             _uiState.update { it.copy(isLoading = true) }
 
             try {
+                // PATCH 8: Reset guards bij start van nieuwe les
+                currentlyCompletingExerciseId = null
+                handledExerciseIds.clear()
+                
                 // Haal user profile op
                 val profile = profileRepository.getProfile().firstOrNull()
                     ?.let { ProfileModel(name = it.name, age = it.age, theme = it.theme) }
@@ -77,7 +81,11 @@ class LessonViewModel(
                         currentPhase = determinePhase(0, lessonPlan),
                         xpEarnedThisLesson = 0,
                         badgesEarnedThisLesson = emptyList(),
-                        lessonPlan = lessonPlan
+                        lessonPlan = lessonPlan,
+                        completionStage = CompletionStage.NOT_STARTED,
+                        completionStageExerciseId = null,
+                        error = null,
+                        failureContext = null
                     )
                 }
 
