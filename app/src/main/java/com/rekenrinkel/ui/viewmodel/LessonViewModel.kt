@@ -181,6 +181,12 @@ class LessonViewModel(
             return
         }
 
+        // PATCH 5: Strict idempotency - check handledExerciseIds
+        if (handledExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.d("LessonViewModel", "[COMPLETION] Exercise ${currentExercise.id} already handled")
+            return
+        }
+
         // PATCH 1-4: Initialize stage for this exercise if not started or stale
         val initialCompletion = currentCompletionState()
         if (initialCompletion.exerciseId != currentExercise.id || initialCompletion.stage == CompletionStage.DONE) {
@@ -217,8 +223,12 @@ class LessonViewModel(
                     )
                 }
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 1 DONE: stage=RESULT_LOGGED")
+            } else if (completion1.stage == CompletionStage.RESULT_LOGGED) {
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 1 SKIP: result already logged")
             } else {
-                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 1 SKIP: result already logged or unexpected stage ${completion1.stage}")
+                android.util.Log.w("LessonViewModel", "[COMPLETION] Step 1 UNEXPECTED: stage=${completion1.stage}")
+                handleCompletionFailure("Unexpected stage in step 1: ${completion1.stage}", FailureStage.UNKNOWN, currentExercise)
+                return
             }
 
             // PATCH 2: Strict stage 2 - RESULT_LOGGED -> PROGRESS_UPDATED (alleen voor normale flow)
@@ -242,8 +252,12 @@ class LessonViewModel(
                 val reason = if (isSkip) "skip" else if (isWorkedExample) "worked example" else "direct continue"
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 2 SKIP: mastery update skipped for $reason")
                 // PATCH 3-4: Voor skip/worked, ga direct naar READY_TO_ADVANCE
+            } else if (completion2.stage == CompletionStage.PROGRESS_UPDATED) {
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 2 SKIP: progress already updated")
             } else {
-                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 2 SKIP: progress already updated or unexpected stage ${completion2.stage}")
+                android.util.Log.w("LessonViewModel", "[COMPLETION] Step 2 UNEXPECTED: stage=${completion2.stage}")
+                handleCompletionFailure("Unexpected stage in step 2: ${completion2.stage}", FailureStage.UNKNOWN, currentExercise)
+                return
             }
 
             // PATCH 2: Strict stage 3 - PROGRESS_UPDATED -> REWARDS_APPLIED (alleen voor normale flow)
@@ -273,8 +287,12 @@ class LessonViewModel(
             } else if (skipMasteryUpdate) {
                 val reason = if (isSkip) "skip" else if (isWorkedExample) "worked example" else "direct continue"
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 3 SKIP: rewards skipped for $reason")
+            } else if (completion3.stage == CompletionStage.REWARDS_APPLIED) {
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 3 SKIP: rewards already applied")
             } else {
-                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 3 SKIP: rewards already applied or unexpected stage ${completion3.stage}")
+                android.util.Log.w("LessonViewModel", "[COMPLETION] Step 3 UNEXPECTED: stage=${completion3.stage}")
+                handleCompletionFailure("Unexpected stage in step 3: ${completion3.stage}", FailureStage.UNKNOWN, currentExercise)
+                return
             }
 
             // PATCH 2: Strict stage 4 - naar READY_TO_ADVANCE
@@ -308,8 +326,12 @@ class LessonViewModel(
                     )
                 }
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 4 DONE: stage=READY_TO_ADVANCE")
+            } else if (completion4.stage == CompletionStage.READY_TO_ADVANCE) {
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 4 SKIP: already ready to advance")
             } else {
-                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 4 SKIP: already ready or unexpected stage ${completion4.stage}")
+                android.util.Log.w("LessonViewModel", "[COMPLETION] Step 4 UNEXPECTED: stage=${completion4.stage}, skipMastery=$skipMasteryUpdate")
+                handleCompletionFailure("Unexpected stage in step 4: ${completion4.stage}", FailureStage.UNKNOWN, currentExercise)
+                return
             }
 
             // PATCH 2: Strict stage 5 - READY_TO_ADVANCE -> DONE -> advance
@@ -329,8 +351,12 @@ class LessonViewModel(
                 completedExerciseIds.add(beforeAdvanceExerciseId)
                 advanceToNextExercise()
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 5 DONE: exercise=$beforeAdvanceExerciseId fully completed")
+            } else if (completion5.stage == CompletionStage.DONE) {
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 5 SKIP: already DONE")
             } else {
-                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 5 SKIP: already DONE or unexpected stage ${completion5.stage}")
+                android.util.Log.w("LessonViewModel", "[COMPLETION] Step 5 UNEXPECTED: currentStage=${completion5.stage}")
+                handleCompletionFailure("Unexpected stage in step 5: ${completion5.stage}", FailureStage.UNKNOWN, currentExercise)
+                return
             }
 
             android.util.Log.d("LessonViewModel", "[COMPLETION] FINISH: exercise=${currentExercise.id} completed successfully")
@@ -467,11 +493,24 @@ class LessonViewModel(
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
 
-        // PATCH 5: Idempotency - check completed
-        if (completedExerciseIds.contains(currentExercise.id)) return
+        // PATCH 5: Hard idempotency - eerste geldige call gaat door, rest wordt genegeerd
+        if (completedExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} already in completedExerciseIds")
+            return
+        }
+        if (handledExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} already handled")
+            return
+        }
+        if (currentlyCompletingExerciseId == currentExercise.id) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} currently being processed")
+            return
+        }
 
         if (state.stepState != LessonStepState.SHOWING) return
 
+        // PATCH 1 & 5: Set processing state and guard BEFORE coroutine
+        currentlyCompletingExerciseId = currentExercise.id
         _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
         val responseTimeMs = System.currentTimeMillis() - exerciseStartTime
@@ -491,6 +530,7 @@ class LessonViewModel(
                 errorType = if (!isCorrect) determineErrorType(currentExercise, answer) else null
             )
 
+            // PATCH 3: Gebruik expliciete completion mode
             finishCurrentExercise(result, mode = CompletionMode.FEEDBACK_THEN_ADVANCE)
         }
     }
@@ -503,24 +543,38 @@ class LessonViewModel(
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
 
-        // PATCH 5: Idempotency - check completed
-        if (completedExerciseIds.contains(currentExercise.id)) return
+        // PATCH 5: Hard idempotency - eerste geldige call gaat door, rest wordt genegeerd
+        if (completedExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${currentExercise.id} already in completedExerciseIds")
+            return
+        }
+        if (handledExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${currentExercise.id} already handled")
+            return
+        }
+        if (currentlyCompletingExerciseId == currentExercise.id) {
+            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${currentExercise.id} currently being processed")
+            return
+        }
 
         // Guard: alleen voor WORKED_EXAMPLE
         if (currentExercise.type != com.rekenrinkel.domain.model.ExerciseType.WORKED_EXAMPLE) {
+            // Als het per ongeluk een ander type is, behandel als normale oefening
             submitAnswer("[worked_fallback]")
             return
         }
 
         if (state.stepState != LessonStepState.SHOWING) return
 
+        // PATCH 5: Set guard BEFORE coroutine
+        currentlyCompletingExerciseId = currentExercise.id
         _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
         viewModelScope.launch {
             val result = DetailedExerciseResult(
                 exerciseId = currentExercise.id,
                 skillId = currentExercise.skillId,
-                isCorrect = true,
+                isCorrect = true, // WORKED_EXAMPLE telt altijd als "gezien"
                 responseTimeMs = System.currentTimeMillis() - exerciseStartTime,
                 givenAnswer = "[worked_example_viewed]",
                 correctAnswer = currentExercise.correctAnswer,
@@ -528,6 +582,7 @@ class LessonViewModel(
                 representationUsed = "WORKED_EXAMPLE"
             )
 
+            // PATCH 3: Gebruik expliciete completion mode
             finishCurrentExercise(result, mode = CompletionMode.DIRECT_CONTINUE)
         }
     }
@@ -540,11 +595,24 @@ class LessonViewModel(
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
 
-        // PATCH 5: Idempotency - check completed
-        if (completedExerciseIds.contains(currentExercise.id)) return
+        // PATCH 5: Hard idempotency - eerste geldige call gaat door, rest wordt genegeerd
+        if (completedExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${currentExercise.id} already in completedExerciseIds")
+            return
+        }
+        if (handledExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${currentExercise.id} already handled")
+            return
+        }
+        if (currentlyCompletingExerciseId == currentExercise.id) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${currentExercise.id} currently being processed")
+            return
+        }
 
         if (state.stepState != LessonStepState.SHOWING) return
 
+        // PATCH 5: Set guard BEFORE coroutine
+        currentlyCompletingExerciseId = currentExercise.id
         _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
         viewModelScope.launch {
@@ -552,13 +620,14 @@ class LessonViewModel(
                 exerciseId = currentExercise.id,
                 skillId = currentExercise.skillId,
                 isCorrect = false,
-                responseTimeMs = 30_000,
+                responseTimeMs = 30_000, // Skip penalty
                 givenAnswer = "[skipped]",
                 correctAnswer = currentExercise.correctAnswer,
                 difficultyTier = currentExercise.difficulty,
                 representationUsed = "SKIPPED"
             )
 
+            // PATCH 1: Skip gebruikt eigen SKIP_ADVANCE mode
             finishCurrentExercise(result, mode = CompletionMode.SKIP_ADVANCE)
         }
     }
@@ -584,8 +653,20 @@ class LessonViewModel(
             return
         }
 
-        // PATCH 5: Guard against already completed
-        if (completedExerciseIds.contains(currentExercise.id)) return
+        // PATCH 5 & 6: Guard against already completed, handled, or currently processing exercises
+        if (completedExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "continueAfterError ignored - exercise ${currentExercise.id} already in completedExerciseIds")
+            return
+        }
+        if (handledExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "continueAfterError ignored - exercise ${currentExercise.id} already handled")
+            return
+        }
+        // PATCH 6: If currently processing, wait - don't start recovery yet
+        if (currentlyCompletingExerciseId == currentExercise.id) {
+            android.util.Log.w("LessonViewModel", "continueAfterError ignored - exercise ${currentExercise.id} currently being processed")
+            return
+        }
 
         val recoveryStage = if (completion.exerciseId == currentExercise.id) completion.stage else CompletionStage.NOT_STARTED
         val currentExerciseId = currentExercise.id
