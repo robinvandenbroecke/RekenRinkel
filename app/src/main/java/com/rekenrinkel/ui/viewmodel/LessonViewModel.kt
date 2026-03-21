@@ -76,8 +76,10 @@ class LessonViewModel(
                 settingsDataStore.premiumUnlocked.first()
             }
 
-            // Bouw les met LessonEngine
-            val lessonPlan = lessonEngine.buildLesson(profile, isPremium)
+            // Bouw les met LessonEngine - PATCH 10: runBlocking voor suspend functie
+            val lessonPlan = kotlinx.coroutines.runBlocking {
+                lessonEngine.buildLesson(profile, isPremium)
+            }
 
             _uiState.update {
                 it.copy(
