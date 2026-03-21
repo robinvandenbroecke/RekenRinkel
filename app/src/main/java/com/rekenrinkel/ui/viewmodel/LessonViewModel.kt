@@ -181,12 +181,6 @@ class LessonViewModel(
             return
         }
 
-        // PATCH 5: Strict idempotency - check handledExerciseIds
-        if (handledExerciseIds.contains(currentExercise.id)) {
-            android.util.Log.d("LessonViewModel", "[COMPLETION] Exercise ${currentExercise.id} already handled")
-            return
-        }
-
         // PATCH 1-4: Initialize stage for this exercise if not started or stale
         val initialCompletion = currentCompletionState()
         if (initialCompletion.exerciseId != currentExercise.id || initialCompletion.stage == CompletionStage.DONE) {
@@ -223,12 +217,8 @@ class LessonViewModel(
                     )
                 }
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 1 DONE: stage=RESULT_LOGGED")
-            } else if (completion1.stage == CompletionStage.RESULT_LOGGED) {
-                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 1 SKIP: result already logged")
             } else {
-                android.util.Log.w("LessonViewModel", "[COMPLETION] Step 1 UNEXPECTED: stage=${completion1.stage}")
-                handleCompletionFailure("Unexpected stage in step 1: ${completion1.stage}", FailureStage.UNKNOWN, currentExercise)
-                return
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 1 SKIP: already at ${completion1.stage}")
             }
 
             // PATCH 2: Strict stage 2 - RESULT_LOGGED -> PROGRESS_UPDATED (alleen voor normale flow)
@@ -252,12 +242,8 @@ class LessonViewModel(
                 val reason = if (isSkip) "skip" else if (isWorkedExample) "worked example" else "direct continue"
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 2 SKIP: mastery update skipped for $reason")
                 // PATCH 3-4: Voor skip/worked, ga direct naar READY_TO_ADVANCE
-            } else if (completion2.stage == CompletionStage.PROGRESS_UPDATED) {
-                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 2 SKIP: progress already updated")
             } else {
-                android.util.Log.w("LessonViewModel", "[COMPLETION] Step 2 UNEXPECTED: stage=${completion2.stage}")
-                handleCompletionFailure("Unexpected stage in step 2: ${completion2.stage}", FailureStage.UNKNOWN, currentExercise)
-                return
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 2 SKIP: already at ${completion2.stage}")
             }
 
             // PATCH 2: Strict stage 3 - PROGRESS_UPDATED -> REWARDS_APPLIED (alleen voor normale flow)
@@ -287,12 +273,8 @@ class LessonViewModel(
             } else if (skipMasteryUpdate) {
                 val reason = if (isSkip) "skip" else if (isWorkedExample) "worked example" else "direct continue"
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 3 SKIP: rewards skipped for $reason")
-            } else if (completion3.stage == CompletionStage.REWARDS_APPLIED) {
-                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 3 SKIP: rewards already applied")
             } else {
-                android.util.Log.w("LessonViewModel", "[COMPLETION] Step 3 UNEXPECTED: stage=${completion3.stage}")
-                handleCompletionFailure("Unexpected stage in step 3: ${completion3.stage}", FailureStage.UNKNOWN, currentExercise)
-                return
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 3 SKIP: already at ${completion3.stage}")
             }
 
             // PATCH 2: Strict stage 4 - naar READY_TO_ADVANCE
@@ -326,12 +308,8 @@ class LessonViewModel(
                     )
                 }
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 4 DONE: stage=READY_TO_ADVANCE")
-            } else if (completion4.stage == CompletionStage.READY_TO_ADVANCE) {
-                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 4 SKIP: already ready to advance")
             } else {
-                android.util.Log.w("LessonViewModel", "[COMPLETION] Step 4 UNEXPECTED: stage=${completion4.stage}, skipMastery=$skipMasteryUpdate")
-                handleCompletionFailure("Unexpected stage in step 4: ${completion4.stage}", FailureStage.UNKNOWN, currentExercise)
-                return
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 4 SKIP: already at ${completion4.stage}")
             }
 
             // PATCH 2: Strict stage 5 - READY_TO_ADVANCE -> DONE -> advance
@@ -351,12 +329,8 @@ class LessonViewModel(
                 completedExerciseIds.add(beforeAdvanceExerciseId)
                 advanceToNextExercise()
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 5 DONE: exercise=$beforeAdvanceExerciseId fully completed")
-            } else if (completion5.stage == CompletionStage.DONE) {
-                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 5 SKIP: already DONE")
             } else {
-                android.util.Log.w("LessonViewModel", "[COMPLETION] Step 5 UNEXPECTED: currentStage=${completion5.stage}")
-                handleCompletionFailure("Unexpected stage in step 5: ${completion5.stage}", FailureStage.UNKNOWN, currentExercise)
-                return
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 5 SKIP: already at ${completion5.stage}")
             }
 
             android.util.Log.d("LessonViewModel", "[COMPLETION] FINISH: exercise=${currentExercise.id} completed successfully")
