@@ -497,7 +497,7 @@ class LessonViewModel(
         val responseTimeMs = System.currentTimeMillis() - exerciseStartTime
         val exerciseToProcess = currentExercise
 
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Unconfined) {
             val isCorrect = exerciseValidator.validate(exerciseToProcess, answer)
 
             val result = DetailedExerciseResult(
@@ -564,8 +564,8 @@ class LessonViewModel(
             representationUsed = "WORKED_EXAMPLE"
         )
 
-        // PATCH 9: Start coroutine met Immediate voor synchrone executie
-        viewModelScope.launch(Dispatchers.Main.immediate) {
+        // PATCH 9: Start coroutine met Unconfined voor onmiddellijke executie in tests
+        viewModelScope.launch(Dispatchers.Unconfined) {
             finishCurrentExercise(result, mode = CompletionMode.DIRECT_CONTINUE)
         }
     }
@@ -610,8 +610,8 @@ class LessonViewModel(
             representationUsed = "SKIPPED"
         )
 
-        // PATCH 9: Start coroutine met Immediate voor synchrone executie
-        viewModelScope.launch(Dispatchers.Main.immediate) {
+        // PATCH 9: Start coroutine met Unconfined voor onmiddellijke executie in tests
+        viewModelScope.launch(Dispatchers.Unconfined) {
             finishCurrentExercise(result, mode = CompletionMode.SKIP_ADVANCE)
         }
     }
