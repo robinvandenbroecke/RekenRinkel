@@ -181,12 +181,9 @@ class LessonViewModel(
             markCompletionStage(CompletionStage.NOT_STARTED, currentExercise.id)
         }
 
-        if (currentlyCompletingExerciseId == currentExercise.id) {
-            android.util.Log.w("LessonViewModel", "[COMPLETION] BLOCKED - Exercise ${currentExercise.id} already being processed")
-            return
-        }
+        // PATCH 5: Set guard if not already set (fallback for recovery paths)
         currentlyCompletingExerciseId = currentExercise.id
-
+        
         val initialCompletion = currentCompletionState()
         android.util.Log.d(
             "LessonViewModel",
@@ -444,20 +441,24 @@ class LessonViewModel(
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
 
+        // PATCH 5: Hard idempotency - eerste geldige call gaat door, rest wordt genegeerd
         if (isCompletionDoneForCurrentExercise(currentExercise.id)) {
             android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} already DONE")
             return
         }
-
-        // PATCH 4: Extra guard against already handled exercises
         if (handledExerciseIds.contains(currentExercise.id)) {
             android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} already handled")
+            return
+        }
+        if (currentlyCompletingExerciseId == currentExercise.id) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} currently being processed")
             return
         }
 
         if (state.stepState != LessonStepState.SHOWING) return
 
-        // PATCH 1: Move state change BEFORE coroutine to prevent race conditions
+        // PATCH 1 & 5: Set processing state and guard BEFORE coroutine
+        currentlyCompletingExerciseId = currentExercise.id
         _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
         val responseTimeMs = System.currentTimeMillis() - exerciseStartTime
@@ -490,14 +491,17 @@ class LessonViewModel(
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
 
+        // PATCH 5: Hard idempotency - eerste geldige call gaat door, rest wordt genegeerd
         if (isCompletionDoneForCurrentExercise(currentExercise.id)) {
             android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${currentExercise.id} already DONE")
             return
         }
-
-        // PATCH 4: Extra guard against already handled exercises
         if (handledExerciseIds.contains(currentExercise.id)) {
             android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${currentExercise.id} already handled")
+            return
+        }
+        if (currentlyCompletingExerciseId == currentExercise.id) {
+            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${currentExercise.id} currently being processed")
             return
         }
 
@@ -508,9 +512,10 @@ class LessonViewModel(
             return
         }
 
-        // PATCH 6: Guard met expliciete state
         if (state.stepState != LessonStepState.SHOWING) return
 
+        // PATCH 5: Set guard BEFORE coroutine
+        currentlyCompletingExerciseId = currentExercise.id
         _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
         viewModelScope.launch {
@@ -538,20 +543,24 @@ class LessonViewModel(
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
 
+        // PATCH 5: Hard idempotency - eerste geldige call gaat door, rest wordt genegeerd
         if (isCompletionDoneForCurrentExercise(currentExercise.id)) {
             android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${currentExercise.id} already DONE")
             return
         }
-
-        // PATCH 4: Extra guard against already handled exercises
         if (handledExerciseIds.contains(currentExercise.id)) {
             android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${currentExercise.id} already handled")
             return
         }
+        if (currentlyCompletingExerciseId == currentExercise.id) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${currentExercise.id} currently being processed")
+            return
+        }
 
-        // PATCH 6: Guard met expliciete state
         if (state.stepState != LessonStepState.SHOWING) return
 
+        // PATCH 5: Set guard BEFORE coroutine
+        currentlyCompletingExerciseId = currentExercise.id
         _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
         viewModelScope.launch {
@@ -592,9 +601,14 @@ class LessonViewModel(
             return
         }
 
-        // PATCH 4: Guard against already handled exercises
+        // PATCH 5 & 6: Guard against already handled or currently processing exercises
         if (handledExerciseIds.contains(currentExercise.id)) {
             android.util.Log.w("LessonViewModel", "continueAfterError ignored - exercise ${currentExercise.id} already handled")
+            return
+        }
+        // PATCH 6: If currently processing, wait - don't start recovery yet
+        if (currentlyCompletingExerciseId == currentExercise.id) {
+            android.util.Log.w("LessonViewModel", "continueAfterError ignored - exercise ${currentExercise.id} currently being processed")
             return
         }
 
@@ -603,10 +617,13 @@ class LessonViewModel(
         android.util.Log.d("LessonViewModel", "Effective recovery stage: $recoveryStage")
 
         viewModelScope.launch {
+            // PATCH 6: Set guard at start of recovery
+            currentlyCompletingExerciseId = currentExercise.id
+            
             when (recoveryStage) {
                 CompletionStage.NOT_STARTED -> {
-                    // Recovery contract: log exact één recovery-result en ga veilig door zonder progress/rewards.
-                    // PATCH 4: Use actual current state, not stale snapshot
+                    // PATCH 6: Recovery contract: log exact één recovery-result en ga veilig door zonder progress/rewards.
+                    // Use actual current state, not stale snapshot
                     val actualState = _uiState.value
                     val alreadyLogged = actualState.results.any { it.exerciseId == currentExerciseId } || 
                                        handledExerciseIds.contains(currentExerciseId)
@@ -621,10 +638,12 @@ class LessonViewModel(
                             difficultyTier = currentExercise.difficulty,
                             representationUsed = "RECOVERY"
                         )
+                        // PATCH 6 & 7: Eerst result loggen, dan DONE zetten, dan advance
+                        // handledExerciseIds wordt gezet in advanceToNextExercise
                         _uiState.update {
                             it.copy(
                                 results = it.results + recoveryResult,
-                                completionStage = CompletionStage.RESULT_LOGGED,
+                                completionStage = CompletionStage.DONE,
                                 completionStageExerciseId = currentExercise.id,
                                 stepState = LessonStepState.ADVANCING,
                                 error = null,
@@ -633,38 +652,38 @@ class LessonViewModel(
                             )
                         }
                     } else {
+                        // PATCH 6: Al gelogd, zet alleen DONE
                         _uiState.update {
                             it.copy(
                                 stepState = LessonStepState.ADVANCING,
                                 error = null,
                                 failureContext = null,
-                                completionStage = CompletionStage.RESULT_LOGGED,
+                                completionStage = CompletionStage.DONE,
                                 completionStageExerciseId = currentExercise.id
                             )
                         }
                     }
-                    currentlyCompletingExerciseId = currentExercise.id
                     advanceToNextExercise()
                 }
                 CompletionStage.RESULT_LOGGED,
                 CompletionStage.PROGRESS_UPDATED,
                 CompletionStage.REWARDS_APPLIED -> {
-                    // Geen side-effects meer opnieuw uitvoeren. Veilig door naar volgend item.
+                    // PATCH 6: Geen side-effects meer opnieuw uitvoeren. Eerst DONE zetten, dan advance.
+                    // handledExerciseIds wordt gezet in advanceToNextExercise
                     _uiState.update {
                         it.copy(
                             stepState = LessonStepState.ADVANCING,
                             error = null,
                             failureContext = null,
-                            completionStage = recoveryStage,
+                            completionStage = CompletionStage.DONE,
                             completionStageExerciseId = currentExercise.id
                         )
                     }
-                    currentlyCompletingExerciseId = currentExercise.id
                     advanceToNextExercise()
                 }
                 CompletionStage.READY_TO_ADVANCE -> {
-                    // Alleen hier expliciet finaliseren.
-                    handledExerciseIds.add(currentExercise.id)
+                    // PATCH 6 & 7: Alleen hier expliciet finaliseren. Eerst DONE, dan advance.
+                    // handledExerciseIds wordt gezet in advanceToNextExercise
                     _uiState.update {
                         it.copy(
                             stepState = LessonStepState.ADVANCING,
@@ -674,10 +693,10 @@ class LessonViewModel(
                             completionStageExerciseId = currentExercise.id
                         )
                     }
-                    currentlyCompletingExerciseId = currentExercise.id
                     advanceToNextExercise()
                 }
                 CompletionStage.DONE -> {
+                    // PATCH 6 & 7: Al afgerond, alleen nog advance als dat niet al gebeurd is
                     _uiState.update {
                         it.copy(
                             stepState = LessonStepState.ADVANCING,
@@ -687,7 +706,6 @@ class LessonViewModel(
                             completionStageExerciseId = currentExercise.id
                         )
                     }
-                    currentlyCompletingExerciseId = currentExercise.id
                     advanceToNextExercise()
                 }
             }
