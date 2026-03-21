@@ -181,12 +181,6 @@ class LessonViewModel(
             return
         }
 
-        // PATCH 5: Strict idempotency - check handledExerciseIds
-        if (handledExerciseIds.contains(currentExercise.id)) {
-            android.util.Log.d("LessonViewModel", "[COMPLETION] Exercise ${currentExercise.id} already handled")
-            return
-        }
-
         // PATCH 1-4: Initialize stage for this exercise if not started or stale
         val initialCompletion = currentCompletionState()
         if (initialCompletion.exerciseId != currentExercise.id || initialCompletion.stage == CompletionStage.DONE) {
