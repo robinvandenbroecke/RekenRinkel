@@ -61,6 +61,19 @@ class LessonViewModelFlowTest {
     }
 
     @Test
+    fun `startLesson should load exercises`() = runTest {
+        val exercises = listOf(createExercise("1"), createExercise("2"))
+        setupLessonWithExercises(exercises)
+
+        viewModel.startLesson()
+
+        // Controleer of oefeningen zijn geladen
+        assertEquals(2, viewModel.uiState.value.exercises.size)
+        assertEquals(0, viewModel.uiState.value.currentIndex)
+        assertEquals(LessonStepState.SHOWING, viewModel.uiState.value.stepState)
+    }
+
+    @Test
     fun `submitAnswer - should show feedback then auto-advance`() = runTest {
         val exercises = listOf(createExercise("1"), createExercise("2"))
         setupLessonWithExercises(exercises)
@@ -68,11 +81,11 @@ class LessonViewModelFlowTest {
 
         viewModel.startLesson()
 
-        println("DEBUG: After startLesson, currentIndex=${viewModel.uiState.value.currentIndex}, exercises.size=${viewModel.uiState.value.exercises.size}")
+        // Controleer eerst of startLesson werkt
+        assertEquals(2, viewModel.uiState.value.exercises.size)
+        assertEquals(0, viewModel.uiState.value.currentIndex)
 
         viewModel.submitAnswer("5")
-
-        println("DEBUG: After submitAnswer, currentIndex=${viewModel.uiState.value.currentIndex}, stepState=${viewModel.uiState.value.stepState}")
 
         // Na submitAnswer: alles gebeurt synchroon, we zijn al bij oefening 2
         assertEquals(1, viewModel.uiState.value.currentIndex)
