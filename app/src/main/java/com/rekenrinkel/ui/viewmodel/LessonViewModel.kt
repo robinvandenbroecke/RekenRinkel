@@ -497,33 +497,33 @@ class LessonViewModel(
         val responseTimeMs = System.currentTimeMillis() - exerciseStartTime
         val exerciseToProcess = currentExercise
 
-        // PATCH 9: Gebruik één coroutine voor de hele flow
-        viewModelScope.launch(Dispatchers.Main.immediate) {
-            val isCorrect = exerciseValidator.validate(exerciseToProcess, answer)
+        // PATCH 9: Directe inline executie voor stappen 1-4 (geen coroutine nodig)
+        val isCorrect = exerciseValidator.validate(exerciseToProcess, answer)
 
-            val result = DetailedExerciseResult(
-                exerciseId = exerciseToProcess.id,
-                skillId = exerciseToProcess.skillId,
-                isCorrect = isCorrect,
-                responseTimeMs = responseTimeMs,
-                givenAnswer = answer,
-                correctAnswer = exerciseToProcess.correctAnswer,
-                difficultyTier = exerciseToProcess.difficulty,
-                representationUsed = exerciseToProcess.visualData?.type?.name ?: "ABSTRACT",
-                errorType = if (!isCorrect) determineErrorType(exerciseToProcess, answer) else null
+        val result = DetailedExerciseResult(
+            exerciseId = exerciseToProcess.id,
+            skillId = exerciseToProcess.skillId,
+            isCorrect = isCorrect,
+            responseTimeMs = responseTimeMs,
+            givenAnswer = answer,
+            correctAnswer = exerciseToProcess.correctAnswer,
+            difficultyTier = exerciseToProcess.difficulty,
+            representationUsed = exerciseToProcess.visualData?.type?.name ?: "ABSTRACT",
+            errorType = if (!isCorrect) determineErrorType(exerciseToProcess, answer) else null
+        )
+
+        // Step 1: Log result
+        _uiState.update {
+            it.copy(
+                results = it.results + result,
+                completionStage = CompletionStage.RESULT_LOGGED,
+                completionStageExerciseId = exerciseToProcess.id
             )
+        }
 
-            // Step 1: Log result
-            _uiState.update {
-                it.copy(
-                    results = it.results + result,
-                    completionStage = CompletionStage.RESULT_LOGGED,
-                    completionStageExerciseId = exerciseToProcess.id
-                )
-            }
-
-            // Step 2: Update progress
-            try {
+        // Step 2 & 3: Update progress and rewards (gebruik runBlocking voor suspend functies)
+        try {
+            kotlinx.coroutines.runBlocking {
                 val currentProgress = progressRepository.getOrCreateProgress(exerciseToProcess.skillId)
                 val outcome = lessonEngine.processExerciseResult(result, currentProgress)
                 progressRepository.updateProgress(outcome.updatedProgress)
@@ -531,7 +531,6 @@ class LessonViewModel(
                     it.copy(completionStage = CompletionStage.PROGRESS_UPDATED)
                 }
 
-                // Step 3: Apply rewards
                 val currentRewards = profileRepository.getRewards()
                 val updatedRewards = currentRewards.addXp(outcome.xpEarned).updateStreak()
                 val newBadges = lessonEngine.checkBadges(outcome, currentRewards, exerciseToProcess.skillId)
@@ -544,24 +543,24 @@ class LessonViewModel(
                         badgesEarnedThisLesson = it.badgesEarnedThisLesson + newBadges
                     )
                 }
-            } catch (e: Exception) {
-                // Continue even if progress/rewards fail
             }
+        } catch (e: Exception) {
+            // Continue even if progress/rewards fail
+        }
 
-            // Step 4: Show feedback
-            _uiState.update {
-                it.copy(
-                    stepState = LessonStepState.FEEDBACK,
-                    lastAnswerCorrect = isCorrect,
-                    completionStage = CompletionStage.READY_TO_ADVANCE,
-                    completionStageExerciseId = exerciseToProcess.id
-                )
-            }
+        // Step 4: Show feedback
+        _uiState.update {
+            it.copy(
+                stepState = LessonStepState.FEEDBACK,
+                lastAnswerCorrect = isCorrect,
+                completionStage = CompletionStage.READY_TO_ADVANCE,
+                completionStageExerciseId = exerciseToProcess.id
+            )
+        }
 
-            // Delay for feedback
+        // Gebruik coroutine alleen voor de delay (stap 5)
+        viewModelScope.launch {
             delay(800)
-
-            // Step 5: Mark DONE and advance
             completedExerciseIds.add(exerciseToProcess.id)
             _uiState.update {
                 it.copy(completionStage = CompletionStage.DONE)
