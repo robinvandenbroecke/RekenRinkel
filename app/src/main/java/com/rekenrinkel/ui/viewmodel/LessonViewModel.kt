@@ -475,17 +475,15 @@ class LessonViewModel(
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
 
-        // PATCH 5: Hard idempotency - eerste geldige call gaat door, rest wordt genegeerd
-        if (completedExerciseIds.contains(currentExercise.id)) {
-            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} already in completedExerciseIds")
-            return
-        }
-        if (handledExerciseIds.contains(currentExercise.id)) {
-            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} already handled")
-            return
-        }
-        if (currentlyCompletingExerciseId == currentExercise.id) {
-            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} currently being processed")
+        // PATCH 5: Hard idempotency - gebruik actuele state als bron van waarheid
+        val actualState = _uiState.value
+        if (completedExerciseIds.contains(currentExercise.id) || 
+            handledExerciseIds.contains(currentExercise.id) ||
+            currentlyCompletingExerciseId == currentExercise.id ||
+            actualState.stepState == LessonStepState.PROCESSING ||
+            actualState.stepState == LessonStepState.ADVANCING ||
+            actualState.stepState == LessonStepState.FEEDBACK) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} already processing/completed")
             return
         }
 
@@ -496,20 +494,21 @@ class LessonViewModel(
         _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
         val responseTimeMs = System.currentTimeMillis() - exerciseStartTime
+        val exerciseToProcess = currentExercise
 
         viewModelScope.launch {
-            val isCorrect = exerciseValidator.validate(currentExercise, answer)
+            val isCorrect = exerciseValidator.validate(exerciseToProcess, answer)
 
             val result = DetailedExerciseResult(
-                exerciseId = currentExercise.id,
-                skillId = currentExercise.skillId,
+                exerciseId = exerciseToProcess.id,
+                skillId = exerciseToProcess.skillId,
                 isCorrect = isCorrect,
                 responseTimeMs = responseTimeMs,
                 givenAnswer = answer,
-                correctAnswer = currentExercise.correctAnswer,
-                difficultyTier = currentExercise.difficulty,
-                representationUsed = currentExercise.visualData?.type?.name ?: "ABSTRACT",
-                errorType = if (!isCorrect) determineErrorType(currentExercise, answer) else null
+                correctAnswer = exerciseToProcess.correctAnswer,
+                difficultyTier = exerciseToProcess.difficulty,
+                representationUsed = exerciseToProcess.visualData?.type?.name ?: "ABSTRACT",
+                errorType = if (!isCorrect) determineErrorType(exerciseToProcess, answer) else null
             )
 
             // PATCH 3: Gebruik expliciete completion mode
@@ -525,17 +524,15 @@ class LessonViewModel(
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
 
-        // PATCH 5: Hard idempotency - eerste geldige call gaat door, rest wordt genegeerd
-        if (completedExerciseIds.contains(currentExercise.id)) {
-            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${currentExercise.id} already in completedExerciseIds")
-            return
-        }
-        if (handledExerciseIds.contains(currentExercise.id)) {
-            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${currentExercise.id} already handled")
-            return
-        }
-        if (currentlyCompletingExerciseId == currentExercise.id) {
-            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${currentExercise.id} currently being processed")
+        // PATCH 5: Hard idempotency - gebruik actuele state als bron van waarheid
+        val actualState = _uiState.value
+        if (completedExerciseIds.contains(currentExercise.id) || 
+            handledExerciseIds.contains(currentExercise.id) ||
+            currentlyCompletingExerciseId == currentExercise.id ||
+            actualState.stepState == LessonStepState.PROCESSING ||
+            actualState.stepState == LessonStepState.ADVANCING ||
+            actualState.stepState == LessonStepState.FEEDBACK) {
+            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${currentExercise.id} already processing/completed")
             return
         }
 
@@ -552,15 +549,17 @@ class LessonViewModel(
         currentlyCompletingExerciseId = currentExercise.id
         _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
+        val exerciseToProcess = currentExercise
+
         viewModelScope.launch {
             val result = DetailedExerciseResult(
-                exerciseId = currentExercise.id,
-                skillId = currentExercise.skillId,
+                exerciseId = exerciseToProcess.id,
+                skillId = exerciseToProcess.skillId,
                 isCorrect = true, // WORKED_EXAMPLE telt altijd als "gezien"
                 responseTimeMs = System.currentTimeMillis() - exerciseStartTime,
                 givenAnswer = "[worked_example_viewed]",
-                correctAnswer = currentExercise.correctAnswer,
-                difficultyTier = currentExercise.difficulty,
+                correctAnswer = exerciseToProcess.correctAnswer,
+                difficultyTier = exerciseToProcess.difficulty,
                 representationUsed = "WORKED_EXAMPLE"
             )
 
@@ -577,17 +576,15 @@ class LessonViewModel(
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
 
-        // PATCH 5: Hard idempotency - eerste geldige call gaat door, rest wordt genegeerd
-        if (completedExerciseIds.contains(currentExercise.id)) {
-            android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${currentExercise.id} already in completedExerciseIds")
-            return
-        }
-        if (handledExerciseIds.contains(currentExercise.id)) {
-            android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${currentExercise.id} already handled")
-            return
-        }
-        if (currentlyCompletingExerciseId == currentExercise.id) {
-            android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${currentExercise.id} currently being processed")
+        // PATCH 5: Hard idempotency - gebruik actuele state als bron van waarheid
+        val actualState = _uiState.value
+        if (completedExerciseIds.contains(currentExercise.id) || 
+            handledExerciseIds.contains(currentExercise.id) ||
+            currentlyCompletingExerciseId == currentExercise.id ||
+            actualState.stepState == LessonStepState.PROCESSING ||
+            actualState.stepState == LessonStepState.ADVANCING ||
+            actualState.stepState == LessonStepState.FEEDBACK) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${currentExercise.id} already processing/completed")
             return
         }
 
@@ -597,15 +594,17 @@ class LessonViewModel(
         currentlyCompletingExerciseId = currentExercise.id
         _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
+        val exerciseToProcess = currentExercise
+
         viewModelScope.launch {
             val result = DetailedExerciseResult(
-                exerciseId = currentExercise.id,
-                skillId = currentExercise.skillId,
+                exerciseId = exerciseToProcess.id,
+                skillId = exerciseToProcess.skillId,
                 isCorrect = false,
                 responseTimeMs = 30_000, // Skip penalty
                 givenAnswer = "[skipped]",
-                correctAnswer = currentExercise.correctAnswer,
-                difficultyTier = currentExercise.difficulty,
+                correctAnswer = exerciseToProcess.correctAnswer,
+                difficultyTier = exerciseToProcess.difficulty,
                 representationUsed = "SKIPPED"
             )
 
