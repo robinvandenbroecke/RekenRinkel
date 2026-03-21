@@ -524,25 +524,27 @@ class LessonViewModel(
 
         // Step 2: Update progress
         try {
-            val currentProgress = progressRepository.getOrCreateProgress(exerciseToProcess.skillId)
-            val outcome = lessonEngine.processExerciseResult(result, currentProgress)
-            progressRepository.updateProgress(outcome.updatedProgress)
-            _uiState.update {
-                it.copy(completionStage = CompletionStage.PROGRESS_UPDATED)
-            }
+            kotlinx.coroutines.runBlocking {
+                val currentProgress = progressRepository.getOrCreateProgress(exerciseToProcess.skillId)
+                val outcome = lessonEngine.processExerciseResult(result, currentProgress)
+                progressRepository.updateProgress(outcome.updatedProgress)
+                _uiState.update {
+                    it.copy(completionStage = CompletionStage.PROGRESS_UPDATED)
+                }
 
-            // Step 3: Apply rewards
-            val currentRewards = profileRepository.getRewards()
-            val updatedRewards = currentRewards.addXp(outcome.xpEarned).updateStreak()
-            val newBadges = lessonEngine.checkBadges(outcome, currentRewards, exerciseToProcess.skillId)
-            val finalRewards = newBadges.fold(updatedRewards) { rewards, badge -> rewards.addBadge(badge) }
-            profileRepository.updateRewards(finalRewards)
-            _uiState.update {
-                it.copy(
-                    completionStage = CompletionStage.REWARDS_APPLIED,
-                    xpEarnedThisLesson = it.xpEarnedThisLesson + outcome.xpEarned,
-                    badgesEarnedThisLesson = it.badgesEarnedThisLesson + newBadges
-                )
+                // Step 3: Apply rewards
+                val currentRewards = profileRepository.getRewards()
+                val updatedRewards = currentRewards.addXp(outcome.xpEarned).updateStreak()
+                val newBadges = lessonEngine.checkBadges(outcome, currentRewards, exerciseToProcess.skillId)
+                val finalRewards = newBadges.fold(updatedRewards) { rewards, badge -> rewards.addBadge(badge) }
+                profileRepository.updateRewards(finalRewards)
+                _uiState.update {
+                    it.copy(
+                        completionStage = CompletionStage.REWARDS_APPLIED,
+                        xpEarnedThisLesson = it.xpEarnedThisLesson + outcome.xpEarned,
+                        badgesEarnedThisLesson = it.badgesEarnedThisLesson + newBadges
+                    )
+                }
             }
         } catch (e: Exception) {
             // Continue even if progress/rewards fail
