@@ -304,7 +304,8 @@ class LessonViewModel(
             val completion5 = currentCompletionState()
             android.util.Log.d("LessonViewModel", "[COMPLETION] Step 5 CHECK: currentStage=${completion5.stage}, target=DONE")
             if (completion5.stage == CompletionStage.READY_TO_ADVANCE) {
-                if (needsFeedback) {
+                // PATCH 2: Only delay for FEEDBACK_THEN_ADVANCE mode - worked example and skip are direct
+                if (mode == CompletionMode.FEEDBACK_THEN_ADVANCE) {
                     delay(feedbackDurationMs)
                 }
                 val beforeAdvanceExerciseId = currentExercise.id
@@ -448,8 +449,15 @@ class LessonViewModel(
             return
         }
 
+        // PATCH 4: Extra guard against already handled exercises
+        if (handledExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} already handled")
+            return
+        }
+
         if (state.stepState != LessonStepState.SHOWING) return
 
+        // PATCH 1: Move state change BEFORE coroutine to prevent race conditions
         _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
         val responseTimeMs = System.currentTimeMillis() - exerciseStartTime
@@ -484,6 +492,12 @@ class LessonViewModel(
 
         if (isCompletionDoneForCurrentExercise(currentExercise.id)) {
             android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${currentExercise.id} already DONE")
+            return
+        }
+
+        // PATCH 4: Extra guard against already handled exercises
+        if (handledExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "continueWorkedExample ignored - exercise ${currentExercise.id} already handled")
             return
         }
 
@@ -526,6 +540,12 @@ class LessonViewModel(
 
         if (isCompletionDoneForCurrentExercise(currentExercise.id)) {
             android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${currentExercise.id} already DONE")
+            return
+        }
+
+        // PATCH 4: Extra guard against already handled exercises
+        if (handledExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "skipExercise ignored - exercise ${currentExercise.id} already handled")
             return
         }
 
@@ -572,6 +592,12 @@ class LessonViewModel(
             return
         }
 
+        // PATCH 4: Guard against already handled exercises
+        if (handledExerciseIds.contains(currentExercise.id)) {
+            android.util.Log.w("LessonViewModel", "continueAfterError ignored - exercise ${currentExercise.id} already handled")
+            return
+        }
+
         val recoveryStage = if (completion.exerciseId == currentExercise.id) completion.stage else CompletionStage.NOT_STARTED
         val currentExerciseId = currentExercise.id
         android.util.Log.d("LessonViewModel", "Effective recovery stage: $recoveryStage")
@@ -580,7 +606,10 @@ class LessonViewModel(
             when (recoveryStage) {
                 CompletionStage.NOT_STARTED -> {
                     // Recovery contract: log exact één recovery-result en ga veilig door zonder progress/rewards.
-                    val alreadyLogged = state.results.any { it.exerciseId == currentExerciseId }
+                    // PATCH 4: Use actual current state, not stale snapshot
+                    val actualState = _uiState.value
+                    val alreadyLogged = actualState.results.any { it.exerciseId == currentExerciseId } || 
+                                       handledExerciseIds.contains(currentExerciseId)
                     if (!alreadyLogged) {
                         val recoveryResult = DetailedExerciseResult(
                             exerciseId = currentExercise.id,
