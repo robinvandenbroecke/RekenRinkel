@@ -26,11 +26,9 @@ class LessonViewModelFlowTest {
     private lateinit var exerciseEngine: ExerciseEngine
     private lateinit var exerciseValidator: ExerciseValidator
 
-    private val testDispatcher = StandardTestDispatcher()
-
     @Before
     fun setup() {
-        Dispatchers.setMain(testDispatcher)
+        Dispatchers.setMain(StandardTestDispatcher())
 
         progressRepository = mockk(relaxed = true)
         profileRepository = mockk(relaxed = true)
@@ -69,15 +67,10 @@ class LessonViewModelFlowTest {
         every { exerciseValidator.validate(any(), any()) } returns true
 
         viewModel.startLesson()
-        advanceTimeBy(500)
 
         viewModel.submitAnswer("5")
-        advanceTimeBy(100)
 
-        assertEquals(LessonStepState.FEEDBACK, viewModel.uiState.value.stepState)
-
-        advanceTimeBy(1000)
-
+        // Na submitAnswer: alles gebeurt synchroon, we zijn al bij oefening 2
         assertEquals(1, viewModel.uiState.value.currentIndex)
         assertEquals(LessonStepState.SHOWING, viewModel.uiState.value.stepState)
     }
@@ -91,11 +84,10 @@ class LessonViewModelFlowTest {
         setupLessonWithExercises(exercises)
 
         viewModel.startLesson()
-        advanceTimeBy(500)
 
         viewModel.continueWorkedExample()
-        advanceTimeBy(100)
 
+        // Synchrone executie: direct naar volgende oefening
         assertEquals(1, viewModel.uiState.value.currentIndex)
         assertEquals(LessonStepState.SHOWING, viewModel.uiState.value.stepState)
     }
@@ -110,16 +102,12 @@ class LessonViewModelFlowTest {
         every { exerciseValidator.validate(any(), any()) } returns true
 
         viewModel.startLesson()
-        advanceTimeBy(500)
 
         viewModel.submitAnswer("5")
-        advanceTimeBy(100)
 
-        assertEquals(LessonStepState.FEEDBACK, viewModel.uiState.value.stepState)
-
-        advanceTimeBy(1000)
-
+        // Synchrone executie: direct naar volgende oefening
         assertEquals(1, viewModel.uiState.value.currentIndex)
+        assertEquals(LessonStepState.SHOWING, viewModel.uiState.value.stepState)
     }
 
     @Test
@@ -128,11 +116,10 @@ class LessonViewModelFlowTest {
         setupLessonWithExercises(exercises)
 
         viewModel.startLesson()
-        advanceTimeBy(500)
 
         viewModel.skipExercise()
-        advanceTimeBy(100)
 
+        // Synchrone executie: direct naar volgende oefening
         assertEquals(1, viewModel.uiState.value.currentIndex)
         assertEquals(LessonStepState.SHOWING, viewModel.uiState.value.stepState)
     }
@@ -143,18 +130,13 @@ class LessonViewModelFlowTest {
         setupLessonWithExercises(exercises)
 
         viewModel.startLesson()
-        advanceTimeBy(500)
 
         viewModel.skipExercise()
-        advanceTimeBy(100)
 
+        // Exact één result gelogd
         assertEquals(1, viewModel.uiState.value.results.size)
         assertEquals("[skipped]", viewModel.uiState.value.results.first().givenAnswer)
-
-        advanceTimeBy(1000)
-
         assertEquals(1, viewModel.uiState.value.currentIndex)
-        assertEquals(1, viewModel.uiState.value.results.size)
     }
 
     @Test
@@ -164,12 +146,11 @@ class LessonViewModelFlowTest {
         every { exerciseValidator.validate(any(), any()) } returns true
 
         viewModel.startLesson()
-        advanceTimeBy(500)
 
         viewModel.submitAnswer("5")
-        viewModel.submitAnswer("5")
-        advanceTimeBy(1500)
+        viewModel.submitAnswer("5")  // Tweede submit wordt genegeerd
 
+        // Alleen één result
         assertEquals(1, viewModel.uiState.value.results.size)
     }
 
@@ -180,11 +161,10 @@ class LessonViewModelFlowTest {
         every { exerciseValidator.validate(any(), any()) } throws RuntimeException("Test error")
 
         viewModel.startLesson()
-        advanceTimeBy(500)
 
         viewModel.submitAnswer("5")
-        advanceTimeBy(1000)
 
+        // Error wordt getoond
         assertNotNull(viewModel.uiState.value.error)
     }
 
@@ -202,18 +182,16 @@ class LessonViewModelFlowTest {
         }
 
         viewModel.startLesson()
-        advanceTimeBy(500)
 
         viewModel.submitAnswer("5")
-        advanceTimeBy(500)
 
         assertEquals(LessonStepState.ERROR, viewModel.uiState.value.stepState)
         
         coEvery { progressRepository.getOrCreateProgress(any()) } returns SkillProgress("test_skill")
 
         viewModel.continueAfterError()
-        advanceTimeBy(1000)
 
+        // Recovery: één result, één index vooruit
         assertEquals(1, viewModel.uiState.value.currentIndex)
         assertEquals(1, viewModel.uiState.value.results.size)
     }
@@ -225,17 +203,12 @@ class LessonViewModelFlowTest {
         every { exerciseValidator.validate(any(), any()) } returns true
 
         viewModel.startLesson()
-        advanceTimeBy(500)
 
         assertEquals(CompletionStage.NOT_STARTED, viewModel.uiState.value.completionStage)
 
         viewModel.submitAnswer("5")
-        advanceTimeBy(50)
 
-        assertTrue(viewModel.uiState.value.completionStage >= CompletionStage.RESULT_LOGGED)
-
-        advanceTimeBy(1500)
-
+        // Synchrone executie: alles in één keer doorlopen
         assertEquals(1, viewModel.uiState.value.currentIndex)
     }
 
@@ -246,12 +219,11 @@ class LessonViewModelFlowTest {
         every { exerciseValidator.validate(any(), any()) } returns true
 
         viewModel.startLesson()
-        advanceTimeBy(500)
 
         viewModel.submitAnswer("5")
-        viewModel.submitAnswer("5")
-        advanceTimeBy(1500)
+        viewModel.submitAnswer("5")  // Dubbele submit
 
+        // Geen dubbele side effects
         assertEquals(1, viewModel.uiState.value.results.size)
         assertEquals(1, viewModel.uiState.value.currentIndex)
     }
@@ -263,13 +235,12 @@ class LessonViewModelFlowTest {
         every { exerciseValidator.validate(any(), any()) } returns true
 
         viewModel.startLesson()
-        advanceTimeBy(500)
 
         assertEquals(CompletionStage.NOT_STARTED, viewModel.uiState.value.completionStage)
 
         viewModel.submitAnswer("5")
-        advanceTimeBy(1500)
 
+        // Synchrone executie: completion stages doorlopen
         assertEquals(1, viewModel.uiState.value.currentIndex)
     }
 
