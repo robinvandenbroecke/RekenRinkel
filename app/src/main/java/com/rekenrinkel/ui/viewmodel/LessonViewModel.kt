@@ -551,8 +551,7 @@ class LessonViewModel(
 
         val exerciseToProcess = currentExercise
 
-        // PATCH 9: Directe synchrone executie voor DIRECT_CONTINUE (geen delay nodig)
-        // Dit zorgt dat tests correct werken met StandardTestDispatcher
+        // PATCH 9: Directe executie voor DIRECT_CONTINUE (geen delay nodig)
         val result = DetailedExerciseResult(
             exerciseId = exerciseToProcess.id,
             skillId = exerciseToProcess.skillId,
@@ -564,8 +563,8 @@ class LessonViewModel(
             representationUsed = "WORKED_EXAMPLE"
         )
 
-        // PATCH 9: Gebruik runBlocking voor synchrone executie in testomgeving
-        kotlinx.coroutines.runBlocking {
+        // PATCH 9: Start coroutine met Immediate voor synchrone executie
+        viewModelScope.launch(Dispatchers.Main.immediate) {
             finishCurrentExercise(result, mode = CompletionMode.DIRECT_CONTINUE)
         }
     }
@@ -598,7 +597,7 @@ class LessonViewModel(
 
         val exerciseToProcess = currentExercise
 
-        // PATCH 9: Directe synchrone executie voor SKIP_ADVANCE (geen delay nodig)
+        // PATCH 9: Directe executie voor SKIP_ADVANCE (geen delay nodig)
         val result = DetailedExerciseResult(
             exerciseId = exerciseToProcess.id,
             skillId = exerciseToProcess.skillId,
@@ -610,8 +609,8 @@ class LessonViewModel(
             representationUsed = "SKIPPED"
         )
 
-        // PATCH 9: Gebruik runBlocking voor synchrone executie in testomgeving
-        kotlinx.coroutines.runBlocking {
+        // PATCH 9: Start coroutine met Immediate voor synchrone executie
+        viewModelScope.launch(Dispatchers.Main.immediate) {
             finishCurrentExercise(result, mode = CompletionMode.SKIP_ADVANCE)
         }
     }
