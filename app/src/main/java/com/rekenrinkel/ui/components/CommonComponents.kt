@@ -1,6 +1,5 @@
 package com.rekenrinkel.ui.components
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -72,7 +71,7 @@ fun AnswerButton(
     Button(
         onClick = onClick,
         modifier = modifier
-            .height(64.dp)
+            .height(48.dp)
             .fillMaxWidth(),
         enabled = enabled,
         colors = ButtonDefaults.buttonColors(
@@ -99,24 +98,24 @@ fun NumberPad(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
-        // Display
+        // Display — compact
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
+                .height(40.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surface),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = currentValue.ifEmpty { "?" },
-                style = MaterialTheme.typography.displayMedium
+                style = MaterialTheme.typography.headlineMedium
             )
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         
-        // Number grid
+        // Number grid — compact rows
         val numbers = listOf(
             listOf("1", "2", "3"),
             listOf("4", "5", "6"),
@@ -143,7 +142,7 @@ fun NumberPad(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(2.dp))
         }
     }
 }
@@ -159,8 +158,8 @@ private fun NumberButton(
     Button(
         onClick = onClick,
         modifier = modifier
-            .padding(4.dp)
-            .aspectRatio(1f),
+            .padding(2.dp)
+            .height(48.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = if (isAction) 
                 MaterialTheme.colorScheme.secondary 
@@ -268,23 +267,63 @@ fun VisualGroups(
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.primary
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        groups.forEach { count ->
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+    // For many or large groups, use a compact representation
+    val totalDots = groups.sumOf { it }
+    if (totalDots > 20 || groups.size > 4) {
+        // Compact: show "N groepjes van M" with a small sample
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Show up to 3 sample groups as small dot clusters
+            Row(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                VisualDots(
-                    count = count,
-                    color = color
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "$count",
-                    style = MaterialTheme.typography.labelMedium
-                )
+                val sampleSize = minOf(3, groups.size)
+                groups.take(sampleSize).forEach { count ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        // Show max 5 dots per group sample
+                        VisualDots(count = minOf(count, 5), color = color)
+                        Text(
+                            text = "$count",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
+                if (groups.size > 3) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("…", style = MaterialTheme.typography.headlineSmall)
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${groups.size} groepjes van ${groups.firstOrNull() ?: 0}",
+                style = MaterialTheme.typography.bodySmall,
+                color = color
+            )
+        }
+    } else {
+        // Normal: show all groups
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            groups.forEach { count ->
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    VisualDots(
+                        count = count,
+                        color = color
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "$count",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
             }
         }
     }
@@ -308,44 +347,203 @@ fun StarDisplay(
     }
 }
 
+/**
+ * DotGrid — uses dice-like patterns for 1-6, grid for larger numbers.
+ * Max height constrained to 200dp.
+ */
+@Composable
+fun DotGrid(
+    count: Int,
+    maxPerRow: Int = 5,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary
+) {
+    Box(modifier = modifier.heightIn(max = 200.dp)) {
+        if (count in 1..6) {
+            // Dice-like patterns
+            val positions = when (count) {
+                1 -> listOf(listOf(1))
+                2 -> listOf(listOf(1, 0, 1))
+                3 -> listOf(listOf(1, 0, 0), listOf(0, 1, 0), listOf(0, 0, 1))
+                4 -> listOf(listOf(1, 0, 1), listOf(0, 0, 0), listOf(1, 0, 1))
+                5 -> listOf(listOf(1, 0, 1), listOf(0, 1, 0), listOf(1, 0, 1))
+                6 -> listOf(listOf(1, 0, 1), listOf(1, 0, 1), listOf(1, 0, 1))
+                else -> emptyList()
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                positions.forEach { row ->
+                    Row {
+                        row.forEach { filled ->
+                            Box(
+                                modifier = Modifier
+                                    .padding(4.dp)
+                                    .size(20.dp)
+                                    .clip(CircleShape)
+                                    .background(if (filled == 1) color else Color.Transparent)
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            // Grid layout for larger numbers
+            val rows = (count + maxPerRow - 1) / maxPerRow
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                repeat(rows) { row ->
+                    Row {
+                        val start = row * maxPerRow
+                        val end = minOf(start + maxPerRow, count)
+                        repeat(end - start) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(3.dp)
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * BlockBar — colored blocks (filled/empty), max width constrained.
+ */
+@Composable
+fun BlockBar(
+    count: Int,
+    total: Int,
+    modifier: Modifier = Modifier,
+    filledColor: Color = MaterialTheme.colorScheme.primary,
+    emptyColor: Color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+) {
+    Row(
+        modifier = modifier.heightIn(max = 200.dp),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        val blockSize = if (total <= 10) 24.dp else 16.dp
+        repeat(total) { index ->
+            Box(
+                modifier = Modifier
+                    .padding(2.dp)
+                    .size(blockSize)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(if (index < count) filledColor else emptyColor)
+            )
+        }
+    }
+}
+
+/**
+ * BondModel — part-part-whole circle diagram.
+ */
+@Composable
+fun BondModel(
+    whole: Int,
+    part1: Int,
+    part2: Int,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary
+) {
+    Column(
+        modifier = modifier.heightIn(max = 200.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Whole circle at top
+        Surface(
+            shape = CircleShape,
+            color = color,
+            modifier = Modifier.size(48.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = whole.toString(),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        // Two part circles below
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(32.dp)
+        ) {
+            listOf(part1, part2).forEach { part ->
+                Surface(
+                    shape = CircleShape,
+                    color = color.copy(alpha = 0.6f),
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = part.toString(),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * GroupsDisplay — shows groups with count label. Max 4 visual groups,
+ * then falls back to "N groepjes van M" text.
+ */
+@Composable
+fun GroupsDisplay(
+    groupCount: Int,
+    perGroup: Int,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary
+) {
+    Column(
+        modifier = modifier.heightIn(max = 200.dp).fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (groupCount <= 4 && perGroup <= 6) {
+            Row(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                repeat(groupCount) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        DotGrid(count = perGroup, color = color)
+                        Text(
+                            text = perGroup.toString(),
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
+            }
+        } else {
+            // Text fallback for large numbers
+            Text(
+                text = "$groupCount groepjes van $perGroup",
+                style = MaterialTheme.typography.titleMedium,
+                color = color,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "$groupCount × $perGroup = ${groupCount * perGroup}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = color.copy(alpha = 0.7f)
+            )
+        }
+    }
+}
+
 @Composable
 fun FeedbackOverlay(
     isCorrect: Boolean,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    AnimatedVisibility(
-        visible = true,
-        enter = fadeIn() + scaleIn(),
-        exit = fadeOut() + scaleOut()
-    ) {
-        Box(
-            modifier = modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Card(
-                modifier = Modifier.padding(32.dp),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = if (isCorrect) "🎉 Goed gedaan!" else "❌ Bijna!",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = if (isCorrect) AppColors.Correct else AppColors.Incorrect
-                    )
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Button(onClick = onDismiss) {
-                        Text("Volgende")
-                    }
-                }
-            }
-        }
-    }
+    // Kept for API compat — feedback is now inline in ExerciseScreen.
+    // No button, no overlay blocking. Auto-advance handled by ViewModel.
 }

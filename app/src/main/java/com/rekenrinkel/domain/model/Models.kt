@@ -133,6 +133,7 @@ data class Exercise(
     val correctAnswer: String,
     val distractors: List<String> = emptyList(),
     val hint: String? = null,
+    val workedSteps: List<String> = emptyList(),  // Multi-step worked example steps
     val isScaffolded: Boolean = false,  // True voor worked examples en guided practice
     val isRemediation: Boolean = false  // PATCH 4: True voor remediëringsoefeningen na fouten
 ) : Serializable

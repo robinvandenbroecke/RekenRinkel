@@ -51,6 +51,18 @@ class LessonEngine(
     }
 
     /**
+     * Bepaal warm-up, focus en review counts op basis van leeftijd.
+     * Returns Triple(warmUp, focus, review).
+     */
+    private fun getSessionCounts(age: Int): Triple<Int, Int, Int> {
+        return when {
+            age <= 6 -> Triple(2, 3, 1)   // 6 total
+            age <= 8 -> Triple(2, 5, 2)   // 9 total
+            else -> Triple(3, 6, 3)       // 12 total
+        }
+    }
+
+    /**
      * PATCH 4: Remediëringsinformatie per fouttype
      */
     data class RemediationInfo(
@@ -138,6 +150,10 @@ class LessonEngine(
 
     /**
      * Bouw een complete les met alle phases
+     * Sessielengte is leeftijdsafhankelijk (research-based):
+     * - Age 5-6: 6 exercises (2 warm-up, 3 focus, 1 review)
+     * - Age 7-8: 9 exercises (2 warm-up, 5 focus, 2 review)
+     * - Age 9-11: 12 exercises (3 warm-up, 6 focus, 3 review)
      */
     suspend fun buildLesson(
         userProfile: UserProfile,
@@ -162,25 +178,26 @@ class LessonEngine(
         // Bepaal focus skill (waar de les om draait)
         val focusSkill = determineFocusSkill(accessibleSkills, progressMap, userProfile)
 
+        // Leeftijdsafhankelijke sessielengte
+        val (warmUpCount, focusCount, reviewCount) = getSessionCounts(userProfile.age)
+
         // 1. Warm-up: makkelijke review (bekende skills, difficulty 1)
         val warmUpExercises = buildWarmUp(
-            accessibleSkills, progressMap, focusSkill, WARM_UP_COUNT
+            accessibleSkills, progressMap, focusSkill, warmUpCount
         )
 
-        // 2. Focus: 50% van kernskill
+        // 2. Focus: kernskill
         val focusExercises = buildFocusBlock(
-            focusSkill, progressMap, FOCUS_COUNT
+            focusSkill, progressMap, focusCount
         )
 
-        // 3. Review: 30% spaced review van zwakke/oude skills
+        // 3. Review: spaced review van zwakke/oude skills
         val reviewExercises = buildReviewBlock(
-            accessibleSkills, progressMap, focusSkill, REVIEW_COUNT
+            accessibleSkills, progressMap, focusSkill, reviewCount
         )
 
-        // 4. Challenge: 20% moeilijker of nieuw
-        val challengeExercises = buildChallengeBlock(
-            accessibleSkills, progressMap, focusSkill, CHALLENGE_COUNT
-        )
+        // 4. Challenge: geen apart challenge blok meer, zit in focus/review
+        val challengeExercises = emptyList<Exercise>()
 
         // Combineer alle phases
         val allExercises = warmUpExercises + focusExercises + reviewExercises + challengeExercises

@@ -76,25 +76,29 @@ fun ParentDashboardScreen(
         ) {
             // Summary stats
             item {
+                val totalCorrect = accessibleProgress.sumOf { it.correctCount }
+                val totalAttempted = totalSessions
+                val accuracyPct = if (totalAttempted > 0) (totalCorrect * 100 / totalAttempted) else 0
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     SummaryCard(
-                        value = totalSessions.toString(),
+                        value = totalAttempted.toString(),
                         label = "Opgaven gemaakt",
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    SummaryCard(
+                        value = "$accuracyPct%",
+                        label = "Nauwkeurigheid",
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     SummaryCard(
                         value = "$currentStreak",
                         label = "Dagen streak",
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    SummaryCard(
-                        value = "${accessibleProgress.size}/${accessibleConfigs.size}",
-                        label = "Skills gestart",
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -188,6 +192,51 @@ fun ParentDashboardScreen(
                 }
             }
             
+            // Recommendations for struggling skills
+            val strugglingSkills = accessibleProgress.filter { p ->
+                p.masteryScore < 30 && (p.correctCount + p.incorrectCount) >= 5
+            }
+            if (strugglingSkills.isNotEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "⚠️ Aanbevelingen",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            strugglingSkills.forEach { p ->
+                                val skillName = ContentRepository.getConfig(p.skillId)?.name ?: p.skillId
+                                Text(
+                                    text = "Oefen meer met $skillName",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // All practiced skills with mastery overview
+            if (accessibleProgress.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "Alle geoefende skills (${accessibleProgress.size})",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                }
+                items(accessibleProgress.sortedByDescending { it.masteryScore }) { progress ->
+                    SkillProgressCard(progress = progress)
+                }
+            }
+
             // Suggested focus
             item {
                 val suggestionText = when {

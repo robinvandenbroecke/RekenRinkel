@@ -21,6 +21,8 @@ fun SettingsScreen(
     onPremiumToggle: (Boolean) -> Unit,
     einkModeEnabled: Boolean,
     onEinkModeToggle: (Boolean) -> Unit,
+    ttsEnabled: Boolean = true,
+    onTtsToggle: (Boolean) -> Unit = {},
     onResetProgress: () -> Unit,
     onResetProfile: () -> Unit,
     onOpenPremium: () -> Unit,
@@ -72,6 +74,20 @@ fun SettingsScreen(
                 Switch(
                     checked = einkModeEnabled,
                     onCheckedChange = onEinkModeToggle
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // TTS
+            SettingCard(
+                title = "🔊 Voorlezen",
+                subtitle = if (ttsEnabled) "Aan (vragen worden voorgelezen)" else "Uit",
+                onClick = { onTtsToggle(!ttsEnabled) }
+            ) {
+                Switch(
+                    checked = ttsEnabled,
+                    onCheckedChange = onTtsToggle
                 )
             }
 
