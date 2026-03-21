@@ -497,25 +497,76 @@ class LessonViewModel(
         val responseTimeMs = System.currentTimeMillis() - exerciseStartTime
         val exerciseToProcess = currentExercise
 
-        // PATCH 9: Gebruik runBlocking voor synchrone executie in tests
-        // FEEDBACK_THEN_ADVANCE heeft wel een delay, maar runBlocking zorgt voor correcte testuitvoering
-        kotlinx.coroutines.runBlocking {
-            val isCorrect = exerciseValidator.validate(exerciseToProcess, answer)
+        // PATCH 9: Directe inline executie voor FEEDBACK_THEN_ADVANCE
+        // Deze flow: RESULT_LOGGED -> PROGRESS_UPDATED -> REWARDS_APPLIED -> FEEDBACK -> delay -> DONE -> advance
+        val isCorrect = exerciseValidator.validate(exerciseToProcess, answer)
 
-            val result = DetailedExerciseResult(
-                exerciseId = exerciseToProcess.id,
-                skillId = exerciseToProcess.skillId,
-                isCorrect = isCorrect,
-                responseTimeMs = responseTimeMs,
-                givenAnswer = answer,
-                correctAnswer = exerciseToProcess.correctAnswer,
-                difficultyTier = exerciseToProcess.difficulty,
-                representationUsed = exerciseToProcess.visualData?.type?.name ?: "ABSTRACT",
-                errorType = if (!isCorrect) determineErrorType(exerciseToProcess, answer) else null
+        val result = DetailedExerciseResult(
+            exerciseId = exerciseToProcess.id,
+            skillId = exerciseToProcess.skillId,
+            isCorrect = isCorrect,
+            responseTimeMs = responseTimeMs,
+            givenAnswer = answer,
+            correctAnswer = exerciseToProcess.correctAnswer,
+            difficultyTier = exerciseToProcess.difficulty,
+            representationUsed = exerciseToProcess.visualData?.type?.name ?: "ABSTRACT",
+            errorType = if (!isCorrect) determineErrorType(exerciseToProcess, answer) else null
+        )
+
+        // Step 1: Log result
+        _uiState.update {
+            it.copy(
+                results = it.results + result,
+                completionStage = CompletionStage.RESULT_LOGGED,
+                completionStageExerciseId = exerciseToProcess.id
             )
+        }
 
-            // PATCH 3: Gebruik expliciete completion mode
-            finishCurrentExercise(result, mode = CompletionMode.FEEDBACK_THEN_ADVANCE)
+        // Step 2: Update progress
+        try {
+            val currentProgress = progressRepository.getOrCreateProgress(exerciseToProcess.skillId)
+            val outcome = lessonEngine.processExerciseResult(result, currentProgress)
+            progressRepository.updateProgress(outcome.updatedProgress)
+            _uiState.update {
+                it.copy(completionStage = CompletionStage.PROGRESS_UPDATED)
+            }
+
+            // Step 3: Apply rewards
+            val currentRewards = profileRepository.getRewards()
+            val updatedRewards = currentRewards.addXp(outcome.xpEarned).updateStreak()
+            val newBadges = lessonEngine.checkBadges(outcome, currentRewards, exerciseToProcess.skillId)
+            val finalRewards = newBadges.fold(updatedRewards) { rewards, badge -> rewards.addBadge(badge) }
+            profileRepository.updateRewards(finalRewards)
+            _uiState.update {
+                it.copy(
+                    completionStage = CompletionStage.REWARDS_APPLIED,
+                    xpEarnedThisLesson = it.xpEarnedThisLesson + outcome.xpEarned,
+                    badgesEarnedThisLesson = it.badgesEarnedThisLesson + newBadges
+                )
+            }
+        } catch (e: Exception) {
+            // Continue even if progress/rewards fail
+        }
+
+        // Step 4: Show feedback
+        _uiState.update {
+            it.copy(
+                stepState = LessonStepState.FEEDBACK,
+                lastAnswerCorrect = isCorrect,
+                completionStage = CompletionStage.READY_TO_ADVANCE,
+                completionStageExerciseId = exerciseToProcess.id
+            )
+        }
+
+        // Gebruik coroutine alleen voor de delay
+        viewModelScope.launch {
+            delay(800)
+            // Step 5: Mark DONE and advance
+            completedExerciseIds.add(exerciseToProcess.id)
+            _uiState.update {
+                it.copy(completionStage = CompletionStage.DONE)
+            }
+            advanceToNextExercise()
         }
     }
 
@@ -554,8 +605,8 @@ class LessonViewModel(
 
         val exerciseToProcess = currentExercise
 
-        // PATCH 9: Directe synchrone executie voor DIRECT_CONTINUE (geen delay nodig)
-        // Dit zorgt voor correcte testuitvoering met StandardTestDispatcher
+        // PATCH 9: Directe inline executie voor DIRECT_CONTINUE (geen delay, geen coroutine nodig)
+        // Deze flow is result-only: RESULT_LOGGED -> READY_TO_ADVANCE -> DONE -> advance
         val result = DetailedExerciseResult(
             exerciseId = exerciseToProcess.id,
             skillId = exerciseToProcess.skillId,
@@ -567,10 +618,31 @@ class LessonViewModel(
             representationUsed = "WORKED_EXAMPLE"
         )
 
-        // Gebruik directe aanroep - geen coroutine nodig voor DIRECT_CONTINUE
-        kotlinx.coroutines.runBlocking {
-            finishCurrentExercise(result, mode = CompletionMode.DIRECT_CONTINUE)
+        // Step 1: Log result
+        _uiState.update {
+            it.copy(
+                results = it.results + result,
+                completionStage = CompletionStage.RESULT_LOGGED,
+                completionStageExerciseId = exerciseToProcess.id
+            )
         }
+
+        // Step 4: Prepare advance (skip mastery update for worked example)
+        _uiState.update {
+            it.copy(
+                stepState = LessonStepState.ADVANCING,
+                lastAnswerCorrect = true,
+                completionStage = CompletionStage.READY_TO_ADVANCE,
+                completionStageExerciseId = exerciseToProcess.id
+            )
+        }
+
+        // Step 5: Mark DONE and advance
+        completedExerciseIds.add(exerciseToProcess.id)
+        _uiState.update {
+            it.copy(completionStage = CompletionStage.DONE)
+        }
+        advanceToNextExercise()
     }
 
     /**
@@ -601,8 +673,8 @@ class LessonViewModel(
 
         val exerciseToProcess = currentExercise
 
-        // PATCH 9: Directe synchrone executie voor SKIP_ADVANCE (geen delay nodig)
-        // Dit zorgt voor correcte testuitvoering met StandardTestDispatcher
+        // PATCH 9: Directe inline executie voor SKIP_ADVANCE (geen delay, geen coroutine nodig)
+        // Deze flow is result-only: RESULT_LOGGED -> READY_TO_ADVANCE -> DONE -> advance
         val result = DetailedExerciseResult(
             exerciseId = exerciseToProcess.id,
             skillId = exerciseToProcess.skillId,
@@ -614,10 +686,31 @@ class LessonViewModel(
             representationUsed = "SKIPPED"
         )
 
-        // Gebruik directe aanroep - geen coroutine nodig voor SKIP_ADVANCE
-        kotlinx.coroutines.runBlocking {
-            finishCurrentExercise(result, mode = CompletionMode.SKIP_ADVANCE)
+        // Step 1: Log result
+        _uiState.update {
+            it.copy(
+                results = it.results + result,
+                completionStage = CompletionStage.RESULT_LOGGED,
+                completionStageExerciseId = exerciseToProcess.id
+            )
         }
+
+        // Step 4: Prepare advance (skip mastery update for skip)
+        _uiState.update {
+            it.copy(
+                stepState = LessonStepState.ADVANCING,
+                lastAnswerCorrect = false,
+                completionStage = CompletionStage.READY_TO_ADVANCE,
+                completionStageExerciseId = exerciseToProcess.id
+            )
+        }
+
+        // Step 5: Mark DONE and advance
+        completedExerciseIds.add(exerciseToProcess.id)
+        _uiState.update {
+            it.copy(completionStage = CompletionStage.DONE)
+        }
+        advanceToNextExercise()
     }
 
     /**
