@@ -312,6 +312,8 @@ class LessonViewModel(
                     )
                 }
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 4 DONE: stage=READY_TO_ADVANCE")
+            } else if (completion4.stage == CompletionStage.READY_TO_ADVANCE) {
+                android.util.Log.d("LessonViewModel", "[COMPLETION] Step 4 SKIP: already READY_TO_ADVANCE")
             } else {
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 4 SKIP: already at ${completion4.stage}")
             }
@@ -320,14 +322,16 @@ class LessonViewModel(
             val completion5 = currentCompletionState()
             android.util.Log.d("LessonViewModel", "[COMPLETION] Step 5 CHECK: currentStage=${completion5.stage}, target=DONE")
             
-            if (completion5.stage == CompletionStage.READY_TO_ADVANCE) {
+            if (completion5.stage == CompletionStage.READY_TO_ADVANCE || completion5.stage == CompletionStage.DONE) {
                 // PATCH 2: Only delay for FEEDBACK_THEN_ADVANCE mode - worked example and skip are direct
-                if (mode == CompletionMode.FEEDBACK_THEN_ADVANCE) {
+                if (mode == CompletionMode.FEEDBACK_THEN_ADVANCE && completion5.stage == CompletionStage.READY_TO_ADVANCE) {
                     delay(feedbackDurationMs)
                 }
                 // PATCH 7: First mark DONE, then advance
                 val beforeAdvanceExerciseId = currentExercise.id
-                markCompletionStage(CompletionStage.DONE, beforeAdvanceExerciseId)
+                if (completion5.stage != CompletionStage.DONE) {
+                    markCompletionStage(CompletionStage.DONE, beforeAdvanceExerciseId)
+                }
                 android.util.Log.d("LessonViewModel", "[COMPLETION] Step 5 EXEC: Advancing from $beforeAdvanceExerciseId")
                 // PATCH 7: Add to completedExerciseIds before advance
                 completedExerciseIds.add(beforeAdvanceExerciseId)
