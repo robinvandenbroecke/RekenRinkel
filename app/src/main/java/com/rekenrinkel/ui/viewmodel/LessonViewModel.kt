@@ -545,25 +545,27 @@ class LessonViewModel(
 
         if (state.stepState != LessonStepState.SHOWING) return
 
-        // PATCH 5: Set guard BEFORE coroutine
+        // PATCH 5: Set guard BEFORE processing
         currentlyCompletingExerciseId = currentExercise.id
         _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
         val exerciseToProcess = currentExercise
 
-        viewModelScope.launch {
-            val result = DetailedExerciseResult(
-                exerciseId = exerciseToProcess.id,
-                skillId = exerciseToProcess.skillId,
-                isCorrect = true, // WORKED_EXAMPLE telt altijd als "gezien"
-                responseTimeMs = System.currentTimeMillis() - exerciseStartTime,
-                givenAnswer = "[worked_example_viewed]",
-                correctAnswer = exerciseToProcess.correctAnswer,
-                difficultyTier = exerciseToProcess.difficulty,
-                representationUsed = "WORKED_EXAMPLE"
-            )
+        // PATCH 9: Directe synchrone executie voor DIRECT_CONTINUE (geen delay nodig)
+        // Dit zorgt dat tests correct werken met StandardTestDispatcher
+        val result = DetailedExerciseResult(
+            exerciseId = exerciseToProcess.id,
+            skillId = exerciseToProcess.skillId,
+            isCorrect = true, // WORKED_EXAMPLE telt altijd als "gezien"
+            responseTimeMs = System.currentTimeMillis() - exerciseStartTime,
+            givenAnswer = "[worked_example_viewed]",
+            correctAnswer = exerciseToProcess.correctAnswer,
+            difficultyTier = exerciseToProcess.difficulty,
+            representationUsed = "WORKED_EXAMPLE"
+        )
 
-            // PATCH 3: Gebruik expliciete completion mode
+        // PATCH 9: Gebruik runBlocking voor synchrone executie in testomgeving
+        kotlinx.coroutines.runBlocking {
             finishCurrentExercise(result, mode = CompletionMode.DIRECT_CONTINUE)
         }
     }
@@ -590,25 +592,26 @@ class LessonViewModel(
 
         if (state.stepState != LessonStepState.SHOWING) return
 
-        // PATCH 5: Set guard BEFORE coroutine
+        // PATCH 5: Set guard BEFORE processing
         currentlyCompletingExerciseId = currentExercise.id
         _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
         val exerciseToProcess = currentExercise
 
-        viewModelScope.launch {
-            val result = DetailedExerciseResult(
-                exerciseId = exerciseToProcess.id,
-                skillId = exerciseToProcess.skillId,
-                isCorrect = false,
-                responseTimeMs = 30_000, // Skip penalty
-                givenAnswer = "[skipped]",
-                correctAnswer = exerciseToProcess.correctAnswer,
-                difficultyTier = exerciseToProcess.difficulty,
-                representationUsed = "SKIPPED"
-            )
+        // PATCH 9: Directe synchrone executie voor SKIP_ADVANCE (geen delay nodig)
+        val result = DetailedExerciseResult(
+            exerciseId = exerciseToProcess.id,
+            skillId = exerciseToProcess.skillId,
+            isCorrect = false,
+            responseTimeMs = 30_000, // Skip penalty
+            givenAnswer = "[skipped]",
+            correctAnswer = exerciseToProcess.correctAnswer,
+            difficultyTier = exerciseToProcess.difficulty,
+            representationUsed = "SKIPPED"
+        )
 
-            // PATCH 1: Skip gebruikt eigen SKIP_ADVANCE mode
+        // PATCH 9: Gebruik runBlocking voor synchrone executie in testomgeving
+        kotlinx.coroutines.runBlocking {
             finishCurrentExercise(result, mode = CompletionMode.SKIP_ADVANCE)
         }
     }
