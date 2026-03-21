@@ -25,6 +25,7 @@ class LessonViewModelFlowTest {
     private lateinit var settingsDataStore: SettingsDataStore
     private lateinit var exerciseEngine: ExerciseEngine
     private lateinit var exerciseValidator: ExerciseValidator
+    private lateinit var lessonEngine: LessonEngine
 
     @Before
     fun setup() {
@@ -35,6 +36,7 @@ class LessonViewModelFlowTest {
         settingsDataStore = mockk(relaxed = true)
         exerciseEngine = mockk(relaxed = true)
         exerciseValidator = mockk(relaxed = true)
+        lessonEngine = mockk(relaxed = true)
 
         every { settingsDataStore.premiumUnlocked } returns flowOf(false)
         every { profileRepository.getProfile() } returns flowOf(
@@ -47,7 +49,7 @@ class LessonViewModelFlowTest {
         coEvery { profileRepository.updateRewards(any()) } just Runs
         
         // Mock buildLesson om een LessonPlan met oefeningen terug te geven
-        coEvery { exerciseEngine.buildLesson(any(), any()) } answers {
+        coEvery { lessonEngine.buildLesson(any(), any()) } answers {
             LessonPlan(
                 exercises = emptyList(), // Wordt overschreven door setupLessonWithExercises
                 skill = "test_skill",
@@ -55,13 +57,24 @@ class LessonViewModelFlowTest {
                 estimatedDurationMinutes = 10
             )
         }
+        
+        // Mock lessonEngine methods die worden aangeroepen in submitAnswer
+        coEvery { lessonEngine.processExerciseResult(any(), any()) } answers {
+            ExerciseOutcome(
+                updatedProgress = SkillProgress("test_skill"),
+                xpEarned = 10,
+                difficultyAdjustment = 0
+            )
+        }
+        coEvery { lessonEngine.checkBadges(any(), any(), any()) } returns emptyList()
 
         viewModel = LessonViewModel(
             progressRepository,
             profileRepository,
             settingsDataStore,
             exerciseEngine,
-            exerciseValidator
+            exerciseValidator,
+            lessonEngine
         )
     }
 
@@ -276,24 +289,8 @@ class LessonViewModelFlowTest {
     }
 
     private fun setupLessonWithExercises(exercises: List<Exercise>) {
-        val workedQueue = ArrayDeque(exercises.filter { it.type == ExerciseType.WORKED_EXAMPLE })
-        val guidedQueue = ArrayDeque(exercises.filter { it.type == ExerciseType.GUIDED_PRACTICE })
-        val regularQueue = ArrayDeque(exercises.filter { 
-            it.type != ExerciseType.WORKED_EXAMPLE && it.type != ExerciseType.GUIDED_PRACTICE 
-        })
-
-        every { exerciseEngine.generateWorkedExample(any(), any()) } answers {
-            workedQueue.removeFirstOrNull() ?: error("Unexpected generateWorkedExample call")
-        }
-        every { exerciseEngine.generateGuidedExercise(any(), any()) } answers {
-            guidedQueue.removeFirstOrNull() ?: error("Unexpected generateGuidedExercise call")
-        }
-        every { exerciseEngine.generateExercise(any(), any()) } answers {
-            regularQueue.removeFirstOrNull() ?: error("Unexpected generateExercise call")
-        }
-        
-        // Overschrijf buildLesson mock voor deze specifieke test
-        coEvery { exerciseEngine.buildLesson(any(), any()) } answers {
+        // Mock buildLesson om de opgegeven oefeningen terug te geven
+        coEvery { lessonEngine.buildLesson(any(), any()) } answers {
             LessonPlan(
                 exercises = exercises,
                 skill = "test_skill",

@@ -22,10 +22,9 @@ class LessonViewModel(
     private val profileRepository: ProfileRepository,
     private val settingsDataStore: SettingsDataStore,
     private val exerciseEngine: ExerciseEngine,
-    private val exerciseValidator: ExerciseValidator
+    private val exerciseValidator: ExerciseValidator,
+    private val lessonEngine: LessonEngine = LessonEngine(exerciseEngine, progressRepository)
 ) : ViewModel() {
-
-    private val lessonEngine = LessonEngine(exerciseEngine, progressRepository)
 
     private val _uiState = MutableStateFlow(LessonUiState())
     val uiState: StateFlow<LessonUiState> = _uiState.asStateFlow()
