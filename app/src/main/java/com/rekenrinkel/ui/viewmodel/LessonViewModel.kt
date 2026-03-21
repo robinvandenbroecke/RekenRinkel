@@ -43,6 +43,10 @@ class LessonViewModel(
     // Dit is extra bescherming tegen dubbele verwerking, maar UI state is leidend.
     private val handledExerciseIds = mutableSetOf<String>()
     
+    // PATCH 5: Set van volledig afgeronde oefeningen (DONE + advance)
+    // Harde idempotency barrier - eenmaal in deze set = nooit meer verwerken
+    private val completedExerciseIds = mutableSetOf<String>()
+    
     // NOTE: currentCompletionStage en currentStageExerciseId verwijderd.
     // Gebruik altijd _uiState.value.completionStage en _uiState.value.completionStageExerciseId
     // Deze private vars waren een bron van stale state en semantische verwarring.
