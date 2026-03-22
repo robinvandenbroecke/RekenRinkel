@@ -29,7 +29,7 @@ class LessonViewModelFlowTest {
 
     @Before
     fun setup() {
-        Dispatchers.setMain(Dispatchers.Unconfined)
+        Dispatchers.setMain(StandardTestDispatcher())
 
         progressRepository = mockk(relaxed = true)
         profileRepository = mockk(relaxed = true)
