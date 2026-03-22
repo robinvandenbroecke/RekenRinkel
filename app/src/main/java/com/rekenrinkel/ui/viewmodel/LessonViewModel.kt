@@ -572,6 +572,7 @@ class LessonViewModel(
         advanceToNextExercise()
         } catch (e: Exception) {
             // Catch any exception and show error state
+            val currentExerciseInCatch = _uiState.value.currentExercise
             _uiState.update {
                 it.copy(
                     stepState = LessonStepState.ERROR,
@@ -579,8 +580,8 @@ class LessonViewModel(
                     failureContext = FailureContext(
                         stage = FailureStage.UNKNOWN,
                         errorMessage = e.message ?: "Unknown error",
-                        exerciseId = currentExercise?.id,
-                        exerciseType = currentExercise?.type
+                        exerciseId = currentExerciseInCatch?.id,
+                        exerciseType = currentExerciseInCatch?.type
                     )
                 )
             }
@@ -664,6 +665,7 @@ class LessonViewModel(
         advanceToNextExercise()
         } catch (e: Exception) {
             // Catch any exception and show error state
+            val currentExerciseInCatch = _uiState.value.currentExercise
             _uiState.update {
                 it.copy(
                     stepState = LessonStepState.ERROR,
@@ -671,8 +673,8 @@ class LessonViewModel(
                     failureContext = FailureContext(
                         stage = FailureStage.UNKNOWN,
                         errorMessage = e.message ?: "Unknown error",
-                        exerciseId = currentExercise?.id,
-                        exerciseType = currentExercise?.type
+                        exerciseId = currentExerciseInCatch?.id,
+                        exerciseType = currentExerciseInCatch?.type
                     )
                 )
             }
@@ -749,6 +751,7 @@ class LessonViewModel(
         advanceToNextExercise()
         } catch (e: Exception) {
             // Catch any exception and show error state
+            val currentExerciseInCatch = _uiState.value.currentExercise
             _uiState.update {
                 it.copy(
                     stepState = LessonStepState.ERROR,
@@ -756,8 +759,8 @@ class LessonViewModel(
                     failureContext = FailureContext(
                         stage = FailureStage.UNKNOWN,
                         errorMessage = e.message ?: "Unknown error",
-                        exerciseId = currentExercise?.id,
-                        exerciseType = currentExercise?.type
+                        exerciseId = currentExerciseInCatch?.id,
+                        exerciseType = currentExerciseInCatch?.type
                     )
                 )
             }
@@ -909,6 +912,7 @@ class LessonViewModel(
         }
         } catch (e: Exception) {
             // Catch any exception and show error state
+            val currentExerciseInCatch = _uiState.value.currentExercise
             _uiState.update {
                 it.copy(
                     stepState = LessonStepState.ERROR,
@@ -916,8 +920,8 @@ class LessonViewModel(
                     failureContext = FailureContext(
                         stage = FailureStage.UNKNOWN,
                         errorMessage = e.message ?: "Unknown error",
-                        exerciseId = currentExercise?.id,
-                        exerciseType = currentExercise?.type
+                        exerciseId = currentExerciseInCatch?.id,
+                        exerciseType = currentExerciseInCatch?.type
                     )
                 )
             }
