@@ -52,18 +52,23 @@ class LessonViewModelFlowTest {
         coEvery { lessonEngine.buildLesson(any(), any()) } answers {
             LessonPlan(
                 exercises = emptyList(), // Wordt overschreven door setupLessonWithExercises
-                skill = "test_skill",
-                difficulty = 1,
-                estimatedDurationMinutes = 10
+                focusSkillId = "test_skill",
+                warmUpCount = 0,
+                focusCount = 0,
+                reviewCount = 0,
+                challengeCount = 0
             )
         }
-        
+
         // Mock lessonEngine methods die worden aangeroepen in submitAnswer
         coEvery { lessonEngine.processExerciseResult(any(), any()) } answers {
             ExerciseOutcome(
                 updatedProgress = SkillProgress("test_skill"),
                 xpEarned = 10,
-                difficultyAdjustment = 0
+                difficultyChanged = false,
+                newDifficultyTier = 1,
+                isMastered = false,
+                isNewlyMastered = false
             )
         }
         coEvery { lessonEngine.checkBadges(any(), any(), any()) } returns emptyList()
@@ -293,9 +298,11 @@ class LessonViewModelFlowTest {
         coEvery { lessonEngine.buildLesson(any(), any()) } answers {
             LessonPlan(
                 exercises = exercises,
-                skill = "test_skill",
-                difficulty = 1,
-                estimatedDurationMinutes = 10
+                focusSkillId = "test_skill",
+                warmUpCount = 0,
+                focusCount = exercises.size,
+                reviewCount = 0,
+                challengeCount = 0
             )
         }
     }
