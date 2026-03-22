@@ -576,7 +576,12 @@ class LessonViewModel(
                 it.copy(
                     stepState = LessonStepState.ERROR,
                     error = e.message,
-                    failureContext = "submitAnswer failed"
+                    failureContext = FailureContext(
+                        stage = FailureStage.UNKNOWN,
+                        errorMessage = e.message ?: "Unknown error",
+                        exerciseId = currentExercise?.id,
+                        exerciseType = currentExercise?.type
+                    )
                 )
             }
             currentlyCompletingExerciseId = null
@@ -663,7 +668,12 @@ class LessonViewModel(
                 it.copy(
                     stepState = LessonStepState.ERROR,
                     error = e.message,
-                    failureContext = "continueWorkedExample failed"
+                    failureContext = FailureContext(
+                        stage = FailureStage.UNKNOWN,
+                        errorMessage = e.message ?: "Unknown error",
+                        exerciseId = currentExercise?.id,
+                        exerciseType = currentExercise?.type
+                    )
                 )
             }
             currentlyCompletingExerciseId = null
@@ -743,7 +753,12 @@ class LessonViewModel(
                 it.copy(
                     stepState = LessonStepState.ERROR,
                     error = e.message,
-                    failureContext = "skipExercise failed"
+                    failureContext = FailureContext(
+                        stage = FailureStage.UNKNOWN,
+                        errorMessage = e.message ?: "Unknown error",
+                        exerciseId = currentExercise?.id,
+                        exerciseType = currentExercise?.type
+                    )
                 )
             }
             currentlyCompletingExerciseId = null
@@ -898,7 +913,12 @@ class LessonViewModel(
                 it.copy(
                     stepState = LessonStepState.ERROR,
                     error = e.message,
-                    failureContext = "continueAfterError failed"
+                    failureContext = FailureContext(
+                        stage = FailureStage.UNKNOWN,
+                        errorMessage = e.message ?: "Unknown error",
+                        exerciseId = currentExercise?.id,
+                        exerciseType = currentExercise?.type
+                    )
                 )
             }
             currentlyCompletingExerciseId = null
