@@ -257,7 +257,7 @@ class ExerciseEngine {
             // FOUNDATION
             "foundation_subitize_5" -> generateNumberImages(config, clampedDifficulty)
             "foundation_number_images_5" -> generateNumberImages(config, clampedDifficulty)
-            "foundation_counting" -> generateNumberImages(config, clampedDifficulty)
+            "foundation_counting" -> generateCounting(config, clampedDifficulty)
             "foundation_groups_intro" -> generateGroupsIntro(config, clampedDifficulty)
             "foundation_number_bonds_5" -> generateSplits(config, clampedDifficulty, 5)
             "foundation_number_bonds_10" -> generateSplits(config, clampedDifficulty, 10)
@@ -304,7 +304,8 @@ class ExerciseEngine {
             while (isRecentDuplicate(skillId, result.question) && attempts < 3) {
                 // Genereer opnieuw als het een duplicaat is (max 3 pogingen)
                 result = when (skillId) {
-                    "foundation_subitize_5", "foundation_number_images_5", "foundation_counting" -> generateNumberImages(config!!, clampedDifficulty)
+                    "foundation_subitize_5", "foundation_number_images_5" -> generateNumberImages(config!!, clampedDifficulty)
+                    "foundation_counting" -> generateCounting(config!!, clampedDifficulty)
                     "foundation_groups_intro" -> generateGroupsIntro(config!!, clampedDifficulty)
                     "foundation_number_bonds_5", "foundation_splits_10" -> generateSplits(config!!, clampedDifficulty, 10)
                     "foundation_number_bonds_10" -> generateSplits(config!!, clampedDifficulty, 10)
@@ -341,63 +342,54 @@ class ExerciseEngine {
     // ============================================
     
     /**
-     * Getalbeelden tot 5 - Altijd visueel met correcte dot representatie
+     * Tellen - Echt tellen met sequentiële ondersteuning
      */
-    private fun generateNumberImages(config: com.rekenrinkel.domain.content.SkillContentConfig, difficulty: Int): Exercise {
-        // Genereer 1-5, geen 0
-        val count = random.nextInt(1, 6)
-        
-        // Variatie in dot patronen afhankelijk van difficulty en skill type
-        val visualType = when (config.skillId) {
-            "foundation_subitize_5" -> {
-                // Subitizing: eenvoudige patronen voor direct herkennen
-                when (difficulty) {
-                    1 -> VisualType.DOTS // Standaard stippen
-                    2 -> VisualType.DOTS // Blijven stippen voor herkenning
-                    else -> if (random.nextBoolean()) VisualType.DOTS else VisualType.BLOCKS
-                }
-            }
-            "foundation_counting" -> {
-                // Counting: meer variatie voor tellen
-                when (difficulty) {
-                    1 -> VisualType.DOTS
-                    2 -> if (random.nextBoolean()) VisualType.DOTS else VisualType.BLOCKS
-                    else -> VisualType.BLOCKS
-                }
-            }
-            else -> { // foundation_number_images_5
-                // Getalbeelden: meer gestructureerde patronen
-                when (difficulty) {
-                    1 -> VisualType.DOTS
-                    2 -> VisualType.BLOCKS
-                    else -> VisualType.BLOCKS
-                }
-            }
+    private fun generateCounting(config: com.rekenrinkel.domain.content.SkillContentConfig, difficulty: Int): Exercise {
+        // Genereer 1-8 voor counting (iets meer dan subitizing)
+        val count = when (difficulty) {
+            1 -> random.nextInt(1, 6) // 1-5 voor beginners
+            2 -> random.nextInt(3, 9) // 3-8 voor intermediate
+            else -> random.nextInt(5, 11) // 5-10 voor advanced
         }
         
-        // Pas vraag aan op basis van skill type
-        val question = when (config.skillId) {
-            "foundation_subitize_5" -> "Hoeveel stippen zie je? (kijk snel!)"
-            "foundation_counting" -> "Tel hoeveel ${if (visualType == VisualType.DOTS) "stippen" else "blokjes"} je ziet"
-            else -> "Hoeveel ${if (visualType == VisualType.DOTS) "stippen" else "blokjes"} zie je?"
-        }
-        
-        // Pas hint aan op basis van skill type
-        val hint = when (config.skillId) {
-            "foundation_subitize_5" -> "Probeer het in één keer te zien, niet te tellen"
-            "foundation_counting" -> "Tel rustig: 1, 2, 3..."
-            else -> "Kijk goed naar het patroon"
+        // Counting gebruikt vaak blokken of gemengde representaties
+        val visualType = when (difficulty) {
+            1 -> VisualType.DOTS
+            2 -> VisualType.BLOCKS
+            else -> if (random.nextBoolean()) VisualType.DOTS else VisualType.BLOCKS
         }
         
         return Exercise(
             skillId = config.skillId,
             type = ExerciseType.VISUAL_QUANTITY,
             difficulty = difficulty,
-            question = question,
+            question = "Tel hoeveel ${if (visualType == VisualType.DOTS) "stippen" else "blokjes"} je ziet",
+            visualData = VisualData(type = visualType, count = count),
+            correctAnswer = count.toString(),
+            distractors = generateNumericDistractors(count, 1, 10),
+            hint = "Tel rustig: 1, 2, 3..."
+        )
+    }
+    
+    /**
+     * Subitizing - Direct herkennen van hoeveelheden zonder te tellen
+     */
+    private fun generateNumberImages(config: com.rekenrinkel.domain.content.SkillContentConfig, difficulty: Int): Exercise {
+        // Subitizing: altijd 1-5, geen 0
+        val count = random.nextInt(1, 6)
+        
+        // Subitizing altijd met stippen voor direct herkenning
+        val visualType = VisualType.DOTS
+        
+        return Exercise(
+            skillId = config.skillId,
+            type = ExerciseType.VISUAL_QUANTITY,
+            difficulty = difficulty,
+            question = "Hoeveel stippen zie je? (kijk snel!)",
             visualData = VisualData(type = visualType, count = count),
             correctAnswer = count.toString(),
             distractors = generateNumericDistractors(count, 1, 5),
-            hint = hint
+            hint = "Probeer het in één keer te zien, niet te tellen"
         )
     }
     
