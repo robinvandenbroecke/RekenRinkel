@@ -95,10 +95,14 @@ class LessonViewModelFlowTest {
 
         viewModel.startLesson()
 
+        // Debug output
+        val state = viewModel.uiState.value
+        println("DEBUG: exercises.size=${state.exercises.size}, currentIndex=${state.currentIndex}, stepState=${state.stepState}")
+
         // Controleer of oefeningen zijn geladen
-        assertEquals(2, viewModel.uiState.value.exercises.size)
-        assertEquals(0, viewModel.uiState.value.currentIndex)
-        assertEquals(LessonStepState.SHOWING, viewModel.uiState.value.stepState)
+        assertEquals("Exercises should be loaded", 2, state.exercises.size)
+        assertEquals("Should start at index 0", 0, state.currentIndex)
+        assertEquals("Should be in SHOWING state", LessonStepState.SHOWING, state.stepState)
     }
 
     @Test
