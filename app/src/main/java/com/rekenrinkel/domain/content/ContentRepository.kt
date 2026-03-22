@@ -459,7 +459,7 @@ object ContentRepository {
             category = SkillCategory.FOUNDATION,
             cpaPhase = CpaPhase.CONCRETE,
             isPremium = false,
-            prerequisites = listOf("foundation_number_bonds_10"),
+            prerequisites = emptyList(),
             minDifficulty = 2,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS),
@@ -503,7 +503,7 @@ object ContentRepository {
             category = SkillCategory.FOUNDATION,
             cpaPhase = CpaPhase.PICTORIAL,
             isPremium = false,
-            prerequisites = listOf("foundation_number_images_5"),
+            prerequisites = listOf("foundation_subitize_5"),
             minDifficulty = 1,
             maxDifficulty = 4,
             allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS, ExerciseType.MISSING_NUMBER),
@@ -1269,12 +1269,12 @@ object ContentRepository {
         return listOf(
             // Level 0: Echte basis (5-6 jaar)
             listOf("foundation_subitize_5", "foundation_shapes"),
-            // Level 1: Tellen en patronen
-            listOf("foundation_counting", "foundation_patterns"),
-            // Level 2: Number bonds 5 + meer/minder
-            listOf("foundation_number_bonds_5", "foundation_more_less"),
-            // Level 3: Number bonds 10 + getalbeelden + splitsen
-            listOf("foundation_number_images_5", "foundation_number_bonds_10", "foundation_splits_10"),
+            // Level 1: Tellen
+            listOf("foundation_counting"),
+            // Level 2: Number bonds 5 + meer/minder + patronen
+            listOf("foundation_number_bonds_5", "foundation_more_less", "foundation_patterns"),
+            // Level 3: Number bonds 10 + groepjes + splitsen
+            listOf("foundation_groups_intro", "foundation_number_bonds_10", "foundation_splits_10"),
             // Level 4: Rekenen tot 10
             listOf("arithmetic_add_10", "arithmetic_sub_10"),
             // Level 5: Patterns (doubles/halves)

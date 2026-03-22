@@ -21,9 +21,9 @@ class ExerciseEngineTest {
     
     @Test
     fun `generateExercise creates valid number images`() {
-        val exercise = engine.generateExercise("foundation_number_images_5", 1)
+        val exercise = engine.generateExercise("foundation_subitize_5", 1)
         
-        assertEquals("foundation_number_images_5", exercise.skillId)
+        assertEquals("foundation_subitize_5", exercise.skillId)
         assertEquals(ExerciseType.VISUAL_QUANTITY, exercise.type)
         assertNotNull(exercise.visualData)
         assertNotNull(exercise.visualData?.count)
@@ -37,7 +37,7 @@ class ExerciseEngineTest {
     @Test
     fun `number images never generates zero`() {
         repeat(20) {
-            val exercise = engine.generateExercise("foundation_number_images_5", 1)
+            val exercise = engine.generateExercise("foundation_subitize_5", 1)
             val count = exercise.visualData?.count
             assertTrue("Should not be zero", count != 0)
         }

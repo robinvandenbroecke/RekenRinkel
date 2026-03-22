@@ -7,11 +7,11 @@ class ContentRepositoryTest {
     
     @Test
     fun `getConfig returns correct config`() {
-        val config = ContentRepository.getConfig("foundation_number_images_5")
+        val config = ContentRepository.getConfig("foundation_groups_intro")
         
         assertNotNull(config)
-        assertEquals("foundation_number_images_5", config?.skillId)
-        assertEquals("Getalbeelden tot 5", config?.name)
+        assertEquals("foundation_groups_intro", config?.skillId)
+        assertEquals("Groepjes tellen", config?.name)
         assertFalse(config?.isPremium ?: true)
     }
     
@@ -41,7 +41,7 @@ class ContentRepositoryTest {
     @Test
     fun `entry skills have no prerequisites`() {
         // Entry skills (root of learning path) should have no prerequisites
-        val entrySkills = listOf("foundation_number_images_5", "foundation_subitize_5", "foundation_shapes")
+        val entrySkills = listOf("foundation_subitize_5", "foundation_shapes", "foundation_groups_intro")
 
         entrySkills.forEach { skillId ->
             val config = ContentRepository.getConfig(skillId)
@@ -146,8 +146,8 @@ class ContentRepositoryTest {
         val masteredSkills = emptySet<String>()
         
         assertTrue(
-            "Number images should be unlockable with no prerequisites",
-            ContentRepository.canUnlockSkill("foundation_number_images_5", masteredSkills)
+            "Subitize 5 should be unlockable with no prerequisites",
+            ContentRepository.canUnlockSkill("foundation_subitize_5", masteredSkills)
         )
     }
     
@@ -182,7 +182,7 @@ class ContentRepositoryTest {
         assertTrue("Should have free configs", freeConfigs.isNotEmpty())
         
         val freeSkillIds = listOf(
-            "foundation_number_images_5",
+            "foundation_subitize_5",
             "foundation_splits_10",
             "arithmetic_add_10",
             "arithmetic_sub_10",
@@ -265,7 +265,7 @@ class ContentRepositoryTest {
     
     @Test
     fun `number images has correct value range`() {
-        val config = ContentRepository.getConfig("foundation_number_images_5")
+        val config = ContentRepository.getConfig("foundation_subitize_5")
         
         assertNotNull(config)
         assertEquals(1, config?.rules?.valueRange?.min)
@@ -333,11 +333,11 @@ class ContentRepositoryTest {
     
     @Test
     fun `visual quantity skills have correct type`() {
-        val config = ContentRepository.getConfig("foundation_number_images_5")
+        val config = ContentRepository.getConfig("foundation_subitize_5")
         
         assertNotNull(config)
         assertTrue(
-            "Number images should allow VISUAL_QUANTITY",
+            "Subitize 5 should allow VISUAL_QUANTITY",
             config?.allowedExerciseTypes?.contains(com.rekenrinkel.domain.model.ExerciseType.VISUAL_QUANTITY) ?: false
         )
     }

@@ -156,7 +156,7 @@ class SessionEngineTest {
         val engine = ExerciseEngine()
         
         repeat(30) {
-            val exercise = engine.generateExercise("foundation_number_images_5", 1)
+            val exercise = engine.generateExercise("foundation_subitize_5", 1)
             val count = exercise.visualData?.count
             assertNotNull("Count should not be null", count)
             assertTrue("Count should be >= 1", count!! >= 1)
