@@ -200,13 +200,25 @@ class LessonEngine(
         val challengeExercises = emptyList<Exercise>()
 
         // Combineer alle phases
-        val allExercises = warmUpExercises + focusExercises + reviewExercises + challengeExercises
-
-        // Smart shuffle met variatie garantie
-        val shuffledExercises = smartShuffleWithVariation(allExercises)
+        // PATCH 1 & 2: Block-aware shuffle - behoud didactische volgorde
+        // Shuffle per block, maar behoud volgorde binnen blocks
+        val shuffledWarmUp = warmUpExercises.shuffled()
+        val shuffledReview = reviewExercises.shuffled()
+        val shuffledChallenge = challengeExercises.shuffled()
+        
+        // Focus block: worked example blijft eerst, rest wordt gehusseld
+        val workedExample = focusExercises.firstOrNull { it.type == ExerciseType.WORKED_EXAMPLE }
+        val otherFocus = focusExercises.filterNot { it.type == ExerciseType.WORKED_EXAMPLE }.shuffled()
+        val shuffledFocus = if (workedExample != null) {
+            listOf(workedExample) + otherFocus
+        } else {
+            focusExercises.shuffled()
+        }
+        
+        val allExercises = shuffledWarmUp + shuffledFocus + shuffledReview + shuffledChallenge
 
         return LessonPlan(
-            exercises = shuffledExercises,
+            exercises = allExercises,
             focusSkillId = focusSkill.id,
             warmUpCount = warmUpExercises.size,
             focusCount = focusExercises.size,
@@ -604,8 +616,16 @@ class LessonEngine(
 
         // Foutpatroon factor: skills met recente fouten
         val errorFactor = if (progress.streakIncorrect >= 2) -15.0 else 0.0
+        
+        // PATCH 5: Voorkom dat "Tellen" te vaak dominant is
+        val countingPenalty = when {
+            // Counting skills die al veel zijn geoefend krijgen penalty
+            skill.id == "foundation_counting" && (progress.correctCount + progress.incorrectCount) > 20 -> 25.0
+            skill.id == "foundation_counting" && (progress.correctCount + progress.incorrectCount) > 10 -> 15.0
+            else -> 0.0
+        }
 
-        return masteryFactor + reviewFactor + errorFactor
+        return masteryFactor + reviewFactor + errorFactor + countingPenalty
     }
 
     private fun buildWarmUp(
@@ -826,28 +846,8 @@ class LessonEngine(
         }
     }
 
-    private fun smartShuffleWithVariation(exercises: List<Exercise>): List<Exercise> {
-        if (exercises.size <= 3) return exercises.shuffled()
-
-        val result = mutableListOf<Exercise>()
-        val remaining = exercises.toMutableList()
-
-        while (remaining.isNotEmpty()) {
-            // Zoek een oefening die verschilt van laatste 2
-            val lastTwo = result.takeLast(2)
-            val candidate = remaining.find { exercise ->
-                lastTwo.none { last ->
-                    last.skillId == exercise.skillId &&
-                    last.correctAnswer == exercise.correctAnswer
-                }
-            } ?: remaining.first()
-
-            result.add(candidate)
-            remaining.remove(candidate)
-        }
-
-        return result
-    }
+    // PATCH 2: Block-aware shuffle vervangt globale smartShuffleWithVariation
+    // Didactische volgorde > globale randomisatie
 
     private fun getDefaultSkill(): Skill {
         return ContentRepository.getConfig("foundation_subitize_5")?.toSkill()

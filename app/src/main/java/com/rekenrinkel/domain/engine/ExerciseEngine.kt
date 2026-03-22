@@ -345,30 +345,51 @@ class ExerciseEngine {
      * Tellen - Echt tellen met sequentiële ondersteuning
      */
     private fun generateCounting(config: com.rekenrinkel.domain.content.SkillContentConfig, difficulty: Int): Exercise {
-        // Genereer 1-8 voor counting (iets meer dan subitizing)
-        val count = when (difficulty) {
-            1 -> random.nextInt(1, 6) // 1-5 voor beginners
-            2 -> random.nextInt(3, 9) // 3-8 voor intermediate
-            else -> random.nextInt(5, 11) // 5-10 voor advanced
+        // PATCH 4: Maak counting duidelijk anders dan subitizing
+        // 50% kans op VISUAL_QUANTITY, 50% kans op SIMPLE_SEQUENCE voor variatie
+        return if (random.nextBoolean()) {
+            // VISUAL_QUANTITY variant
+            val count = when (difficulty) {
+                1 -> random.nextInt(1, 6) // 1-5 voor beginners
+                2 -> random.nextInt(3, 9) // 3-8 voor intermediate
+                else -> random.nextInt(5, 11) // 5-10 voor advanced
+            }
+            
+            val visualType = when (difficulty) {
+                1 -> VisualType.DOTS
+                2 -> VisualType.BLOCKS
+                else -> if (random.nextBoolean()) VisualType.DOTS else VisualType.BLOCKS
+            }
+            
+            Exercise(
+                skillId = config.skillId,
+                type = ExerciseType.VISUAL_QUANTITY,
+                difficulty = difficulty,
+                question = "Tel hoeveel ${if (visualType == VisualType.DOTS) "stippen" else "blokjes"} je ziet",
+                visualData = VisualData(type = visualType, count = count),
+                correctAnswer = count.toString(),
+                distractors = generateNumericDistractors(count, 1, 10),
+                hint = "Tel rustig: 1, 2, 3..."
+            )
+        } else {
+            // SIMPLE_SEQUENCE variant - echt tellen met sequentie
+            val start = random.nextInt(1, 6)
+            val step = 1
+            val count = 3 // Tel 3 getallen
+            val sequence = List(count) { start + it * step }
+            val answer = sequence.last().toString()
+            
+            Exercise(
+                skillId = config.skillId,
+                type = ExerciseType.SIMPLE_SEQUENCE,
+                difficulty = difficulty,
+                question = "Tel verder: ${sequence.dropLast(1).joinToString(", ")}",
+                visualData = null,
+                correctAnswer = answer,
+                distractors = generateNumericDistractors(sequence.last(), sequence.last() - 2, sequence.last() + 2),
+                hint = "Wat komt na ${sequence[sequence.size - 2]}?"
+            )
         }
-        
-        // Counting gebruikt vaak blokken of gemengde representaties
-        val visualType = when (difficulty) {
-            1 -> VisualType.DOTS
-            2 -> VisualType.BLOCKS
-            else -> if (random.nextBoolean()) VisualType.DOTS else VisualType.BLOCKS
-        }
-        
-        return Exercise(
-            skillId = config.skillId,
-            type = ExerciseType.VISUAL_QUANTITY,
-            difficulty = difficulty,
-            question = "Tel hoeveel ${if (visualType == VisualType.DOTS) "stippen" else "blokjes"} je ziet",
-            visualData = VisualData(type = visualType, count = count),
-            correctAnswer = count.toString(),
-            distractors = generateNumericDistractors(count, 1, 10),
-            hint = "Tel rustig: 1, 2, 3..."
-        )
     }
     
     /**
@@ -379,6 +400,16 @@ class ExerciseEngine {
         val count = random.nextInt(1, 6)
         
         // Subitizing altijd met stippen voor direct herkenning
+        // Maar met verschillende patronen voor herkenning
+        val patternType = when (count) {
+            1 -> "single"
+            2 -> "pair"
+            3 -> "triangle"
+            4 -> "square"
+            5 -> "pentagon"
+            else -> "random"
+        }
+        
         val visualType = VisualType.DOTS
         
         return Exercise(
@@ -389,7 +420,7 @@ class ExerciseEngine {
             visualData = VisualData(type = visualType, count = count),
             correctAnswer = count.toString(),
             distractors = generateNumericDistractors(count, 1, 5),
-            hint = "Probeer het in één keer te zien, niet te tellen"
+            hint = "Probeer het patroon in één keer te zien, niet te tellen"
         )
     }
     
