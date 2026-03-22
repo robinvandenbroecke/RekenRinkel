@@ -91,15 +91,23 @@ class LessonViewModelFlowTest {
     @Test
     fun `startLesson should load exercises`() = runTest {
         val exercises = listOf(createExercise("1"), createExercise("2"))
-        setupLessonWithExercises(exercises)
+        
+        // Setup mock directly in test
+        coEvery { lessonEngine.buildLesson(any(), any()) } answers {
+            LessonPlan(
+                exercises = exercises,
+                focusSkillId = "test_skill",
+                warmUpCount = 0,
+                focusCount = exercises.size,
+                reviewCount = 0,
+                challengeCount = 0
+            )
+        }
 
         viewModel.startLesson()
 
-        // Debug output
-        val state = viewModel.uiState.value
-        println("DEBUG: exercises.size=${state.exercises.size}, currentIndex=${state.currentIndex}, stepState=${state.stepState}")
-
         // Controleer of oefeningen zijn geladen
+        val state = viewModel.uiState.value
         assertEquals("Exercises should be loaded", 2, state.exercises.size)
         assertEquals("Should start at index 0", 0, state.currentIndex)
         assertEquals("Should be in SHOWING state", LessonStepState.SHOWING, state.stepState)
