@@ -578,10 +578,11 @@ class LessonViewModel(
                     stepState = LessonStepState.ERROR,
                     error = e.message,
                     failureContext = FailureContext(
-                        stage = FailureStage.UNKNOWN,
                         errorMessage = e.message ?: "Unknown error",
-                        exerciseId = currentExerciseInCatch?.id,
-                        exerciseType = currentExerciseInCatch?.type
+                        exerciseId = currentExerciseInCatch?.id ?: "unknown",
+                        exerciseType = currentExerciseInCatch?.type ?: ExerciseType.TYPED_NUMERIC,
+                        currentIndex = _uiState.value.currentIndex,
+                        stage = FailureStage.UNKNOWN
                     )
                 )
             }
@@ -671,10 +672,11 @@ class LessonViewModel(
                     stepState = LessonStepState.ERROR,
                     error = e.message,
                     failureContext = FailureContext(
-                        stage = FailureStage.UNKNOWN,
                         errorMessage = e.message ?: "Unknown error",
-                        exerciseId = currentExerciseInCatch?.id,
-                        exerciseType = currentExerciseInCatch?.type
+                        exerciseId = currentExerciseInCatch?.id ?: "unknown",
+                        exerciseType = currentExerciseInCatch?.type ?: ExerciseType.TYPED_NUMERIC,
+                        currentIndex = _uiState.value.currentIndex,
+                        stage = FailureStage.UNKNOWN
                     )
                 )
             }
@@ -757,10 +759,11 @@ class LessonViewModel(
                     stepState = LessonStepState.ERROR,
                     error = e.message,
                     failureContext = FailureContext(
-                        stage = FailureStage.UNKNOWN,
                         errorMessage = e.message ?: "Unknown error",
-                        exerciseId = currentExerciseInCatch?.id,
-                        exerciseType = currentExerciseInCatch?.type
+                        exerciseId = currentExerciseInCatch?.id ?: "unknown",
+                        exerciseType = currentExerciseInCatch?.type ?: ExerciseType.TYPED_NUMERIC,
+                        currentIndex = _uiState.value.currentIndex,
+                        stage = FailureStage.UNKNOWN
                     )
                 )
             }
@@ -918,10 +921,11 @@ class LessonViewModel(
                     stepState = LessonStepState.ERROR,
                     error = e.message,
                     failureContext = FailureContext(
-                        stage = FailureStage.UNKNOWN,
                         errorMessage = e.message ?: "Unknown error",
-                        exerciseId = currentExerciseInCatch?.id,
-                        exerciseType = currentExerciseInCatch?.type
+                        exerciseId = currentExerciseInCatch?.id ?: "unknown",
+                        exerciseType = currentExerciseInCatch?.type ?: ExerciseType.TYPED_NUMERIC,
+                        currentIndex = _uiState.value.currentIndex,
+                        stage = FailureStage.UNKNOWN
                     )
                 )
             }
