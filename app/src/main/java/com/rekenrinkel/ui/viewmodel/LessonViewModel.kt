@@ -477,26 +477,27 @@ class LessonViewModel(
      * Gebruikt de uniforme finishCurrentExercise helper
      */
     fun submitAnswer(answer: String) {
-        val state = _uiState.value
-        val currentExercise = state.currentExercise ?: return
+        try {
+            val state = _uiState.value
+            val currentExercise = state.currentExercise ?: return
 
-        // PATCH 5: Hard idempotency - gebruik actuele state als bron van waarheid
-        val actualState = _uiState.value
-        if (completedExerciseIds.contains(currentExercise.id) || 
-            handledExerciseIds.contains(currentExercise.id) ||
-            currentlyCompletingExerciseId == currentExercise.id ||
-            actualState.stepState == LessonStepState.PROCESSING ||
-            actualState.stepState == LessonStepState.ADVANCING ||
-            actualState.stepState == LessonStepState.FEEDBACK) {
-            android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} already processing/completed")
-            return
-        }
+            // PATCH 5: Hard idempotency - gebruik actuele state als bron van waarheid
+            val actualState = _uiState.value
+            if (completedExerciseIds.contains(currentExercise.id) || 
+                handledExerciseIds.contains(currentExercise.id) ||
+                currentlyCompletingExerciseId == currentExercise.id ||
+                actualState.stepState == LessonStepState.PROCESSING ||
+                actualState.stepState == LessonStepState.ADVANCING ||
+                actualState.stepState == LessonStepState.FEEDBACK) {
+                android.util.Log.w("LessonViewModel", "submitAnswer ignored - exercise ${currentExercise.id} already processing/completed")
+                return
+            }
 
-        if (state.stepState != LessonStepState.SHOWING) return
+            if (state.stepState != LessonStepState.SHOWING) return
 
-        // PATCH 1 & 5: Set processing state and guard BEFORE coroutine
-        currentlyCompletingExerciseId = currentExercise.id
-        _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
+            // PATCH 1 & 5: Set processing state and guard BEFORE coroutine
+            currentlyCompletingExerciseId = currentExercise.id
+            _uiState.update { it.copy(stepState = LessonStepState.PROCESSING) }
 
         val responseTimeMs = System.currentTimeMillis() - exerciseStartTime
         val exerciseToProcess = currentExercise
@@ -569,6 +570,17 @@ class LessonViewModel(
             it.copy(completionStage = CompletionStage.DONE)
         }
         advanceToNextExercise()
+        } catch (e: Exception) {
+            // Catch any exception and show error state
+            _uiState.update {
+                it.copy(
+                    stepState = LessonStepState.ERROR,
+                    error = e.message,
+                    failureContext = "submitAnswer failed"
+                )
+            }
+            currentlyCompletingExerciseId = null
+        }
     }
 
     /**
@@ -576,6 +588,7 @@ class LessonViewModel(
      * Geen validatie, geen feedback-overlay, direct advance
      */
     fun continueWorkedExample() {
+        try {
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
 
@@ -644,6 +657,17 @@ class LessonViewModel(
             it.copy(completionStage = CompletionStage.DONE)
         }
         advanceToNextExercise()
+        } catch (e: Exception) {
+            // Catch any exception and show error state
+            _uiState.update {
+                it.copy(
+                    stepState = LessonStepState.ERROR,
+                    error = e.message,
+                    failureContext = "continueWorkedExample failed"
+                )
+            }
+            currentlyCompletingExerciseId = null
+        }
     }
 
     /**
@@ -651,6 +675,7 @@ class LessonViewModel(
      * Geen feedback, direct door naar volgende oefening
      */
     fun skipExercise() {
+        try {
         val state = _uiState.value
         val currentExercise = state.currentExercise ?: return
 
@@ -712,6 +737,17 @@ class LessonViewModel(
             it.copy(completionStage = CompletionStage.DONE)
         }
         advanceToNextExercise()
+        } catch (e: Exception) {
+            // Catch any exception and show error state
+            _uiState.update {
+                it.copy(
+                    stepState = LessonStepState.ERROR,
+                    error = e.message,
+                    failureContext = "skipExercise failed"
+                )
+            }
+            currentlyCompletingExerciseId = null
+        }
     }
 
     /**
@@ -719,6 +755,7 @@ class LessonViewModel(
      * Gebruikt failure context om veilige recovery te bepalen
      */
     fun continueAfterError() {
+        try {
         val state = _uiState.value
         val failureContext = state.failureContext
         val completion = currentCompletionState()
@@ -854,6 +891,17 @@ class LessonViewModel(
                 }
                 advanceToNextExercise()
             }
+        }
+        } catch (e: Exception) {
+            // Catch any exception and show error state
+            _uiState.update {
+                it.copy(
+                    stepState = LessonStepState.ERROR,
+                    error = e.message,
+                    failureContext = "continueAfterError failed"
+                )
+            }
+            currentlyCompletingExerciseId = null
         }
     }
 
