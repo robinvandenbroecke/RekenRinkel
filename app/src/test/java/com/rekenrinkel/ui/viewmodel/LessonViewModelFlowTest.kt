@@ -127,6 +127,10 @@ class LessonViewModelFlowTest {
 
         viewModel.submitAnswer("5")
 
+        // Debug: print de state
+        val state = viewModel.uiState.value
+        println("DEBUG: After submitAnswer: currentIndex=${state.currentIndex}, stepState=${state.stepState}, exercises.size=${state.exercises.size}")
+
         // Na submitAnswer: alles gebeurt synchroon, we zijn al bij oefening 2
         assertEquals(1, viewModel.uiState.value.currentIndex)
         assertEquals(LessonStepState.SHOWING, viewModel.uiState.value.stepState)
