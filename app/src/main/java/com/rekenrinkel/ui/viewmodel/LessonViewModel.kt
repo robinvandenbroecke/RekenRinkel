@@ -65,18 +65,18 @@ class LessonViewModel(
             completedExerciseIds.clear()
             
             // Haal user profile op - gebruik runBlocking voor suspend functies
-            val profile = kotlinx.coroutines.runBlocking(Dispatchers.Unconfined) {
+            val profile = kotlinx.coroutines.runBlocking {
                 profileRepository.getProfile().firstOrNull()
                     ?.let { ProfileModel(name = it.name, age = it.age, theme = it.theme) }
                     ?: ProfileModel()
             }
 
-            val isPremium = kotlinx.coroutines.runBlocking(Dispatchers.Unconfined) {
+            val isPremium = kotlinx.coroutines.runBlocking {
                 settingsDataStore.premiumUnlocked.first()
             }
 
             // Bouw les met LessonEngine - PATCH 10: runBlocking voor suspend functie
-            val lessonPlan = kotlinx.coroutines.runBlocking(Dispatchers.Unconfined) {
+            val lessonPlan = kotlinx.coroutines.runBlocking {
                 lessonEngine.buildLesson(profile, isPremium)
             }
 
@@ -527,7 +527,7 @@ class LessonViewModel(
 
         // Step 2 & 3: Update progress and rewards (gebruik runBlocking voor suspend functies)
         try {
-            kotlinx.coroutines.runBlocking(Dispatchers.Unconfined) {
+            kotlinx.coroutines.runBlocking {
                 val currentProgress = progressRepository.getOrCreateProgress(exerciseToProcess.skillId)
                 val outcome = lessonEngine.processExerciseResult(result, currentProgress)
                 progressRepository.updateProgress(outcome.updatedProgress)
