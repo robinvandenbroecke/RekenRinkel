@@ -451,24 +451,27 @@ object ContentRepository {
 
     // Leeftijd 6-8: Rekenen tot 20, brug over 10, doubles/halves
     private val age6_8Configs = listOf(
+        // === VERMENIGVULDIGING INTRO (Leeftijd 6-8) ===
         SkillContentConfig(
-            skillId = "foundation_number_images_5",
-            name = "Getalbeelden tot 5",
-            description = "Visueel herkennen van hoeveelheden tot 5",
+            skillId = "foundation_groups_intro",
+            name = "Groepjes tellen",
+            description = "Herkennen en tellen van groepjes (eerste stap naar vermenigvuldigen)",
             category = SkillCategory.FOUNDATION,
             cpaPhase = CpaPhase.CONCRETE,
             isPremium = false,
-            prerequisites = emptyList(),
-            minDifficulty = 1,
-            maxDifficulty = 3,
-            allowedExerciseTypes = listOf(ExerciseType.VISUAL_QUANTITY),
-            preferredRepresentations = listOf(RepresentationType.DOTS, RepresentationType.BLOCKS),
+            prerequisites = listOf("foundation_number_bonds_10"),
+            minDifficulty = 2,
+            maxDifficulty = 4,
+            allowedExerciseTypes = listOf(ExerciseType.VISUAL_GROUPS),
+            preferredRepresentations = listOf(RepresentationType.GROUPS, RepresentationType.ARRAY),
             rules = DidacticRules.build {
-                range(1, 5)
-                requireVisualPrompt()
+                maxGroups(3)
+                maxPerGroup(5)
+                range(2, 15)
             },
             hintStrategy = HintStrategy.VISUAL,
-            commonErrorTypes = listOf(ErrorType.SUBITIZING_ERROR)
+            commonErrorTypes = listOf(ErrorType.GROUPING_ERROR, ErrorType.COUNTING_ERROR),
+            remediationSkill = "foundation_counting"
         ),
         
         // === NUMBER BONDS 20 (Leeftijd 6-8) ===

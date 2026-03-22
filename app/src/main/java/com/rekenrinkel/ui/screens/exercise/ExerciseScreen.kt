@@ -428,7 +428,12 @@ private fun VisualContent(exercise: Exercise) {
                 }
             }
         }
-        exercise.type == ExerciseType.VISUAL_QUANTITY ||
+        exercise.type == ExerciseType.VISUAL_QUANTITY -> {
+            // For VISUAL_QUANTITY, always show something
+            // If visualData exists but count is null, show fallback with count 3
+            val fallbackCount = 3
+            VisualDots(count = fallbackCount)
+        }
         exercise.type == ExerciseType.VISUAL_GROUPS -> {
             MissingVisualFallback()
         }

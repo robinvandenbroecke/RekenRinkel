@@ -258,6 +258,7 @@ class ExerciseEngine {
             "foundation_subitize_5" -> generateNumberImages(config, clampedDifficulty)
             "foundation_number_images_5" -> generateNumberImages(config, clampedDifficulty)
             "foundation_counting" -> generateNumberImages(config, clampedDifficulty)
+            "foundation_groups_intro" -> generateGroupsIntro(config, clampedDifficulty)
             "foundation_number_bonds_5" -> generateSplits(config, clampedDifficulty, 5)
             "foundation_number_bonds_10" -> generateSplits(config, clampedDifficulty, 10)
             "foundation_number_bonds_20" -> generateSplits(config, clampedDifficulty, 20)
@@ -304,6 +305,7 @@ class ExerciseEngine {
                 // Genereer opnieuw als het een duplicaat is (max 3 pogingen)
                 result = when (skillId) {
                     "foundation_subitize_5", "foundation_number_images_5", "foundation_counting" -> generateNumberImages(config!!, clampedDifficulty)
+                    "foundation_groups_intro" -> generateGroupsIntro(config!!, clampedDifficulty)
                     "foundation_number_bonds_5", "foundation_splits_10" -> generateSplits(config!!, clampedDifficulty, 10)
                     "foundation_number_bonds_10" -> generateSplits(config!!, clampedDifficulty, 10)
                     "foundation_number_bonds_20", "foundation_splits_20" -> generateSplits(config!!, clampedDifficulty, 20)
@@ -345,22 +347,81 @@ class ExerciseEngine {
         // Genereer 1-5, geen 0
         val count = random.nextInt(1, 6)
         
-        // Variatie in dot patronen afhankelijk van difficulty
-        val visualType = when (difficulty) {
-            1 -> VisualType.DOTS // Eenvoudige stippen
-            2 -> if (random.nextBoolean()) VisualType.DOTS else VisualType.BLOCKS
-            else -> VisualType.BLOCKS // Blokken voor hogere difficulty
+        // Variatie in dot patronen afhankelijk van difficulty en skill type
+        val visualType = when (config.skillId) {
+            "foundation_subitize_5" -> {
+                // Subitizing: eenvoudige patronen voor direct herkennen
+                when (difficulty) {
+                    1 -> VisualType.DOTS // Standaard stippen
+                    2 -> VisualType.DOTS // Blijven stippen voor herkenning
+                    else -> if (random.nextBoolean()) VisualType.DOTS else VisualType.BLOCKS
+                }
+            }
+            "foundation_counting" -> {
+                // Counting: meer variatie voor tellen
+                when (difficulty) {
+                    1 -> VisualType.DOTS
+                    2 -> if (random.nextBoolean()) VisualType.DOTS else VisualType.BLOCKS
+                    else -> VisualType.BLOCKS
+                }
+            }
+            else -> { // foundation_number_images_5
+                // Getalbeelden: meer gestructureerde patronen
+                when (difficulty) {
+                    1 -> VisualType.DOTS
+                    2 -> VisualType.BLOCKS
+                    else -> VisualType.BLOCKS
+                }
+            }
+        }
+        
+        // Pas vraag aan op basis van skill type
+        val question = when (config.skillId) {
+            "foundation_subitize_5" -> "Hoeveel stippen zie je? (kijk snel!)"
+            "foundation_counting" -> "Tel hoeveel ${if (visualType == VisualType.DOTS) "stippen" else "blokjes"} je ziet"
+            else -> "Hoeveel ${if (visualType == VisualType.DOTS) "stippen" else "blokjes"} zie je?"
+        }
+        
+        // Pas hint aan op basis van skill type
+        val hint = when (config.skillId) {
+            "foundation_subitize_5" -> "Probeer het in één keer te zien, niet te tellen"
+            "foundation_counting" -> "Tel rustig: 1, 2, 3..."
+            else -> "Kijk goed naar het patroon"
         }
         
         return Exercise(
             skillId = config.skillId,
             type = ExerciseType.VISUAL_QUANTITY,
             difficulty = difficulty,
-            question = "Hoeveel ${if (visualType == VisualType.DOTS) "stippen" else "blokjes"} zie je?",
+            question = question,
             visualData = VisualData(type = visualType, count = count),
             correctAnswer = count.toString(),
             distractors = generateNumericDistractors(count, 1, 5),
-            hint = "Tel rustig: 1, 2, 3..."
+            hint = hint
+        )
+    }
+    
+    /**
+     * Groepjes introductie - Eerste stap naar vermenigvuldigen
+     */
+    private fun generateGroupsIntro(config: com.rekenrinkel.domain.content.SkillContentConfig, difficulty: Int): Exercise {
+        // Genereer groepjes: 2-3 groepjes met 2-5 items per groepje
+        val numGroups = random.nextInt(2, 4) // 2 of 3 groepjes
+        val itemsPerGroup = random.nextInt(2, 6) // 2-5 items per groepje
+        val total = numGroups * itemsPerGroup
+        
+        // Maak groepen data
+        val groups = List(numGroups) { itemsPerGroup }
+        
+        return Exercise(
+            skillId = config.skillId,
+            type = ExerciseType.VISUAL_GROUPS,
+            difficulty = difficulty,
+            question = "Hoeveel items zijn er in totaal?",
+            visualData = VisualData(type = VisualType.GROUPS, groups = groups),
+            correctAnswer = total.toString(),
+            distractors = generateNumericDistractors(total, (total - 3).coerceAtLeast(1), total + 3),
+            hint = "Tel per groepje: $itemsPerGroup, ${itemsPerGroup * 2}, ..."
         )
     }
     
